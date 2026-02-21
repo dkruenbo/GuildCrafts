@@ -433,6 +433,15 @@ function Data:PruneRoster()
     -- Build set of current guild member keys
     local rosterKeys = {}
     local numMembers = GetNumGuildMembers()
+
+    -- Safety: don't prune if the roster hasn't fully loaded yet.
+    -- On login the first GUILD_ROSTER_UPDATE can fire before the server
+    -- has sent the full member list, returning 0 or very few members.
+    if numMembers < 2 then
+        GuildCrafts:Debug("PruneRoster skipped — roster not ready yet (", numMembers, "members)")
+        return
+    end
+
     for i = 1, numMembers do
         local name, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = GetGuildRosterInfo(i)
         if name then
@@ -442,6 +451,15 @@ function Data:PruneRoster()
             end
             rosterKeys[name] = true
         end
+    end
+
+    -- Extra safety: if we resolved very few names from the roster,
+    -- the data probably isn't fully loaded yet — skip pruning.
+    local resolvedCount = 0
+    for _ in pairs(rosterKeys) do resolvedCount = resolvedCount + 1 end
+    if resolvedCount < 2 then
+        GuildCrafts:Debug("PruneRoster skipped — too few names resolved (", resolvedCount, ")")
+        return
     end
 
     -- Prune entries not in the roster
