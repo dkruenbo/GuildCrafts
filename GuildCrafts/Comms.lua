@@ -288,6 +288,14 @@ function Comms:OnGuildRosterUpdate()
     -- Build set of online guild members
     local onlineMembers = {}
     local numMembers = GetNumGuildMembers()
+
+    -- Safety: if roster hasn't fully loaded yet, skip the offline check.
+    -- On login the first GUILD_ROSTER_UPDATE can fire with 0 members.
+    if numMembers < 2 then
+        GuildCrafts:Debug("OnGuildRosterUpdate skipped — roster not ready yet (", numMembers, "members)")
+        return
+    end
+
     for i = 1, numMembers do
         local name, _, _, _, _, _, _, _, isOnline = GetGuildRosterInfo(i)
         if name and isOnline then

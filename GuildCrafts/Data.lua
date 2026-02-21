@@ -189,16 +189,19 @@ function Data:ScanTradeSkill()
 
     local recipes = entry.professions[profName].recipes
     local newCount = 0
+    local newRecipes = {}
 
     for i = 1, numSkills do
         local skillName, skillType = GetTradeSkillInfo(i)
         if skillType ~= "header" and skillName then
             local recipeKey = self:GetRecipeKey(i)
             if recipeKey and not recipes[recipeKey] then
-                recipes[recipeKey] = {
+                local recipeData = {
                     name = skillName,
-                    source = "", -- Optional; could be enhanced later
+                    source = "",
                 }
+                recipes[recipeKey] = recipeData
+                newRecipes[recipeKey] = recipeData
                 newCount = newCount + 1
             end
         end
@@ -208,9 +211,9 @@ function Data:ScanTradeSkill()
         entry.lastUpdate = time()
         GuildCrafts:Printf("Scanned %s: %d new recipe(s) found.", profName, newCount)
 
-        -- Phase 2 will add: broadcast DELTA_UPDATE for each new recipe
+        -- Only broadcast the newly discovered recipes, not the entire set
         if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastNewRecipes then
-            GuildCrafts.Comms:BroadcastNewRecipes(playerKey, profName, recipes)
+            GuildCrafts.Comms:BroadcastNewRecipes(playerKey, profName, newRecipes)
         end
     else
         GuildCrafts:Debug("Scanned " .. profName .. ": no new recipes.")
@@ -296,16 +299,19 @@ function Data:ScanCraft()
 
     local recipes = entry.professions[profName].recipes
     local newCount = 0
+    local newRecipes = {}
 
     for i = 1, numCrafts do
         local craftName, _, craftType = GetCraftInfo(i)
         if craftType ~= "header" and craftName then
             local recipeKey = self:GetCraftRecipeKey(i)
             if recipeKey and not recipes[recipeKey] then
-                recipes[recipeKey] = {
+                local recipeData = {
                     name = craftName,
                     source = "",
                 }
+                recipes[recipeKey] = recipeData
+                newRecipes[recipeKey] = recipeData
                 newCount = newCount + 1
             end
         end
@@ -316,7 +322,7 @@ function Data:ScanCraft()
         GuildCrafts:Printf("Scanned %s: %d new recipe(s) found.", profName, newCount)
 
         if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastNewRecipes then
-            GuildCrafts.Comms:BroadcastNewRecipes(playerKey, profName, recipes)
+            GuildCrafts.Comms:BroadcastNewRecipes(playerKey, profName, newRecipes)
         end
     else
         GuildCrafts:Debug("Scanned " .. profName .. ": no new recipes.")
