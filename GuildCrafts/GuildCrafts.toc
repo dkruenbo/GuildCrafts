@@ -1,0 +1,19 @@
+## Interface: 20505
+## Title: GuildCrafts
+## Notes: Track all learned recipes across guild members' professions
+## Author: GuildCrafts Team
+## Version: 0.1.0-dev
+## SavedVariables: GuildCraftsDB
+## X-Category: Guild
+
+# Libraries
+Libs\embeds.xml
+
+# Core modules
+Core.lua
+Data.lua
+Comms.lua
+CraftRequest.lua
+
+# UI (all panels consolidated in MainFrame.lua)
+UI\MainFrame.lua

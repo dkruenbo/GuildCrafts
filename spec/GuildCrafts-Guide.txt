@@ -1,0 +1,72 @@
+========================================
+  GuildCrafts — How It Works
+========================================
+
+WHAT IT DOES
+------------
+GuildCrafts is a recipe book for your entire guild. Instead of whispering every guildie asking "Hey, can anyone craft Flask of Supreme Power?" — you open one window and instantly see every recipe that every guild member knows, across all crafting professions. You can browse by profession, search by item name, and even send a craft request directly to someone who's online.
+
+
+HOW YOUR RECIPES GET INTO THE SYSTEM
+-------------------------------------
+The addon does NOT know your recipes automatically. It reads them only when you open a profession window in-game (e.g. you talk to a trainer or click your Alchemy skill). At that moment, it scans every recipe in the list and saves it locally. If you see "0 recipes" for yourself, just open your profession window once and they'll appear.
+
+Enchanting works too — it's handled separately under the hood because WoW treats it differently, but from your perspective it works the same way.
+
+
+HOW RECIPES SPREAD TO OTHER GUILDIES
+--------------------------------------
+Once your recipes are scanned, the addon shares them automatically through invisible guild chat messages (you never see them — they're hidden addon-to-addon messages). Here's how:
+
+1. "Hello, I'm here!" — When you log in, your addon announces itself to the guild. Every other guildie running the addon hears it.
+
+2. Picking a coordinator — All addon users automatically elect one person as the Designated Router (DR) — basically the librarian who holds the master copy. There's also a Backup (BDR) in case the first goes offline. This is fully automatic — no player action needed.
+
+3. First sync — Your addon sends a summary of what data you already have. The DR compares it with theirs and sends back only the recipes you're missing. If you have data the DR doesn't, it pulls that from you too. Two-way exchange.
+
+4. Live updates — Whenever someone opens their profession window and the addon finds new recipes, a small update is broadcast to the guild. Everyone online gets it instantly, no full re-sync needed.
+
+5. Heartbeat — The DR sends a little "I'm still here" signal every 60 seconds. If 3 heartbeats are missed (3 minutes), the Backup takes over. If both go offline, any remaining addon user can respond to sync requests.
+
+6. The more guildies who install it, the more complete the guild-wide recipe book becomes.
+
+
+THE WINDOW
+----------
+Type /gc to open or close the main window.
+
+- Left panel — Lists all 7 TBC professions (Alchemy, Blacksmithing, Enchanting, Engineering, Jewelcrafting, Leatherworking, Tailoring) with a count of how many guild members have each one. Click a profession to see the members. Click a member to view their recipes.
+
+- Right panel — Shows the recipe list for whoever you selected, or your search results.
+
+- Search bar — Type any item name to find it across ALL guild members. Results show who can craft it, whether they're online (green dot) or offline (grey dot), and a "Request Craft" button for online players.
+
+- Sync dot (top-right corner) — Green = synced, Yellow = syncing, Red = disconnected/alone. Hover for details.
+
+- Craft Queue bar (bottom) — If someone requests you to craft something, it shows up here after you accept. Click "Done" when finished.
+
+
+CRAFT REQUESTS
+--------------
+When you find a recipe in the search and click "Request Craft", the crafter gets a popup asking them to Accept or Decline. If they accept, the item goes into their craft queue. When they're done, they click "Done" and you get a notification. If the crafter doesn't have the addon, a regular whisper is sent instead.
+
+
+SLASH COMMANDS
+--------------
+/gc            Open/close the window
+/gc reset      Wipe all saved data and start fresh
+
+
+INSTALLATION
+------------
+1. Download the GuildCrafts folder.
+2. Put it in your WoW addons directory:
+   World of Warcraft/_classic_/Interface/AddOns/GuildCrafts
+3. Restart WoW (or type /reload in-game).
+4. Open each of your profession windows once so the addon can scan your recipes.
+5. Done! Your recipes will sync automatically with other guildies who have the addon.
+
+
+IN SHORT
+--------
+Install the addon, open your profession windows once, and from that point on it automatically shares and receives everyone's recipe data in the background. The more people who install it, the better it works for everyone.
