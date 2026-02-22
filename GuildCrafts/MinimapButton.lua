@@ -49,11 +49,35 @@ end
 -- Position Helpers
 ----------------------------------------------------------------------
 
+--- Detect whether the minimap is rendered as a square (e.g. SexyMap,
+--- BasicMinimap, or any addon that swaps the mask texture).
+local function IsMinimapRound()
+    if Minimap.GetMaskTexture then
+        local mask = Minimap:GetMaskTexture()
+        if mask and not mask:lower():find("minimapmask") then
+            return false
+        end
+    end
+    return true  -- default WoW minimap is round
+end
+
 local function UpdatePosition(btn, angle)
-    local x = math.cos(angle) * DRAG_RADIUS
-    local y = math.sin(angle) * DRAG_RADIUS
+    local x = math.cos(angle)
+    local y = math.sin(angle)
+
+    if not IsMinimapRound() then
+        -- Project the circular unit vector onto the square perimeter.
+        -- Dividing by max(|x|,|y|) scales the larger component to ±1,
+        -- keeping the angle identical but hugging the square edge.
+        local q = math.max(math.abs(x), math.abs(y))
+        if q > 0 then
+            x = x / q
+            y = y / q
+        end
+    end
+
     btn:ClearAllPoints()
-    btn:SetPoint("CENTER", Minimap, "CENTER", x, y)
+    btn:SetPoint("CENTER", Minimap, "CENTER", x * DRAG_RADIUS, y * DRAG_RADIUS)
 end
 
 local function AngleFromCursor()

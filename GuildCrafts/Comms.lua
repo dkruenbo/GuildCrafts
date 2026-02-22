@@ -140,6 +140,8 @@ function Comms:HandleHello(payload, sender)
     local memberKey = payload.sender or sender
     if not memberKey then return end
 
+    local isNew = not self.addonUsers[memberKey]
+
     self.addonUsers[memberKey] = {
         version  = payload.version or 1,
         lastSeen = time(),
@@ -147,6 +149,29 @@ function Comms:HandleHello(payload, sender)
 
     GuildCrafts:Debug("HELLO from", memberKey, "v" .. (payload.version or "?"))
     self:RecomputeElection()
+
+    -- Reply with our own HELLO so the sender discovers us too.
+    -- Only reply to genuinely new users (not replies) to prevent infinite loops.
+    if isNew and not payload.isReply then
+        local playerKey = GuildCrafts.Data:GetPlayerKey()
+        if memberKey ~= playerKey then
+            self:SendMessage(MSG_HELLO, {
+                sender  = playerKey,
+                version = GuildCrafts.VERSION,
+                isReply = true,
+            }, "GUILD")
+            GuildCrafts:Debug("Sent HELLO reply to", memberKey)
+        end
+    end
+
+    -- Trigger a sync whenever we discover a new addon user.
+    -- This handles late logins, reconnects, and the initial race where
+    -- the first SYNC_REQUEST fires before any HELLO replies arrive.
+    if isNew and not self.syncPending then
+        self.syncRetryCount = 0
+        self:ScheduleTimer("SendSyncRequest", 2)
+        GuildCrafts:Debug("Scheduling re-sync after discovering", memberKey)
+    end
 end
 
 ----------------------------------------------------------------------
@@ -360,8 +385,10 @@ function Comms:OnSyncTimeout()
     elseif self.syncRetryCount == 2 then
         -- Neither DR nor BDR responded — evict both and re-elect so the
         -- new DR (sorted[1] of remaining nodes) handles the request.
-        if self.currentDR  then self.addonUsers[self.currentDR]  = nil end
-        if self.currentBDR then self.addonUsers[self.currentBDR] = nil end
+        -- Never evict ourselves — we know we're online.
+        local playerKey = GuildCrafts.Data:GetPlayerKey()
+        if self.currentDR  and self.currentDR  ~= playerKey then self.addonUsers[self.currentDR]  = nil end
+        if self.currentBDR and self.currentBDR ~= playerKey then self.addonUsers[self.currentBDR] = nil end
         self:RecomputeElection()
         GuildCrafts:Debug("SYNC_REQUEST retry timeout — evicted DR/BDR, re-elected. New DR:", self.currentDR or "none")
         self:SendSyncRequest()
@@ -389,8 +416,10 @@ function Comms:HandleSyncRequest(payload, sender)
     elseif retryCount >= 2 then
         -- DR and BDR both failed to respond — evict them and re-elect.
         -- Only the newly elected DR responds, preventing a flood.
-        if self.currentDR  then self.addonUsers[self.currentDR]  = nil end
-        if self.currentBDR then self.addonUsers[self.currentBDR] = nil end
+        -- Never evict ourselves — we know we're online.
+        local playerKey = GuildCrafts.Data:GetPlayerKey()
+        if self.currentDR  and self.currentDR  ~= playerKey then self.addonUsers[self.currentDR]  = nil end
+        if self.currentBDR and self.currentBDR ~= playerKey then self.addonUsers[self.currentBDR] = nil end
         self:RecomputeElection()
         if self.myRole == "DR" then
             shouldRespond = true
