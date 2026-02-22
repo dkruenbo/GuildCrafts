@@ -76,31 +76,6 @@ local SPECIALISATION_SPELLS = {
     [26797] = { prof = "Tailoring",       spec = "Spellfire Tailoring" },
 }
 
--- TBC profession cooldowns worth tracking (spellID → display info)
--- These are the long shared/specialty cooldowns players care about
-local TRACKED_COOLDOWNS = {
-    -- Alchemy Transmutes (shared CD, any one triggers it)
-    [29688] = { prof = "Alchemy",    name = "Transmute: Primal Might" },
-    [28566] = { prof = "Alchemy",    name = "Transmute: Primal Air" },
-    [28567] = { prof = "Alchemy",    name = "Transmute: Primal Earth" },
-    [28568] = { prof = "Alchemy",    name = "Transmute: Primal Fire" },
-    [28569] = { prof = "Alchemy",    name = "Transmute: Primal Mana" },
-    [28570] = { prof = "Alchemy",    name = "Transmute: Primal Shadow" },
-    [28571] = { prof = "Alchemy",    name = "Transmute: Primal Water" },
-    [28580] = { prof = "Alchemy",    name = "Transmute: Primal Water to Shadow" },
-    [28581] = { prof = "Alchemy",    name = "Transmute: Primal Water to Air" },
-    [28582] = { prof = "Alchemy",    name = "Transmute: Primal Mana to Fire" },
-    [28583] = { prof = "Alchemy",    name = "Transmute: Primal Fire to Earth" },
-    [28584] = { prof = "Alchemy",    name = "Transmute: Primal Earth to Water" },
-    [28585] = { prof = "Alchemy",    name = "Transmute: Primal Shadow to Water" },
-    [32765] = { prof = "Alchemy",    name = "Transmute: Earthstorm Diamond" },
-    [32766] = { prof = "Alchemy",    name = "Transmute: Skyfire Diamond" },
-    -- Tailoring specialty cloths
-    [26751] = { prof = "Tailoring",  name = "Primal Mooncloth" },
-    [31373] = { prof = "Tailoring",  name = "Spellcloth" },
-    [36686] = { prof = "Tailoring",  name = "Shadowcloth" },
-}
-
 -- AceDB defaults
 local DB_DEFAULTS = {
     global = {
@@ -216,15 +191,28 @@ function Data:DetectSpecialisations()
     local entry = self:GetMemberEntry(playerKey, false)
     if not entry then return end
 
+    -- Build a set of which professions have specs detected this pass
+    local detectedSpecs = {}  -- prof -> spec
+
     local changed = false
     for spellID, info in pairs(SPECIALISATION_SPELLS) do
         local profData = entry.professions[info.prof]
         if profData and IsSpellKnown(spellID) then
+            detectedSpecs[info.prof] = info.spec
             if profData.specialisation ~= info.spec then
                 profData.specialisation = info.spec
                 changed = true
                 GuildCrafts:Debug("Specialisation detected:", info.prof, "→", info.spec)
             end
+        end
+    end
+
+    -- Clear specialisations for professions that no longer have a known spec
+    for profName, profData in pairs(entry.professions) do
+        if profData.specialisation and not detectedSpecs[profName] then
+            profData.specialisation = nil
+            changed = true
+            GuildCrafts:Debug("Specialisation cleared:", profName)
         end
     end
 
@@ -328,14 +316,34 @@ function Data:ScanTradeSkillCooldowns(profName, numSkills)
         end
     end
 
-    -- Only update if cooldowns changed
+    -- Only update if cooldown state actually changed
     local hasCD = false
     for _ in pairs(cooldowns) do hasCD = true; break end
 
-    if hasCD or profData.cooldowns then
+    local hadCD = profData.cooldowns ~= nil
+    local changed = false
+
+    if hasCD ~= hadCD then
+        changed = true
+    elseif hasCD and hadCD then
+        -- Check if the set of cooldown names changed
+        for name in pairs(cooldowns) do
+            if not profData.cooldowns[name] then changed = true; break end
+        end
+        if not changed then
+            for name in pairs(profData.cooldowns) do
+                if not cooldowns[name] then changed = true; break end
+            end
+        end
+    end
+
+    if changed then
         profData.cooldowns = hasCD and cooldowns or nil
         entry.lastUpdate = now
-        GuildCrafts:Debug("Cooldowns scanned for", profName, ":", hasCD and "active" or "none")
+        GuildCrafts:Debug("Cooldowns changed for", profName, ":", hasCD and "active" or "cleared")
+    else
+        -- Update endTimes locally without triggering a sync
+        if hasCD then profData.cooldowns = cooldowns end
     end
 end
 
@@ -367,10 +375,28 @@ function Data:ScanCraftCooldowns(profName, numCrafts)
     local hasCD = false
     for _ in pairs(cooldowns) do hasCD = true; break end
 
-    if hasCD or profData.cooldowns then
+    local hadCD = profData.cooldowns ~= nil
+    local changed = false
+
+    if hasCD ~= hadCD then
+        changed = true
+    elseif hasCD and hadCD then
+        for name in pairs(cooldowns) do
+            if not profData.cooldowns[name] then changed = true; break end
+        end
+        if not changed then
+            for name in pairs(profData.cooldowns) do
+                if not cooldowns[name] then changed = true; break end
+            end
+        end
+    end
+
+    if changed then
         profData.cooldowns = hasCD and cooldowns or nil
         entry.lastUpdate = now
-        GuildCrafts:Debug("Cooldowns scanned for", profName, ":", hasCD and "active" or "none")
+        GuildCrafts:Debug("Cooldowns changed for", profName, ":", hasCD and "active" or "cleared")
+    else
+        if hasCD then profData.cooldowns = cooldowns end
     end
 end
 
@@ -436,15 +462,20 @@ function Data:ScanTradeSkill()
         local skillName, skillType = GetTradeSkillInfo(i)
         if skillType ~= "header" and skillName then
             local recipeKey = self:GetRecipeKey(i)
-            if recipeKey and not recipes[recipeKey] then
-                local recipeData = {
-                    name = skillName,
-                    source = "",
-                    reagents = self:ScanTradeSkillReagents(i),
-                }
-                recipes[recipeKey] = recipeData
-                newRecipes[recipeKey] = recipeData
-                newCount = newCount + 1
+            if recipeKey then
+                if not recipes[recipeKey] then
+                    local recipeData = {
+                        name = skillName,
+                        source = "",
+                        reagents = self:ScanTradeSkillReagents(i),
+                    }
+                    recipes[recipeKey] = recipeData
+                    newRecipes[recipeKey] = recipeData
+                    newCount = newCount + 1
+                elseif not recipes[recipeKey].reagents then
+                    -- Backfill reagent data for recipes scanned before reagent tracking
+                    recipes[recipeKey].reagents = self:ScanTradeSkillReagents(i)
+                end
             end
         end
     end
@@ -456,6 +487,11 @@ function Data:ScanTradeSkill()
         -- Only broadcast the newly discovered recipes, not the entire set
         if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastNewRecipes then
             GuildCrafts.Comms:BroadcastNewRecipes(playerKey, profName, newRecipes)
+        end
+
+        -- Invalidate tooltip index so new recipes appear in tooltips
+        if GuildCrafts.Tooltip then
+            GuildCrafts.Tooltip:InvalidateIndex()
         end
     else
         GuildCrafts:Debug("Scanned " .. profName .. ": no new recipes.")
@@ -550,15 +586,20 @@ function Data:ScanCraft()
         local craftName, _, craftType = GetCraftInfo(i)
         if craftType ~= "header" and craftName then
             local recipeKey = self:GetCraftRecipeKey(i)
-            if recipeKey and not recipes[recipeKey] then
-                local recipeData = {
-                    name = craftName,
-                    source = "",
-                    reagents = self:ScanCraftReagents(i),
-                }
-                recipes[recipeKey] = recipeData
-                newRecipes[recipeKey] = recipeData
-                newCount = newCount + 1
+            if recipeKey then
+                if not recipes[recipeKey] then
+                    local recipeData = {
+                        name = craftName,
+                        source = "",
+                        reagents = self:ScanCraftReagents(i),
+                    }
+                    recipes[recipeKey] = recipeData
+                    newRecipes[recipeKey] = recipeData
+                    newCount = newCount + 1
+                elseif not recipes[recipeKey].reagents then
+                    -- Backfill reagent data for recipes scanned before reagent tracking
+                    recipes[recipeKey].reagents = self:ScanCraftReagents(i)
+                end
             end
         end
     end
@@ -569,6 +610,11 @@ function Data:ScanCraft()
 
         if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastNewRecipes then
             GuildCrafts.Comms:BroadcastNewRecipes(playerKey, profName, newRecipes)
+        end
+
+        -- Invalidate tooltip index so new recipes appear in tooltips
+        if GuildCrafts.Tooltip then
+            GuildCrafts.Tooltip:InvalidateIndex()
         end
     else
         GuildCrafts:Debug("Scanned " .. profName .. ": no new recipes.")
@@ -648,6 +694,9 @@ function Data:MergeIncoming(incomingData)
             end
         end
     end
+    if changed and GuildCrafts.Tooltip then
+        GuildCrafts.Tooltip:InvalidateIndex()
+    end
     return changed
 end
 
@@ -661,6 +710,9 @@ function Data:MergeDelta(memberKey, profName, recipeKey, recipeData, newLastUpda
     if newLastUpdate and newLastUpdate > (entry.lastUpdate or 0) then
         entry.lastUpdate = newLastUpdate
     end
+    if GuildCrafts.Tooltip then
+        GuildCrafts.Tooltip:InvalidateIndex()
+    end
     GuildCrafts:Debug("Delta merged:", memberKey, profName, recipeKey)
 end
 
@@ -671,6 +723,9 @@ function Data:MergeProfessionRemoval(memberKey, profName, newLastUpdate)
         entry.professions[profName] = nil
         if newLastUpdate and newLastUpdate > (entry.lastUpdate or 0) then
             entry.lastUpdate = newLastUpdate
+        end
+        if GuildCrafts.Tooltip then
+            GuildCrafts.Tooltip:InvalidateIndex()
         end
         GuildCrafts:Debug("Profession removed:", memberKey, profName)
     end
