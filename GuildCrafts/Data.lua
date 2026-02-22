@@ -854,14 +854,21 @@ end
 -- Returns true if any data was merged.
 function Data:MergeIncoming(incomingData)
     local changed = false
+    local playerKey = self:GetPlayerKey()
     for memberKey, incomingEntry in pairs(incomingData) do
         if type(incomingEntry) == "table" and incomingEntry.lastUpdate then
-            local localEntry = self.db.global[memberKey]
-            if not localEntry or incomingEntry.lastUpdate > localEntry.lastUpdate then
-                -- Full replacement — handles profession removals correctly
-                self.db.global[memberKey] = incomingEntry
-                changed = true
-                GuildCrafts:Debug("Merged data for:", memberKey)
+            -- Never overwrite our own data — we're always authoritative
+            -- for ourselves (local scans have reagents/cooldowns that
+            -- sync payloads strip out)
+            if memberKey == playerKey then
+                GuildCrafts:Debug("Skipped merge for own data:", memberKey)
+            else
+                local localEntry = self.db.global[memberKey]
+                if not localEntry or incomingEntry.lastUpdate > localEntry.lastUpdate then
+                    self.db.global[memberKey] = incomingEntry
+                    changed = true
+                    GuildCrafts:Debug("Merged data for:", memberKey)
+                end
             end
         end
     end
