@@ -77,6 +77,20 @@
   - Max 5 `[GC]L:` messages per broadcast. Each message is a single short line.
 - A `ChatFrame_AddMessageEventFilter` strips `[GC]` messages from addon users' chat windows so they never see them.
 - **UI Taint warning**: WoW's chat filters are notorious for causing UI taint (where standard Blizzard buttons stop working) if not implemented correctly. The filter must be a plain function reference — no closures over secure frames, no calls to protected functions, no modifications to Blizzard UI elements inside the filter callback. Test thoroughly with `/run SetCVar("taintLog", 1)` and check `BugSack` / `!BugGrabber` for taint traces.
+- **Reference implementation** — taint-safe filter (the filter's only job is hiding text; data collection happens in a separate `CHAT_MSG_CHANNEL` handler via AceEvent):
+  ```lua
+  -- Local function: no globals, no closures over secure frames, no side effects.
+  local function GuildCraftsMarketFilter(self, event, msg, author, ...)
+      if msg and string.sub(msg, 1, 4) == "[GC]" then
+          return true  -- hide from chat window
+      end
+      return false, msg, author, ...
+  end
+
+  ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL", GuildCraftsMarketFilter)
+  ```
+  - The filter returns `true` to suppress, or `false` + pass-through args to allow.
+  - Data ingestion (parsing `[GC]L:` into cache) must be a **separate** `CHAT_MSG_CHANNEL` event handler (e.g. via `self:RegisterEvent`), not inside the filter. Mixing concerns inside the filter risks taint.
 
 **Custom Channel Resilience:**
 - WoW custom channels can be hijacked — the oldest member becomes "Owner" and can password-lock the channel, blocking all other users. Trolls do this on popular servers.
