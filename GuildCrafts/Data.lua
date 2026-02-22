@@ -478,7 +478,7 @@ end
 --- Check if a member's data is stale (not updated in 30+ days).
 --- Returns nil if fresh, or a human-readable age string if stale.
 function Data:GetStalenessTag(lastUpdate)
-    if not lastUpdate then return "unknown" end
+    if not lastUpdate or lastUpdate == 0 then return nil end
     local age = time() - lastUpdate
     if age < STALE_THRESHOLD then return nil end
 

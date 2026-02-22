@@ -442,7 +442,7 @@ function UI:PopulateProfessionList()
         yOffset = yOffset + 24
     end
 
-    self.leftContent:SetHeight(math.max(yOffset, 1))
+    self.leftContent:SetHeight(math.max(yOffset + 8, 1))
     self:UpdateDetailWelcome()
 end
 
@@ -501,7 +501,7 @@ function UI:NavigateToMembers(profName)
         yOffset = yOffset + 24
     end
 
-    self.leftContent:SetHeight(math.max(yOffset, 1))
+    self.leftContent:SetHeight(math.max(yOffset + 8, 1))
     self:UpdateDetailWelcome()
 end
 
@@ -663,7 +663,8 @@ function UI:ShowMemberRecipes(memberKey, profName)
             reagentText:SetWidth(360)
             self.detailRows[#self.detailRows + 1] = reagentText
             -- Measure actual height for wrapped text
-            local textHeight = reagentText:GetStringHeight() or 12
+            local textHeight = reagentText:GetStringHeight()
+            if not textHeight or textHeight < 12 then textHeight = 12 end
             yOffset = yOffset - 14 - textHeight - 4
         else
             yOffset = yOffset - 6
@@ -672,7 +673,7 @@ function UI:ShowMemberRecipes(memberKey, profName)
         yOffset = yOffset - 14
     end
 
-    self.detailContent:SetHeight(math.max(math.abs(yOffset), 1))
+    self.detailContent:SetHeight(math.max(math.abs(yOffset) + 8, 1))
 end
 
 ----------------------------------------------------------------------
@@ -765,7 +766,7 @@ function UI:ShowSearchResults(results)
         yOffset = yOffset - 8  -- spacing between recipes
     end
 
-    self.detailContent:SetHeight(math.max(math.abs(yOffset), 1))
+    self.detailContent:SetHeight(math.max(math.abs(yOffset) + 8, 1))
 end
 
 ----------------------------------------------------------------------
@@ -1048,7 +1049,7 @@ function UI:FilterProfessionList(query)
             yOffset = yOffset + 24
         end
     end
-    self.leftContent:SetHeight(math.max(yOffset, 1))
+    self.leftContent:SetHeight(math.max(yOffset + 8, 1))
 end
 
 function UI:FilterMemberList(query)
@@ -1082,7 +1083,7 @@ function UI:FilterMemberList(query)
         self.leftRows[#self.leftRows + 1] = row
         yOffset = yOffset + 24
     end
-    self.leftContent:SetHeight(math.max(yOffset, 1))
+    self.leftContent:SetHeight(math.max(yOffset + 8, 1))
 end
 
 ----------------------------------------------------------------------
