@@ -76,6 +76,11 @@ SKILL LEVELS
 Each member's profession skill level (e.g. "375/375") is shown next to their name in the member list and in the recipe detail header. This is detected automatically when you log in and syncs to the guild, so you can tell at a glance who is max-level and who is still levelling a profession — useful for knowing whether someone can actually learn a high-level recipe they don't have yet.
 
 
+RECIPE CATEGORIES
+-----------------
+When you open a member's recipe list, recipes are grouped by category (e.g. Potions, Elixirs, Flasks for Alchemy; Weapons, Armor for Blacksmithing). These categories come straight from the profession window headers and are stored with each recipe. Within each category, recipes are sorted alphabetically. This makes browsing through large recipe lists much easier than a single flat alphabetical list.
+
+
 SLASH COMMANDS
 --------------
 /gc            Open/close the window

@@ -564,14 +564,33 @@ function UI:ShowMemberRecipes(memberKey, profName)
         end
     end
 
-    -- Sort recipes by name
+    -- Sort recipes by category then name
     local sorted = {}
     for key, data in pairs(recipes) do
-        sorted[#sorted + 1] = { key = key, name = data.name or "Unknown", source = data.source or "", reagents = data.reagents }
+        sorted[#sorted + 1] = { key = key, name = data.name or "Unknown", source = data.source or "", reagents = data.reagents, category = data.category or "" }
     end
-    table.sort(sorted, function(a, b) return a.name < b.name end)
+    table.sort(sorted, function(a, b)
+        if a.category ~= b.category then
+            -- Empty category sorts last
+            if a.category == "" then return false end
+            if b.category == "" then return true end
+            return a.category < b.category
+        end
+        return a.name < b.name
+    end)
 
+    local lastCategory = nil
     for _, recipe in ipairs(sorted) do
+        -- Category header
+        if recipe.category ~= "" and recipe.category ~= lastCategory then
+            lastCategory = recipe.category
+            local catText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            catText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
+            catText:SetText(recipe.category)
+            catText:SetTextColor(1, 0.82, 0)
+            self.detailRows[#self.detailRows + 1] = catText
+            yOffset = yOffset - 18
+        end
         -- Recipe name
         local nameText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         nameText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 12, yOffset)

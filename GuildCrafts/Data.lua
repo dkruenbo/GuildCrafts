@@ -468,10 +468,13 @@ function Data:ScanTradeSkill()
     local recipes = entry.professions[profName].recipes
     local newCount = 0
     local newRecipes = {}
+    local currentCategory = nil
 
     for i = 1, numSkills do
         local skillName, skillType = GetTradeSkillInfo(i)
-        if skillType ~= "header" and skillName then
+        if skillType == "header" then
+            currentCategory = skillName
+        elseif skillName then
             local recipeKey = self:GetRecipeKey(i)
             if recipeKey then
                 if not recipes[recipeKey] then
@@ -479,13 +482,20 @@ function Data:ScanTradeSkill()
                         name = skillName,
                         source = "",
                         reagents = self:ScanTradeSkillReagents(i),
+                        category = currentCategory,
                     }
                     recipes[recipeKey] = recipeData
                     newRecipes[recipeKey] = recipeData
                     newCount = newCount + 1
-                elseif not recipes[recipeKey].reagents then
-                    -- Backfill reagent data for recipes scanned before reagent tracking
-                    recipes[recipeKey].reagents = self:ScanTradeSkillReagents(i)
+                else
+                    if not recipes[recipeKey].reagents then
+                        -- Backfill reagent data for recipes scanned before reagent tracking
+                        recipes[recipeKey].reagents = self:ScanTradeSkillReagents(i)
+                    end
+                    if not recipes[recipeKey].category and currentCategory then
+                        -- Backfill category for recipes scanned before categorization
+                        recipes[recipeKey].category = currentCategory
+                    end
                 end
             end
         end
@@ -592,10 +602,13 @@ function Data:ScanCraft()
     local recipes = entry.professions[profName].recipes
     local newCount = 0
     local newRecipes = {}
+    local currentCategory = nil
 
     for i = 1, numCrafts do
         local craftName, _, craftType = GetCraftInfo(i)
-        if craftType ~= "header" and craftName then
+        if craftType == "header" then
+            currentCategory = craftName
+        elseif craftName then
             local recipeKey = self:GetCraftRecipeKey(i)
             if recipeKey then
                 if not recipes[recipeKey] then
@@ -603,13 +616,20 @@ function Data:ScanCraft()
                         name = craftName,
                         source = "",
                         reagents = self:ScanCraftReagents(i),
+                        category = currentCategory,
                     }
                     recipes[recipeKey] = recipeData
                     newRecipes[recipeKey] = recipeData
                     newCount = newCount + 1
-                elseif not recipes[recipeKey].reagents then
-                    -- Backfill reagent data for recipes scanned before reagent tracking
-                    recipes[recipeKey].reagents = self:ScanCraftReagents(i)
+                else
+                    if not recipes[recipeKey].reagents then
+                        -- Backfill reagent data for recipes scanned before reagent tracking
+                        recipes[recipeKey].reagents = self:ScanCraftReagents(i)
+                    end
+                    if not recipes[recipeKey].category and currentCategory then
+                        -- Backfill category for recipes scanned before categorization
+                        recipes[recipeKey].category = currentCategory
+                    end
                 end
             end
         end
@@ -862,6 +882,12 @@ local SAMPLE_RECIPES = {
     "Greater Planar Essence", "Large Prismatic Shard", "Void Crystal",
 }
 
+local SAMPLE_CATEGORIES = {
+    "Flasks", "Elixirs", "Potions", "Weapons", "Armor", "Enchantments",
+    "Goggles", "Gems", "Robes", "Leg Armor", "Leather Armor", "Plate Armor",
+    "Reagents",
+}
+
 local PROF_NAMES = { "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
 
 function Data:HandleSimCommand(arg)
@@ -923,6 +949,7 @@ function Data:SimGenerate(count)
                 recipes[recipeKey] = {
                     name = SAMPLE_RECIPES[idx],
                     source = (math.random() > 0.5) and "Trainer" or "World Drop",
+                    category = SAMPLE_CATEGORIES[math.random(#SAMPLE_CATEGORIES)],
                 }
             end
             entry.professions[profName] = { recipes = recipes, skillLevel = math.random(300, 375), maxSkillLevel = 375 }
@@ -960,6 +987,7 @@ function Data:SimSync()
             recipes[recipeKey] = {
                 name = SAMPLE_RECIPES[math.random(#SAMPLE_RECIPES)],
                 source = "Simulated Sync",
+                category = SAMPLE_CATEGORIES[math.random(#SAMPLE_CATEGORIES)],
             }
         end
         fakeData[memberKey] = {
