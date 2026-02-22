@@ -156,16 +156,17 @@ function Data:DetectProfessions()
     end
 
     -- Detect dropped professions
-    local changed = false
+    local profChanged = false
     for profName, _ in pairs(entry.professions) do
         if TRACKED_PROFESSIONS[profName] and not currentProfs[profName] then
             GuildCrafts:Printf("Profession dropped: %s — purging recipes.", profName)
             entry.professions[profName] = nil
-            changed = true
+            profChanged = true
         end
     end
 
     -- Ensure entries exist for current professions and update skill levels
+    local dataChanged = false
     for profName, _ in pairs(currentProfs) do
         if not entry.professions[profName] then
             entry.professions[profName] = { recipes = {} }
@@ -176,14 +177,17 @@ function Data:DetectProfessions()
             if profData.skillLevel ~= sl.rank or profData.maxSkillLevel ~= sl.max then
                 profData.skillLevel = sl.rank
                 profData.maxSkillLevel = sl.max
-                changed = true
+                dataChanged = true
             end
         end
     end
 
-    if changed then
+    if profChanged or dataChanged then
         entry.lastUpdate = time()
-        -- Phase 2 will add: broadcast DELTA_UPDATE removal
+    end
+
+    -- Only broadcast profession removal when a profession was actually dropped
+    if profChanged then
         if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastProfessionRemoval then
             GuildCrafts.Comms:BroadcastProfessionRemoval(playerKey)
         end
@@ -477,6 +481,19 @@ function Data:ScanTradeSkill()
         entry.professions[profName] = { recipes = {} }
     end
 
+    -- Refresh skill level while the profession window is open
+    if GetTradeSkillLine then
+        local _, currentLevel, maxLevel = GetTradeSkillLine()
+        if currentLevel and maxLevel then
+            local profDataLocal = entry.professions[profName]
+            if profDataLocal.skillLevel ~= currentLevel or profDataLocal.maxSkillLevel ~= maxLevel then
+                profDataLocal.skillLevel = currentLevel
+                profDataLocal.maxSkillLevel = maxLevel
+                entry.lastUpdate = time()
+            end
+        end
+    end
+
     -- Expand all collapsed headers (iterate backwards to avoid index shifting)
     for i = numSkills, 1, -1 do
         local _, skillType, _, isExpanded = GetTradeSkillInfo(i)
@@ -609,6 +626,20 @@ function Data:ScanCraft()
     local entry = self:GetMemberEntry(playerKey, true)
     if not entry.professions[profName] then
         entry.professions[profName] = { recipes = {} }
+    end
+
+    -- Refresh Enchanting skill level while the window is open
+    for i = 1, GetNumSkillLines() do
+        local skillName, isHeader, _, skillRank, _, _, skillMaxRank = GetSkillLineInfo(i)
+        if not isHeader and skillName == profName then
+            local profDataLocal = entry.professions[profName]
+            if profDataLocal.skillLevel ~= skillRank or profDataLocal.maxSkillLevel ~= skillMaxRank then
+                profDataLocal.skillLevel = skillRank
+                profDataLocal.maxSkillLevel = skillMaxRank
+                entry.lastUpdate = time()
+            end
+            break
+        end
     end
 
     -- Expand collapsed headers

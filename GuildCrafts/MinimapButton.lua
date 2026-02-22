@@ -120,6 +120,7 @@ end
 
 --- Toggle minimap button visibility (e.g. from slash command).
 function MinimapButton:Toggle()
+    if not self.btn then return end
     local db = GuildCrafts.db
     if self.btn:IsShown() then
         self.btn:Hide()

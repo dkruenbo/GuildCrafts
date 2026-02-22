@@ -609,12 +609,22 @@ function UI:ShowMemberRecipes(memberKey, profName)
     local lastCategory = nil
     for _, recipe in ipairs(sorted) do
         -- Category header
-        if recipe.category ~= "" and recipe.category ~= lastCategory then
-            lastCategory = recipe.category
+        local displayCategory = recipe.category ~= "" and recipe.category or nil
+        if displayCategory and displayCategory ~= lastCategory then
+            lastCategory = displayCategory
             local catText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             catText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
-            catText:SetText(recipe.category)
-            catText:SetTextColor(1, 0.82, 0)
+            catText:SetText(displayCategory)
+            catText:SetTextColor(0.9, 0.7, 0.3)
+            self.detailRows[#self.detailRows + 1] = catText
+            yOffset = yOffset - 18
+        elseif not displayCategory and lastCategory and lastCategory ~= "" then
+            -- Transitioning from categorized to uncategorized recipes
+            lastCategory = ""
+            local catText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            catText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
+            catText:SetText("Other")
+            catText:SetTextColor(0.9, 0.7, 0.3)
             self.detailRows[#self.detailRows + 1] = catText
             yOffset = yOffset - 18
         end
