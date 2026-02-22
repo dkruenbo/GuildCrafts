@@ -86,6 +86,9 @@ function GuildCrafts:OnLoginReady()
     if self.Comms then
         self.Comms:OnLoginReady()
     end
+
+    -- Remind the player to open profession windows so recipes get scanned
+    self:Print("Open each profession window once so GuildCrafts can scan your recipes.")
 end
 
 function GuildCrafts:OnTradeSkillShow()

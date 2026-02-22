@@ -542,6 +542,7 @@ function Data:ScanTradeSkill()
     local newCount = 0
     local newRecipes = {}
     local currentCategory = nil
+    local backfillChanged = false
 
     for i = 1, numSkills do
         local skillName, skillType = GetTradeSkillInfo(i)
@@ -564,14 +565,21 @@ function Data:ScanTradeSkill()
                     if not recipes[recipeKey].reagents then
                         -- Backfill reagent data for recipes scanned before reagent tracking
                         recipes[recipeKey].reagents = self:ScanTradeSkillReagents(i)
+                        backfillChanged = true
                     end
                     if not recipes[recipeKey].category and currentCategory then
                         -- Backfill category for recipes scanned before categorization
                         recipes[recipeKey].category = currentCategory
+                        backfillChanged = true
                     end
                 end
             end
         end
+    end
+
+    if backfillChanged and newCount == 0 then
+        entry.lastUpdate = time()
+        GuildCrafts:Printf("Scanned %s: backfilled reagent/category data.", profName)
     end
 
     if newCount > 0 then
@@ -690,6 +698,7 @@ function Data:ScanCraft()
     local newCount = 0
     local newRecipes = {}
     local currentCategory = nil
+    local backfillChanged = false
 
     for i = 1, numCrafts do
         local craftName, _, craftType = GetCraftInfo(i)
@@ -712,14 +721,21 @@ function Data:ScanCraft()
                     if not recipes[recipeKey].reagents then
                         -- Backfill reagent data for recipes scanned before reagent tracking
                         recipes[recipeKey].reagents = self:ScanCraftReagents(i)
+                        backfillChanged = true
                     end
                     if not recipes[recipeKey].category and currentCategory then
                         -- Backfill category for recipes scanned before categorization
                         recipes[recipeKey].category = currentCategory
+                        backfillChanged = true
                     end
                 end
             end
         end
+    end
+
+    if backfillChanged and newCount == 0 then
+        entry.lastUpdate = time()
+        GuildCrafts:Printf("Scanned %s: backfilled reagent/category data.", profName)
     end
 
     if newCount > 0 then
@@ -807,7 +823,7 @@ function Data:StripSyncFields(entry)
                 name = recipeData.name,
                 source = recipeData.source,
                 category = recipeData.category,
-                -- reagents intentionally omitted
+                reagents = recipeData.reagents,
             }
         end
         copy.professions[profName] = profCopy
@@ -826,6 +842,7 @@ function Data:StripRecipeReagents(recipes)
             name = recipeData.name,
             source = recipeData.source,
             category = recipeData.category,
+            reagents = recipeData.reagents,
         }
     end
     return copy

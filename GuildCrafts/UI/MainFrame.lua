@@ -1112,6 +1112,10 @@ end
 ----------------------------------------------------------------------
 
 function UI:UpdateDetailWelcome()
+    -- During a Refresh cycle, skip — Refresh will call us at the end
+    -- with the correct state to avoid flashing the welcome text.
+    if self._refreshing then return end
+
     if self._selectedMember or self._searchActive then
         self.detailWelcome:Hide()
     else
@@ -1285,16 +1289,33 @@ function UI:Refresh()
 
     self:UpdateSyncIndicator()
 
+    -- Save state that will be cleared by NavigateToMembers/PopulateProfessionList
+    local savedMember = self._selectedMember
+    local savedSearch = self._searchActive
+
+    -- Suppress intermediate UpdateDetailWelcome calls during refresh
+    -- to prevent the welcome text from flashing over content.
+    self._refreshing = true
+
     if self._navState == "professions" then
         self:PopulateProfessionList()
     elseif self._navState == "members" and self._selectedProfession then
         self:NavigateToMembers(self._selectedProfession)
     end
 
+    self._refreshing = false
+
+    -- Restore state cleared by the left-panel rebuild
+    self._selectedMember = savedMember
+    self._searchActive = savedSearch
+
     -- Refresh detail if a member was selected
     if self._selectedMember and self._selectedProfession then
         self:ShowMemberRecipes(self._selectedMember, self._selectedProfession)
     end
+
+    -- Make sure welcome state is correct after all updates
+    self:UpdateDetailWelcome()
 
     self:RefreshCraftQueue()
 end
