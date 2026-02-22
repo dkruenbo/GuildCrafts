@@ -480,6 +480,14 @@ function Comms:ProcessSyncRequest(requester, incomingVector)
         if not localTs or incomingTs > localTs then
             -- Requester has newer data → request via SYNC_PULL
             toPull[#toPull + 1] = memberKey
+        elseif localTs == incomingTs then
+            -- Timestamps match — check if our local copy is in an old data format
+            local localEntry = db[memberKey]
+            if localEntry and (localEntry.dataFormat or 0) < GuildCrafts.DATA_FORMAT_VERSION then
+                toPull[#toPull + 1] = memberKey
+                GuildCrafts:Debug("Format upgrade pull for", memberKey,
+                    "(local format", localEntry.dataFormat or 0, "< current", GuildCrafts.DATA_FORMAT_VERSION, ")")
+            end
         end
     end
 

@@ -865,26 +865,27 @@ function UI:ShowCraftRequestPopup(request)
     declineText:SetText("Decline")
     declineText:SetTextColor(1, 0.8, 0.8)
 
-    -- Handlers
+    -- Handlers — hide popup FIRST to ensure it disappears even if
+    -- downstream logic (queue refresh, comms) throws an error.
     accept:SetScript("OnClick", function()
+        self:RemovePopup(popup)
         if GuildCrafts.CraftRequest then
             GuildCrafts.CraftRequest:AcceptRequest(request)
         end
-        self:RemovePopup(popup)
     end)
 
     decline:SetScript("OnClick", function()
+        self:RemovePopup(popup)
         if GuildCrafts.CraftRequest then
             GuildCrafts.CraftRequest:DeclineRequest(request)
         end
-        self:RemovePopup(popup)
     end)
 
     closeBtn:SetScript("OnClick", function()
+        self:RemovePopup(popup)
         if GuildCrafts.CraftRequest then
             GuildCrafts.CraftRequest:DeclineRequest(request)
         end
-        self:RemovePopup(popup)
     end)
 
     -- Track popup

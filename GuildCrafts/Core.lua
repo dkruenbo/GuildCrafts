@@ -19,6 +19,10 @@ _G.GuildCrafts = GuildCrafts
 GuildCrafts.VERSION = 1
 GuildCrafts.ADDON_PREFIX = "GuildCrafts"
 
+-- Data format version — bump when sync payload structure changes
+-- (e.g. adding reagents to sync). Forces re-pull of stale copies.
+GuildCrafts.DATA_FORMAT_VERSION = 2
+
 -- Debug mode toggle
 GuildCrafts.debugMode = false
 

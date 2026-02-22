@@ -54,11 +54,6 @@ function CraftRequest:OnIncomingRequest(requester, itemName)
     GuildCrafts:Printf("|cffffd100Craft Request:|r %s wants you to craft: |cffffd100%s|r",
         requester, itemName)
 
-    -- Play alert sound
-    if PlaySound then
-        PlaySound(SOUNDKIT and SOUNDKIT.READY_CHECK or 8960)
-    end
-
     -- Add to pending popups
     local request = {
         requester = requester,
@@ -67,9 +62,34 @@ function CraftRequest:OnIncomingRequest(requester, itemName)
     }
     self.pendingPopups[#self.pendingPopups + 1] = request
 
+    -- Defer popup if in combat
+    if InCombatLockdown() or UnitAffectingCombat("player") then
+        GuildCrafts:Debug("Deferring craft request popup (in combat)")
+        if not self._combatDeferred then
+            self._combatDeferred = true
+            GuildCrafts:RegisterEvent("PLAYER_REGEN_ENABLED", function()
+                GuildCrafts:UnregisterEvent("PLAYER_REGEN_ENABLED")
+                self._combatDeferred = false
+                self:ShowDeferredPopups()
+            end)
+        end
+        return
+    end
+
     -- Show popup UI
     if GuildCrafts.UI and GuildCrafts.UI.ShowCraftRequestPopup then
         GuildCrafts.UI:ShowCraftRequestPopup(request)
+    end
+end
+
+function CraftRequest:ShowDeferredPopups()
+    for _, request in ipairs(self.pendingPopups) do
+        if not request._popupShown then
+            request._popupShown = true
+            if GuildCrafts.UI and GuildCrafts.UI.ShowCraftRequestPopup then
+                GuildCrafts.UI:ShowCraftRequestPopup(request)
+            end
+        end
     end
 end
 
