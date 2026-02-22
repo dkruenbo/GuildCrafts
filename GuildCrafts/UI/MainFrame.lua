@@ -563,7 +563,6 @@ function UI:ShowMemberRecipes(memberKey, profName)
     end
     table.sort(sorted, function(a, b) return a.name < b.name end)
 
-    local yOffset = -32
     for _, recipe in ipairs(sorted) do
         -- Recipe name
         local nameText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
