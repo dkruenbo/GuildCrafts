@@ -110,6 +110,33 @@ function Data:OnEnable()
 end
 
 ----------------------------------------------------------------------
+-- Online Status Cache
+-- Rebuilt once per GUILD_ROSTER_UPDATE; shared by UI and Tooltip.
+----------------------------------------------------------------------
+
+Data._onlineCache = {}
+
+function Data:RebuildOnlineCache()
+    self._onlineCache = {}
+    if not IsInGuild() then return end
+
+    local numMembers = GetNumGuildMembers()
+    for i = 1, numMembers do
+        local name, _, _, _, _, _, _, _, isOnline = GetGuildRosterInfo(i)
+        if name then
+            if not name:find("-") then
+                name = name .. "-" .. GetRealmName()
+            end
+            self._onlineCache[name] = isOnline or false
+        end
+    end
+end
+
+function Data:IsMemberOnline(memberKey)
+    return self._onlineCache[memberKey] or false
+end
+
+----------------------------------------------------------------------
 -- Helpers
 ----------------------------------------------------------------------
 
@@ -155,14 +182,18 @@ function Data:DetectProfessions()
         end
     end
 
-    -- Detect dropped professions
+    -- Detect dropped professions — collect names before nil'ing
     local profChanged = false
+    local droppedProfs = {}
     for profName, _ in pairs(entry.professions) do
         if TRACKED_PROFESSIONS[profName] and not currentProfs[profName] then
-            GuildCrafts:Printf("Profession dropped: %s — purging recipes.", profName)
-            entry.professions[profName] = nil
-            profChanged = true
+            droppedProfs[#droppedProfs + 1] = profName
         end
+    end
+    for _, profName in ipairs(droppedProfs) do
+        GuildCrafts:Printf("Profession dropped: %s — purging recipes.", profName)
+        entry.professions[profName] = nil
+        profChanged = true
     end
 
     -- Ensure entries exist for current professions and update skill levels
@@ -186,10 +217,12 @@ function Data:DetectProfessions()
         entry.lastUpdate = time()
     end
 
-    -- Only broadcast profession removal when a profession was actually dropped
+    -- Broadcast each dropped profession individually so receivers know which one
     if profChanged then
         if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastProfessionRemoval then
-            GuildCrafts.Comms:BroadcastProfessionRemoval(playerKey)
+            for _, profName in ipairs(droppedProfs) do
+                GuildCrafts.Comms:BroadcastProfessionRemoval(playerKey, profName)
+            end
         end
     end
 
@@ -708,6 +741,7 @@ function Data:ScanCraft()
     -- Scan cooldowns while the window is open
     self:ScanCraftCooldowns(profName, numCrafts)
 end
+
 function Data:GetCraftRecipeKey(index)
     -- Try item link first
     if GetCraftItemLink then
@@ -743,6 +777,58 @@ function Data:GetCraftRecipeKey(index)
     end
 
     return nil
+end
+
+----------------------------------------------------------------------
+-- Sync Payload Stripping
+-- Removes fields that are only meaningful locally (cooldowns, reagents)
+-- from outgoing sync data to reduce payload size and avoid clock issues.
+----------------------------------------------------------------------
+
+function Data:StripSyncFields(entry)
+    if type(entry) ~= "table" then return entry end
+
+    local copy = {
+        lastUpdate = entry.lastUpdate,
+        _simulated = entry._simulated,
+        professions = {},
+    }
+
+    for profName, profData in pairs(entry.professions or {}) do
+        local profCopy = {
+            recipes = {},
+            skillLevel = profData.skillLevel,
+            maxSkillLevel = profData.maxSkillLevel,
+            specialisation = profData.specialisation,
+            -- cooldowns intentionally omitted
+        }
+        for recipeKey, recipeData in pairs(profData.recipes or {}) do
+            profCopy.recipes[recipeKey] = {
+                name = recipeData.name,
+                source = recipeData.source,
+                category = recipeData.category,
+                -- reagents intentionally omitted
+            }
+        end
+        copy.professions[profName] = profCopy
+    end
+
+    return copy
+end
+
+--- Strip reagents from a recipes table (for delta payloads).
+function Data:StripRecipeReagents(recipes)
+    if type(recipes) ~= "table" then return recipes end
+
+    local copy = {}
+    for recipeKey, recipeData in pairs(recipes) do
+        copy[recipeKey] = {
+            name = recipeData.name,
+            source = recipeData.source,
+            category = recipeData.category,
+        }
+    end
+    return copy
 end
 
 ----------------------------------------------------------------------

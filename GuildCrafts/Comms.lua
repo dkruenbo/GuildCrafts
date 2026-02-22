@@ -425,8 +425,8 @@ function Comms:ProcessSyncRequest(requester, incomingVector)
     for memberKey, localTs in pairs(localVector) do
         local incomingTs = incomingVector[memberKey]
         if not incomingTs or localTs > incomingTs then
-            -- We have newer data → include in SYNC_RESPONSE
-            toSend[memberKey] = db[memberKey]
+            -- We have newer data → include in SYNC_RESPONSE (stripped)
+            toSend[memberKey] = GuildCrafts.Data:StripSyncFields(db[memberKey])
         end
     end
 
@@ -519,7 +519,7 @@ function Comms:HandleSyncPull(payload, sender)
 
     for _, memberKey in ipairs(payload.memberKeys) do
         if db[memberKey] then
-            responseData[memberKey] = db[memberKey]
+            responseData[memberKey] = GuildCrafts.Data:StripSyncFields(db[memberKey])
         end
     end
 
@@ -552,7 +552,7 @@ function Comms:HandleSyncPush(payload, sender)
                         type       = "add",
                         member     = memberKey,
                         profession = profName,
-                        recipes    = profData.recipes,
+                        recipes    = GuildCrafts.Data:StripRecipeReagents(profData.recipes),
                         lastUpdate = entry.lastUpdate,
                     }, "GUILD", nil, PRIO_NORMAL)
                 end
@@ -571,21 +571,22 @@ function Comms:BroadcastNewRecipes(memberKey, profName, recipes)
         type       = "add",
         member     = memberKey,
         profession = profName,
-        recipes    = recipes,
+        recipes    = GuildCrafts.Data:StripRecipeReagents(recipes),
         lastUpdate = GuildCrafts.Data.db.global[memberKey] and
                      GuildCrafts.Data.db.global[memberKey].lastUpdate or time(),
     }, "GUILD", nil, PRIO_NORMAL)
     GuildCrafts:Debug("Broadcast DELTA_UPDATE (add) for", memberKey, profName)
 end
 
-function Comms:BroadcastProfessionRemoval(memberKey)
+function Comms:BroadcastProfessionRemoval(memberKey, profName)
     local entry = GuildCrafts.Data.db.global[memberKey]
     self:SendMessage(MSG_DELTA_UPDATE, {
         type       = "remove_profession",
         member     = memberKey,
+        profession = profName,
         lastUpdate = entry and entry.lastUpdate or time(),
     }, "GUILD", nil, PRIO_NORMAL)
-    GuildCrafts:Debug("Broadcast DELTA_UPDATE (remove) for", memberKey)
+    GuildCrafts:Debug("Broadcast DELTA_UPDATE (remove) for", memberKey, profName)
 end
 
 function Comms:HandleDeltaUpdate(payload, sender)

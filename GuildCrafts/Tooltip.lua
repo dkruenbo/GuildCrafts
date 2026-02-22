@@ -4,7 +4,7 @@
 ----------------------------------------------------------------------
 local GuildCrafts = _G.GuildCrafts
 
-local Tooltip = GuildCrafts:NewModule("Tooltip", "AceHook-3.0", "AceEvent-3.0")
+local Tooltip = GuildCrafts:NewModule("Tooltip", "AceHook-3.0")
 GuildCrafts.Tooltip = Tooltip
 
 -- Local references
@@ -12,10 +12,6 @@ local pairs = pairs
 local type = type
 local tonumber = tonumber
 local GetItemInfo = GetItemInfo
-local GetNumGuildMembers = GetNumGuildMembers
-local GetGuildRosterInfo = GetGuildRosterInfo
-local GetRealmName = GetRealmName
-local IsInGuild = IsInGuild
 
 ----------------------------------------------------------------------
 -- Reverse Lookup Index
@@ -72,33 +68,6 @@ function Tooltip:RebuildIndex()
 end
 
 ----------------------------------------------------------------------
--- Online Status Cache
--- Rebuilt once per GUILD_ROSTER_UPDATE; avoids repeated roster scans.
-----------------------------------------------------------------------
-
-local onlineCache = {} -- [memberKey] = true/false
-
-function Tooltip:RebuildOnlineCache()
-    onlineCache = {}
-    if not IsInGuild() then return end
-
-    local numMembers = GetNumGuildMembers()
-    for i = 1, numMembers do
-        local name, _, _, _, _, _, _, _, isOnline = GetGuildRosterInfo(i)
-        if name then
-            if not name:find("-") then
-                name = name .. "-" .. GetRealmName()
-            end
-            onlineCache[name] = isOnline or false
-        end
-    end
-end
-
-function Tooltip:IsCrafterOnline(memberKey)
-    return onlineCache[memberKey] or false
-end
-
-----------------------------------------------------------------------
 -- Lifecycle
 ----------------------------------------------------------------------
 
@@ -111,16 +80,7 @@ function Tooltip:OnEnable()
         self:SecureHookScript(ItemRefTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
     end
 
-    -- Listen for events that invalidate our caches
-    self:RegisterEvent("GUILD_ROSTER_UPDATE", "OnGuildRosterUpdate")
-
-    -- Build caches on first enable
-    self:RebuildOnlineCache()
     indexDirty = true
-end
-
-function Tooltip:OnGuildRosterUpdate()
-    self:RebuildOnlineCache()
 end
 
 ----------------------------------------------------------------------
@@ -165,7 +125,7 @@ function Tooltip:OnTooltipSetItem(tooltip)
         end
 
         local name = crafter.key:match("^(.+)-") or crafter.key
-        local isOnline = self:IsCrafterOnline(crafter.key)
+        local isOnline = GuildCrafts.Data:IsMemberOnline(crafter.key)
 
         if isOnline then
             tooltip:AddDoubleLine(
@@ -224,8 +184,8 @@ function Tooltip:FindCrafters(itemID, itemName)
 
     -- Sort: online first, then alphabetical
     table.sort(crafters, function(a, b)
-        local aOnline = self:IsCrafterOnline(a.key)
-        local bOnline = self:IsCrafterOnline(b.key)
+        local aOnline = GuildCrafts.Data:IsMemberOnline(a.key)
+        local bOnline = GuildCrafts.Data:IsMemberOnline(b.key)
         if aOnline ~= bOnline then
             return aOnline
         end

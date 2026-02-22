@@ -17,6 +17,11 @@ local MIN_WIDTH      = 500
 local MIN_HEIGHT     = 350
 local LEFT_PANEL_WIDTH = 200
 
+-- Frame pools (avoid orphaning frames on each refresh)
+UI._leftRowPool       = {}
+UI._detailFontStringPool = {}
+UI._detailFramePool   = {}
+
 -- Colors
 local COLOR_BG       = { 0.05, 0.05, 0.05, 0.92 }
 local COLOR_TITLE_BG = { 0.12, 0.12, 0.12, 1 }
@@ -466,7 +471,7 @@ function UI:NavigateToMembers(profName)
 
     local yOffset = 0
     for _, memberInfo in ipairs(members) do
-        local isOnline = self:IsMemberOnline(memberInfo.key)
+        local isOnline = GuildCrafts.Data:IsMemberOnline(memberInfo.key)
         local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
         local specTag = ""
         local skillTag = ""
@@ -710,7 +715,7 @@ function UI:ShowSearchResults(results)
 
         -- Crafters
         for _, crafter in ipairs(result.crafters) do
-            local isOnline = self:IsMemberOnline(crafter.key)
+            local isOnline = GuildCrafts.Data:IsMemberOnline(crafter.key)
             local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
             local crafterName = crafter.key:match("^(.+)-") or crafter.key
 
@@ -1013,7 +1018,11 @@ function UI:OnSearch(text)
 
     local scope = self._searchScope or "All"
 
-    if scope == "Item" or scope == "All" then
+    if scope == "All" then
+        local results = GuildCrafts.Data:SearchRecipes(text)
+        self:ShowSearchResults(results)
+        self:FilterMemberList(text)
+    elseif scope == "Item" then
         local results = GuildCrafts.Data:SearchRecipes(text)
         self:ShowSearchResults(results)
     elseif scope == "Profession" then
@@ -1065,7 +1074,7 @@ function UI:FilterMemberList(query)
 
     local yOffset = 0
     for _, memberInfo in ipairs(members) do
-        local isOnline = self:IsMemberOnline(memberInfo.key)
+        local isOnline = GuildCrafts.Data:IsMemberOnline(memberInfo.key)
         local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
         local label = dot .. memberInfo.key:match("^(.+)-") .. "  |cff888888" .. memberInfo.recipeCount .. " recipes|r"
         local row = self:CreateLeftRow(self.leftContent, yOffset, label)
@@ -1100,11 +1109,87 @@ function UI:ShowDetailEmpty(memberKey, profName)
 end
 
 ----------------------------------------------------------------------
+-- Frame / FontString Acquisition (pool-aware)
+----------------------------------------------------------------------
+
+function UI:AcquireFontString(parent, template)
+    local pool = self._detailFontStringPool
+    local fs = table.remove(pool)
+    if fs then
+        -- Re-parent the recycled FontString
+        -- FontStrings don't have SetParent, so we create new ones but
+        -- keep the pool for same-parent reuse
+        if fs:GetParent() == parent then
+            fs:Show()
+            return fs
+        end
+        -- Different parent — can't re-parent FontStrings, put it back
+        pool[#pool + 1] = fs
+    end
+    return parent:CreateFontString(nil, "OVERLAY", template or "GameFontNormal")
+end
+
+function UI:AcquireFrame(parent, frameType, template)
+    local pool = self._detailFramePool
+    local frame = table.remove(pool)
+    if frame then
+        frame:SetParent(parent)
+        frame:Show()
+        return frame
+    end
+    return CreateFrame(frameType or "Frame", nil, parent, template)
+end
+
+----------------------------------------------------------------------
 -- Row Factory
 ----------------------------------------------------------------------
 
 function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
-    local row = CreateFrame("Button", nil, parent)
+    -- Try to reuse a pooled row
+    local row = table.remove(self._leftRowPool)
+    if row then
+        row:SetParent(parent)
+        row:SetHeight(22)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", parent, "TOPLEFT", 4, -yOffset)
+        row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -yOffset)
+        -- Update text
+        row._label:ClearAllPoints()
+        row._label:SetText(text)
+        -- Update icon
+        if iconPath then
+            if not row._icon then
+                row._icon = row:CreateTexture(nil, "ARTWORK")
+                row._icon:SetSize(18, 18)
+                row._icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            end
+            row._icon:SetPoint("LEFT", row, "LEFT", 4, 0)
+            row._icon:SetTexture(iconPath)
+            row._icon:Show()
+            row._label:SetPoint("LEFT", row, "LEFT", 26, 0)
+        else
+            if row._icon then row._icon:Hide() end
+            row._label:SetPoint("LEFT", row, "LEFT", 6, 0)
+        end
+        -- Update badge
+        if badge then
+            if not row._badge then
+                row._badge = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            end
+            row._badge:ClearAllPoints()
+            row._badge:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+            row._badge:SetText(badge)
+            row._badge:SetTextColor(0.5, 0.5, 0.5)
+            row._badge:Show()
+        else
+            if row._badge then row._badge:Hide() end
+        end
+        row:Show()
+        return row
+    end
+
+    -- Create new row
+    row = CreateFrame("Button", nil, parent)
     row:SetHeight(22)
     row:SetPoint("TOPLEFT", parent, "TOPLEFT", 4, -yOffset)
     row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -yOffset)
@@ -1122,7 +1207,8 @@ function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
         icon:SetSize(18, 18)
         icon:SetPoint("LEFT", row, "LEFT", 4, 0)
         icon:SetTexture(iconPath)
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)  -- trim default icon border
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        row._icon = icon
         labelAnchorX = 26
     end
 
@@ -1131,6 +1217,7 @@ function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
     label:SetPoint("LEFT", row, "LEFT", labelAnchorX, 0)
     label:SetTextColor(0.9, 0.9, 0.9)
     label:SetText(text)
+    row._label = label
 
     -- Badge (count)
     if badge then
@@ -1138,6 +1225,7 @@ function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
         badgeText:SetPoint("RIGHT", row, "RIGHT", -6, 0)
         badgeText:SetText(badge)
         badgeText:SetTextColor(0.5, 0.5, 0.5)
+        row._badge = badgeText
     end
 
     return row
@@ -1150,7 +1238,10 @@ end
 function UI:ClearLeftRows()
     for _, row in ipairs(self.leftRows) do
         row:Hide()
-        row:SetParent(nil)
+        row:ClearAllPoints()
+        row:SetScript("OnClick", nil)
+        row.memberKey = nil
+        self._leftRowPool[#self._leftRowPool + 1] = row
     end
     self.leftRows = {}
 end
@@ -1158,30 +1249,18 @@ end
 function UI:ClearDetailRows()
     for _, obj in ipairs(self.detailRows) do
         if obj.Hide then obj:Hide() end
-        if obj.SetParent then obj:SetParent(nil) end
-    end
-    self.detailRows = {}
-end
-
-----------------------------------------------------------------------
--- Online Status Helper
-----------------------------------------------------------------------
-
-function UI:IsMemberOnline(memberKey)
-    if not IsInGuild() then return false end
-    local numMembers = GetNumGuildMembers()
-    for i = 1, numMembers do
-        local name, _, _, _, _, _, _, _, isOnline = GetGuildRosterInfo(i)
-        if name then
-            if not name:find("-") then
-                name = name .. "-" .. GetRealmName()
-            end
-            if name == memberKey then
-                return isOnline
-            end
+        if obj.ClearAllPoints then obj:ClearAllPoints() end
+        -- Return to the appropriate pool based on object type
+        if obj.SetText and not obj.SetScript then
+            -- FontString
+            self._detailFontStringPool[#self._detailFontStringPool + 1] = obj
+        elseif obj.SetScript then
+            -- Frame or Button
+            obj:SetScript("OnClick", nil)
+            self._detailFramePool[#self._detailFramePool + 1] = obj
         end
     end
-    return false
+    self.detailRows = {}
 end
 
 ----------------------------------------------------------------------
@@ -1190,8 +1269,8 @@ end
 
 function UI:SortMemberList(members)
     table.sort(members, function(a, b)
-        local aOnline = self:IsMemberOnline(a.key)
-        local bOnline = self:IsMemberOnline(b.key)
+        local aOnline = GuildCrafts.Data:IsMemberOnline(a.key)
+        local bOnline = GuildCrafts.Data:IsMemberOnline(b.key)
         if aOnline ~= bOnline then
             return aOnline -- online first
         end
