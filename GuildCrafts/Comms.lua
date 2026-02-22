@@ -358,7 +358,12 @@ function Comms:OnSyncTimeout()
         GuildCrafts:Debug("SYNC_REQUEST timeout — retrying (BDR should respond)")
         self:SendSyncRequest()
     elseif self.syncRetryCount == 2 then
-        GuildCrafts:Debug("SYNC_REQUEST retry timeout — sending open request")
+        -- Neither DR nor BDR responded — evict both and re-elect so the
+        -- new DR (sorted[1] of remaining nodes) handles the request.
+        if self.currentDR  then self.addonUsers[self.currentDR]  = nil end
+        if self.currentBDR then self.addonUsers[self.currentBDR] = nil end
+        self:RecomputeElection()
+        GuildCrafts:Debug("SYNC_REQUEST retry timeout — evicted DR/BDR, re-elected. New DR:", self.currentDR or "none")
         self:SendSyncRequest()
     else
         GuildCrafts:Debug("SYNC_REQUEST all retries exhausted. No responder available.")
@@ -382,8 +387,14 @@ function Comms:HandleSyncRequest(payload, sender)
     elseif retryCount == 1 and (self.myRole == "DR" or self.myRole == "BDR") then
         shouldRespond = true
     elseif retryCount >= 2 then
-        -- Open round — anyone can respond
-        shouldRespond = true
+        -- DR and BDR both failed to respond — evict them and re-elect.
+        -- Only the newly elected DR responds, preventing a flood.
+        if self.currentDR  then self.addonUsers[self.currentDR]  = nil end
+        if self.currentBDR then self.addonUsers[self.currentBDR] = nil end
+        self:RecomputeElection()
+        if self.myRole == "DR" then
+            shouldRespond = true
+        end
     end
 
     if not shouldRespond then return end
