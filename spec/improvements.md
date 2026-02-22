@@ -48,15 +48,33 @@
 - New module: `Market.lua` — handles listings, channel communication, and caching.
 - New UI tab: "Market" added to the main window alongside the existing guild view.
 
-**Communication — Request/Response Model (not heartbeat):**
-- On login, the addon auto-joins a server-wide custom chat channel (e.g. `GCMarket`).
-- Uses the same AceComm + serialize + compress infrastructure already built for guild sync.
-- All market messages use the custom channel instead of GUILD.
-- **No periodic heartbeat.** A 5-min heartbeat does not scale — 2,000 users would generate ~7 msgs/sec constant load, overwhelming ChatThrottleLib and risking server disconnects.
-- Instead, use a **broadcast-on-change + request/response** model:
-  - When a player creates, updates, or removes a listing → broadcast the change once.
-  - When a player opens the Market tab → send a `MARKET_REQUEST`. Online sellers with active listings respond with a **randomised delay** (e.g. 0–5 seconds, jittered) to avoid thundering herd.
-  - Listings expire from the local cache after 30 minutes without a refresh (seller going offline).
+**Critical API Constraint — `SendAddonMessage` vs `SendChatMessage`:**
+- Guild sync (Tier 1–4) uses `C_ChatInfo.SendAddonMessage()` via AceComm. This sends invisible addon data with reasonable rate limits — but it **only works on GUILD, PARTY, RAID, and WHISPER channels**.
+- Custom channels (like `GCMarket`) **cannot use `SendAddonMessage`**. The addon must use `SendChatMessage()` instead, which sends real visible text into a public channel. A Lua `ChatFrame_AddMessageEventFilter` hides the messages from addon users, but non-addon users see raw text.
+- This changes everything about the communication design. Compressed/serialized data (AceSerializer + LibDeflate) would appear as gibberish in the channel, triggering Blizzard's anti-spam system and inviting mass-reports from trolls.
+
+**Communication — Passive Broadcast Model (no request/response):**
+- ~~Previous plan used request/response: `MARKET_REQUEST` → N sellers respond with jitter.~~
+- **Problem**: Even with jitter, 50 sellers responding within 5 seconds = 50 `SendChatMessage` calls flooding a public channel. This causes client lag, triggers spam detection, and exposes the addon to mass-reporting.
+- **New model: broadcast-only, passive listen.**
+  - Sellers broadcast their listings **only** on login and when they manually update/add/remove a listing. No automated periodic re-broadcasts.
+  - All other addon users **passively listen** on the channel and cache what they hear. No request messages, no responses.
+  - Listings expire from the local cache after 30 minutes. If a seller is still online and hasn't changed anything, their listings naturally age out — but they will re-broadcast on next login.
+  - This reduces traffic from O(N) response storms to O(1) per seller action. A server with 200 active sellers generates ~200 messages total at peak login, spread across the login window — not 200 responses to a single request.
+
+**Lightweight Wire Format (no AceSerializer):**
+- AceSerializer + LibDeflate produce opaque binary-looking strings that trigger Blizzard's spam detector and look like bot output to other players.
+- Instead, use a **human-readable micro-format** that is trivially parseable but doesn't look like spam:
+  ```
+  [GC]L:Flask of Supreme Power,Alchemy,Potions Master,Free for guildies
+  [GC]L:Enchant Weapon - Mongoose,Enchanting,,PST
+  [GC]R:Flask of Supreme Power
+  ```
+  - `[GC]L:` = listing (create/update). Fields: item, profession, spec (optional), tip (optional).
+  - `[GC]R:` = remove listing.
+  - Sender name comes from the chat message metadata (no need to include it in payload).
+  - Max 5 `[GC]L:` messages per broadcast. Each message is a single short line.
+- A `ChatFrame_AddMessageEventFilter` strips `[GC]` messages from addon users' chat windows so they never see them.
 
 **Custom Channel Resilience:**
 - WoW custom channels can be hijacked — the oldest member becomes "Owner" and can password-lock the channel, blocking all other users. Trolls do this on popular servers.
@@ -64,19 +82,26 @@
 - Fallback strategy: if the primary channel (`GCMarket`) is locked, try rotating fallback channels (`GCMarket1`, `GCMarket2`).
 - Consider a deterministic channel name that rotates (e.g. based on date or realm hash) to make hijacking harder to sustain.
 
-**Blizzard TOS Considerations:**
+**Blizzard TOS & Spam Avoidance:**
 - Blizzard has broken addons that create large automated networks in public channels (e.g. ClassicLFG). To stay compliant:
   - **Max 5 listings** per player — keeps it feeling like a bulletin board, not an automated system. Non-negotiable.
   - **No automated matching or trading** — players must whisper to arrange crafts manually.
   - **No price data aggregation** — the market is a service board, not an AH replacement.
   - **100% opt-in** — no market data is sent unless the player explicitly lists recipes for sale.
+- **Anti-spam specifics** (because `SendChatMessage` is used):
+  - Human-readable wire format — never send compressed/serialized blobs that look like bot output.
+  - No request/response pattern — eliminates message storms that trigger rate limits or spam flags.
+  - Broadcast only on player-initiated actions (login, manual listing update) — never automated periodic sends.
+  - Respect `SendChatMessage` throttle: space messages 1–2 seconds apart when sending multiple listings on login.
+  - If Blizzard's spam filter mutes a message (detected via `ChatFrame_MessageEventHandler` failure), back off and retry later — never rapid-fire retry.
 
 **Listing Flow:**
 1. Player opens their recipe list in the guild view and clicks "List for Sale" on up to 5 recipes.
-2. Listings are stored locally in SavedVariables and broadcast to the market channel on change (create/update/remove).
-3. When another addon user opens the Market tab, they send a `MARKET_REQUEST` and receive responses from online sellers.
+2. Listings are stored locally in SavedVariables.
+3. On login (after channel join) and on any listing change, the addon broadcasts up to 5 `[GC]L:` messages to the market channel, spaced 1–2 seconds apart.
+4. Other addon users passively receive and cache these listings.
 
-**Data Model per Listing:**
+**Data Model per Listing (local cache):**
 ```
 {
     seller    = "PlayerName-Realm",
@@ -84,15 +109,15 @@
     profName  = "Alchemy",
     spec      = "Potions Master",    -- optional
     tip       = "Free for guildies", -- optional seller note (max 80 chars)
-    listedAt  = timestamp,
+    receivedAt = timestamp,          -- when we last heard this listing (for 30-min TTL)
 }
 ```
 
 **Browsing & Contact:**
-- Market tab shows all active listings, searchable and sortable by item name, profession, or seller.
+- Market tab shows all cached listings, searchable and sortable by item name, profession, or seller.
 - Each listing has a "Whisper" button that opens a whisper to the seller.
 - If both parties have the addon, "Request Craft" works the same way as the guild version.
-- Only shows listings from sellers who are currently online. When a seller logs off, their listings expire from the cache (30-minute TTL).
+- Listings expire from the cache after 30 minutes without a refresh. Stale entries are hidden automatically.
 
 **Data Trust & Anti-Abuse (server-wide = untrusted senders):**
 - **Rate limiting**: Ignore users who flood more than N listing messages per minute.
@@ -103,11 +128,12 @@
 **Additional Constraints:**
 - **Channel slot**: WoW allows max 10 custom channels per player. Market uses 1 slot. If all 10 are taken, warn the user and don't join.
 - **Privacy**: Listing is fully opt-in. No recipes are shared on the market channel unless the player explicitly marks them for sale.
+- **Non-addon visibility**: Because `SendChatMessage` is used, players without GuildCrafts who join the `GCMarket` channel will see raw `[GC]L:` messages. The human-readable format is intentional — it looks like bulletin board posts, not bot spam.
 
 **Milestone Sequence:**
 1. Implement custom channel join/leave with fallback handling and error resilience.
 2. Add "List for Sale" toggle to recipe rows in the UI (max 5).
-3. Implement broadcast-on-change (listing create/update/remove) and `MARKET_REQUEST`/`MARKET_RESPONSE` with jittered reply delay.
+3. Implement passive broadcast-on-change (`[GC]L:` / `[GC]R:` via `SendChatMessage`) with throttled spacing and `ChatFrame_AddMessageEventFilter` to hide messages from addon users.
 4. Build the Market tab with listing display, search, and "Whisper" button.
 5. Add cache expiry (30-min TTL), rate limiting, validation, and local blocklist.
-6. Polish: seller notes, spec display, sort/filter options, channel rotation fallback.
+6. Polish: seller notes, spec display, sort/filter options, channel rotation fallback, spam-filter backoff.
