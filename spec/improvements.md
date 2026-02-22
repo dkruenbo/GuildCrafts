@@ -48,15 +48,33 @@
 - New module: `Market.lua` — handles listings, channel communication, and caching.
 - New UI tab: "Market" added to the main window alongside the existing guild view.
 
-**Communication:**
+**Communication — Request/Response Model (not heartbeat):**
 - On login, the addon auto-joins a server-wide custom chat channel (e.g. `GCMarket`).
 - Uses the same AceComm + serialize + compress infrastructure already built for guild sync.
 - All market messages use the custom channel instead of GUILD.
+- **No periodic heartbeat.** A 5-min heartbeat does not scale — 2,000 users would generate ~7 msgs/sec constant load, overwhelming ChatThrottleLib and risking server disconnects.
+- Instead, use a **broadcast-on-change + request/response** model:
+  - When a player creates, updates, or removes a listing → broadcast the change once.
+  - When a player opens the Market tab → send a `MARKET_REQUEST`. Online sellers with active listings respond with a **randomised delay** (e.g. 0–5 seconds, jittered) to avoid thundering herd.
+  - Listings expire from the local cache after 30 minutes without a refresh (seller going offline).
+
+**Custom Channel Resilience:**
+- WoW custom channels can be hijacked — the oldest member becomes "Owner" and can password-lock the channel, blocking all other users. Trolls do this on popular servers.
+- The addon **must** handle channel join failures gracefully: disable market features silently, notify the user, never error or block.
+- Fallback strategy: if the primary channel (`GCMarket`) is locked, try rotating fallback channels (`GCMarket1`, `GCMarket2`).
+- Consider a deterministic channel name that rotates (e.g. based on date or realm hash) to make hijacking harder to sustain.
+
+**Blizzard TOS Considerations:**
+- Blizzard has broken addons that create large automated networks in public channels (e.g. ClassicLFG). To stay compliant:
+  - **Max 5 listings** per player — keeps it feeling like a bulletin board, not an automated system. Non-negotiable.
+  - **No automated matching or trading** — players must whisper to arrange crafts manually.
+  - **No price data aggregation** — the market is a service board, not an AH replacement.
+  - **100% opt-in** — no market data is sent unless the player explicitly lists recipes for sale.
 
 **Listing Flow:**
 1. Player opens their recipe list in the guild view and clicks "List for Sale" on up to 5 recipes.
-2. Listings are stored locally in SavedVariables and broadcast to the custom channel on a periodic heartbeat (every 5 minutes).
-3. When another addon user joins the channel, they receive active listings from whoever is online.
+2. Listings are stored locally in SavedVariables and broadcast to the market channel on change (create/update/remove).
+3. When another addon user opens the Market tab, they send a `MARKET_REQUEST` and receive responses from online sellers.
 
 **Data Model per Listing:**
 ```
@@ -64,7 +82,7 @@
     seller    = "PlayerName-Realm",
     item      = "Flask of Supreme Power",
     profName  = "Alchemy",
-    spec      = "Potions Master",    -- optional, if spec tracking is implemented
+    spec      = "Potions Master",    -- optional
     tip       = "Free for guildies", -- optional seller note (max 80 chars)
     listedAt  = timestamp,
 }
@@ -74,18 +92,22 @@
 - Market tab shows all active listings, searchable and sortable by item name, profession, or seller.
 - Each listing has a "Whisper" button that opens a whisper to the seller.
 - If both parties have the addon, "Request Craft" works the same way as the guild version.
-- Only shows listings from sellers who are currently online. When a seller logs off, their listings are removed from the market view immediately (no cached/stale entries).
+- Only shows listings from sellers who are currently online. When a seller logs off, their listings expire from the cache (30-minute TTL).
 
-**Constraints to Handle:**
-- **Throttling**: Custom channels have stricter rate limits than guild chat. Heartbeat interval should be conservative (5 min). Use compression aggressively.
-- **Channel slot**: WoW allows max 10 custom channels per player. Market uses 1 slot. If all 10 are taken, warn the user.
-- **Spam prevention**: Max 5 listings per player enforced client-side. Listings auto-expire after 24 hours without a heartbeat refresh.
+**Data Trust & Anti-Abuse (server-wide = untrusted senders):**
+- **Rate limiting**: Ignore users who flood more than N listing messages per minute.
+- **Validation**: Reject listings with invalid item names, excessive length, or more than 5 per sender.
+- **Local blocklist**: `/gc market ignore PlayerName` to permanently hide a spammer's listings.
 - **No DR/BDR needed**: Unlike guild sync, the marketplace doesn't need a coordinator. Every user broadcasts their own listings and caches what they receive. Simple gossip protocol.
+
+**Additional Constraints:**
+- **Channel slot**: WoW allows max 10 custom channels per player. Market uses 1 slot. If all 10 are taken, warn the user and don't join.
 - **Privacy**: Listing is fully opt-in. No recipes are shared on the market channel unless the player explicitly marks them for sale.
 
 **Milestone Sequence:**
-1. Implement custom channel join/leave and basic send/receive on the market channel.
+1. Implement custom channel join/leave with fallback handling and error resilience.
 2. Add "List for Sale" toggle to recipe rows in the UI (max 5).
-3. Build the Market tab with listing display, search, and "Whisper" button.
-4. Add heartbeat broadcast and cache expiry logic.
-5. Polish: seller notes, spec display, sort/filter options.
+3. Implement broadcast-on-change (listing create/update/remove) and `MARKET_REQUEST`/`MARKET_RESPONSE` with jittered reply delay.
+4. Build the Market tab with listing display, search, and "Whisper" button.
+5. Add cache expiry (30-min TTL), rate limiting, validation, and local blocklist.
+6. Polish: seller notes, spec display, sort/filter options, channel rotation fallback.
