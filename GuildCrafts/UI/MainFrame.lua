@@ -17,10 +17,8 @@ local MIN_WIDTH      = 500
 local MIN_HEIGHT     = 350
 local LEFT_PANEL_WIDTH = 200
 
--- Frame pools (avoid orphaning frames on each refresh)
-UI._leftRowPool       = {}
-UI._detailFontStringPool = {}
-UI._detailFramePool   = {}
+-- Frame pool for left-panel row recycling
+UI._leftRowPool = {}
 
 -- Colors
 local COLOR_BG       = { 0.05, 0.05, 0.05, 0.92 }
@@ -1055,6 +1053,9 @@ end
 
 function UI:FilterMemberList(query)
     query = query:lower()
+    self._navState = "allMembers"
+    self._selectedProfession = nil
+    self._selectedMember = nil
     self:ClearLeftRows()
     self.leftBreadcrumb:Hide()
 
@@ -1106,38 +1107,6 @@ function UI:ShowDetailEmpty(memberKey, profName)
     msg:SetTextColor(0.5, 0.5, 0.5)
     msg:SetJustifyH("CENTER")
     self.detailRows[#self.detailRows + 1] = msg
-end
-
-----------------------------------------------------------------------
--- Frame / FontString Acquisition (pool-aware)
-----------------------------------------------------------------------
-
-function UI:AcquireFontString(parent, template)
-    local pool = self._detailFontStringPool
-    local fs = table.remove(pool)
-    if fs then
-        -- Re-parent the recycled FontString
-        -- FontStrings don't have SetParent, so we create new ones but
-        -- keep the pool for same-parent reuse
-        if fs:GetParent() == parent then
-            fs:Show()
-            return fs
-        end
-        -- Different parent — can't re-parent FontStrings, put it back
-        pool[#pool + 1] = fs
-    end
-    return parent:CreateFontString(nil, "OVERLAY", template or "GameFontNormal")
-end
-
-function UI:AcquireFrame(parent, frameType, template)
-    local pool = self._detailFramePool
-    local frame = table.remove(pool)
-    if frame then
-        frame:SetParent(parent)
-        frame:Show()
-        return frame
-    end
-    return CreateFrame(frameType or "Frame", nil, parent, template)
 end
 
 ----------------------------------------------------------------------
@@ -1250,15 +1219,6 @@ function UI:ClearDetailRows()
     for _, obj in ipairs(self.detailRows) do
         if obj.Hide then obj:Hide() end
         if obj.ClearAllPoints then obj:ClearAllPoints() end
-        -- Return to the appropriate pool based on object type
-        if obj.SetText and not obj.SetScript then
-            -- FontString
-            self._detailFontStringPool[#self._detailFontStringPool + 1] = obj
-        elseif obj.SetScript then
-            -- Frame or Button
-            obj:SetScript("OnClick", nil)
-            self._detailFramePool[#self._detailFramePool + 1] = obj
-        end
     end
     self.detailRows = {}
 end
