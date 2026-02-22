@@ -156,8 +156,14 @@ function GuildCrafts:SlashHandler(input)
         else
             self:Print("Data module not loaded.")
         end
+    elseif input == "minimap" then
+        if self.MinimapButton then
+            self.MinimapButton:Toggle()
+        else
+            self:Print("MinimapButton module not loaded.")
+        end
     else
-        self:Print("Commands: /gc, /gc debug, /gc dump, /gc comms, /gc mem, /gc sim <N>, /gc reset")
+        self:Print("Commands: /gc, /gc debug, /gc dump, /gc comms, /gc mem, /gc sim <N>, /gc minimap, /gc reset")
     end
 end
 

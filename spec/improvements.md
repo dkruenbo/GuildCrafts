@@ -16,7 +16,7 @@
 | 5 | ~~Skill Level Display~~ | ~~Show each member's current profession skill (e.g. "Alchemy 375/375").~~ | **DONE** — Skill level captured during DetectProfessions, displayed in member list and recipe detail header |
 | 6 | Favorites / Bookmarks | Let users star recipes for quick access in a dedicated "Favorites" tab. | Avoids repeated searches for the same commonly-needed items (flasks, enchants). |
 | 7 | ~~Recipe Categorization~~ | ~~Group recipes by sub-type (Potions, Elixirs, Flasks for Alchemy; Weapons, Armor for Blacksmithing, etc.).~~ | **DONE** — Category captured from profession window headers during scan, displayed as grouped headers in recipe detail view |
-| 8 | Minimap Button | Small icon on the minimap to toggle the window. Uses LibDBIcon. | Not everyone remembers `/gc`. A visible button increases discoverability. |
+| 8 | ~~Minimap Button~~ | ~~Small icon on the minimap to toggle the window. Uses LibDBIcon.~~ | **DONE** — Self-contained MinimapButton.lua module with draggable icon, saved position, /gc minimap toggle |
 
 ## Tier 3 — Communication & UX
 

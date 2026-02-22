@@ -16,6 +16,7 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Cooldown tracking** — shows active profession cooldowns (Transmutes, Primal Mooncloth, Spellcloth, Shadowcloth) with time remaining
 - **Skill level display** — see each member's current profession skill level (e.g. "375/375") in the member list and recipe detail view
 - **Recipe categorization** — recipes are grouped by sub-type (Potions, Elixirs, Flasks, Weapons, Armor, etc.) with visual category headers
+- **Minimap button** — small icon on the minimap to toggle the window; drag to reposition, hide with `/gc minimap`
 - **Profession change detection** — dropping a profession automatically purges stale data
 - **Guild roster pruning** — ex-guild members are cleaned up automatically
 
@@ -43,6 +44,7 @@ Alchemy · Blacksmithing · Enchanting · Engineering · Jewelcrafting · Leathe
 | `/gc sim sync` | Simulate a full sync response |
 | `/gc sim delta` | Simulate an incoming recipe update |
 | `/gc sim craft` | Simulate an incoming craft request |
+| `/gc minimap` | Toggle minimap button visibility |
 | `/gc reset` | Wipe all saved data and reload |
 
 ## How It Works

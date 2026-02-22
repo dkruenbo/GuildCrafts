@@ -15,6 +15,7 @@ read_globals = {
     "ChatFontNormal", "UISpecialFrames",
     "UIDropDownMenu_Initialize", "UIDropDownMenu_AddButton",
     "UIDropDownMenu_SetSelectedID",
+    "Minimap", "GetCursorPosition",
 
     -- WoW API — Addon messaging
     "C_ChatInfo", "C_Timer", "C_GuildInfo",

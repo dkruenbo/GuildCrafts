@@ -81,9 +81,15 @@ RECIPE CATEGORIES
 When you open a member's recipe list, recipes are grouped by category (e.g. Potions, Elixirs, Flasks for Alchemy; Weapons, Armor for Blacksmithing). These categories come straight from the profession window headers and are stored with each recipe. Within each category, recipes are sorted alphabetically. This makes browsing through large recipe lists much easier than a single flat alphabetical list.
 
 
+MINIMAP BUTTON
+--------------
+A small book icon appears on your minimap after installing the addon. Left-click it to toggle the GuildCrafts window — same as typing /gc. You can drag the icon around the minimap edge to reposition it. If you prefer a clean minimap, type /gc minimap to hide it (and again to bring it back). The position is saved between sessions.
+
+
 SLASH COMMANDS
 --------------
 /gc            Open/close the window
+/gc minimap    Toggle minimap button visibility
 /gc reset      Wipe all saved data and start fresh
 
 
