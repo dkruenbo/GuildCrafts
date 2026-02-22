@@ -806,6 +806,7 @@ function Data:StripSyncFields(entry)
 
     local copy = {
         lastUpdate = entry.lastUpdate,
+        dataFormat = GuildCrafts.DATA_FORMAT_VERSION,
         _simulated = entry._simulated,
         professions = {},
     }
@@ -881,7 +882,11 @@ function Data:MergeIncoming(incomingData)
                 GuildCrafts:Debug("Skipped merge for own data:", memberKey)
             else
                 local localEntry = self.db.global[memberKey]
-                if not localEntry or incomingEntry.lastUpdate > localEntry.lastUpdate then
+                local dominated = not localEntry
+                    or incomingEntry.lastUpdate > localEntry.lastUpdate
+                    or (incomingEntry.lastUpdate == localEntry.lastUpdate
+                        and (incomingEntry.dataFormat or 0) > (localEntry.dataFormat or 0))
+                if dominated then
                     self.db.global[memberKey] = incomingEntry
                     changed = true
                     GuildCrafts:Debug("Merged data for:", memberKey)
