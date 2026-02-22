@@ -14,6 +14,7 @@ Core.lua
 Data.lua
 Comms.lua
 CraftRequest.lua
+Tooltip.lua
 
 # UI (all panels consolidated in MainFrame.lua)
 UI\MainFrame.lua

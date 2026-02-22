@@ -9,7 +9,8 @@ globals = {
 
 read_globals = {
     -- WoW API — Frames & UI
-    "CreateFrame", "UIParent", "GameTooltip", "GameFontNormal",
+    "CreateFrame", "UIParent", "GameTooltip", "ItemRefTooltip",
+    "GameFontNormal",
     "GameFontNormalLarge", "GameFontNormalSmall", "GameFontDisableSmall",
     "ChatFontNormal", "UISpecialFrames",
     "UIDropDownMenu_Initialize", "UIDropDownMenu_AddButton",
@@ -40,6 +41,7 @@ read_globals = {
 
     -- WoW API — Misc
     "GetAddOnMemoryUsage", "UpdateAddOnMemoryUsage",
+    "GetBuildInfo", "GetItemInfo",
     "UnitName", "GetRealmName", "ReloadUI",
     "time",
 

@@ -51,6 +51,11 @@ CRAFT REQUESTS
 When you find a recipe in the search and click "Request Craft", the crafter gets a popup asking them to Accept or Decline. If they accept, the item goes into their craft queue. When they're done, they click "Done" and you get a notification. If the crafter doesn't have the addon, a regular whisper is sent instead.
 
 
+TOOLTIPS
+--------
+When you hover over any item in the game (in your bags, the auction house, or a link in chat), the tooltip will automatically show which guild members can craft that item. Online crafters are shown in green, offline in grey.
+
+
 SLASH COMMANDS
 --------------
 /gc            Open/close the window

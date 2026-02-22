@@ -4,7 +4,7 @@
 
 | # | Feature | Description | Why |
 |---|---------|-------------|-----|
-| 1 | Tooltip Integration | When hovering over any item in WoW (bags, AH, chat links), show "Craftable by: PlayerA, PlayerB" in the tooltip automatically. | Biggest daily convenience — no need to open the window at all for quick lookups. |
+| 1 | ~~Tooltip Integration~~ | ~~When hovering over any item in WoW (bags, AH, chat links), show "Craftable by: PlayerA, PlayerB" in the tooltip automatically.~~ | **DONE** — Implemented in Tooltip.lua |
 | 2 | Reagent / Material Tracking | Show what materials each recipe requires. Scan `GetTradeSkillReagentInfo()` during profession scan. | Lets players prepare mats before requesting a craft. Saves back-and-forth whispers. |
 | 3 | Specialisation Tracking | Detect and display profession specialisations (Potions/Elixir/Transmute Master, Weaponsmith/Armorsmith, Gnomish/Goblin Engineering, Mooncloth/Shadoweave/Spellfire Tailoring, Dragonscale/Elemental/Tribal Leatherworking). | Specs unlock exclusive recipes and procs. Knowing who has what spec saves guesswork when planning crafts. |
 | 4 | Cooldown Tracking | Track shared cooldowns (Primal Mooncloth, Transmutes, Spellcloth, etc.) and show time remaining per player. | Guild officers and raid leaders can coordinate limited daily/multi-day crafts across the roster. |
