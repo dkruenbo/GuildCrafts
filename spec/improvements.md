@@ -59,8 +59,9 @@
 - **New model: broadcast-only, passive listen.**
   - Sellers broadcast their listings **only** on login and when they manually update/add/remove a listing. No automated periodic re-broadcasts.
   - All other addon users **passively listen** on the channel and cache what they hear. No request messages, no responses.
-  - Listings expire from the local cache after 30 minutes. If a seller is still online and hasn't changed anything, their listings naturally age out — but they will re-broadcast on next login.
-  - This reduces traffic from O(N) response storms to O(1) per seller action. A server with 200 active sellers generates ~200 messages total at peak login, spread across the login window — not 200 responses to a single request.
+  - Listings expire from the local cache after 30 minutes.
+  - **Keeping-alive without spam**: A seller who logs in and plays for 3 hours without changing listings would vanish from everyone's cache after 30 minutes. To prevent this, the seller's client runs an automatic re-broadcast every 25 minutes (just under the 30-min TTL). This is max 5 short messages spaced 1–2 seconds apart, once every 25 minutes — negligible traffic that will never trigger spam detection. Additionally, the Market tab has a manual "Refresh My Listings" button with a 15-minute cooldown for sellers who want explicit control.
+  - This reduces traffic from O(N) response storms to O(1) per seller action. A server with 200 active sellers generates ~200 messages total at peak login, spread across the login window — not 200 responses to a single request. Ongoing keep-alive adds ~200 × 5 messages per 25-minute window across the entire server, spread naturally by login time offsets.
 
 **Lightweight Wire Format (no AceSerializer):**
 - AceSerializer + LibDeflate produce opaque binary-looking strings that trigger Blizzard's spam detector and look like bot output to other players.
@@ -75,6 +76,7 @@
   - Sender name comes from the chat message metadata (no need to include it in payload).
   - Max 5 `[GC]L:` messages per broadcast. Each message is a single short line.
 - A `ChatFrame_AddMessageEventFilter` strips `[GC]` messages from addon users' chat windows so they never see them.
+- **UI Taint warning**: WoW's chat filters are notorious for causing UI taint (where standard Blizzard buttons stop working) if not implemented correctly. The filter must be a plain function reference — no closures over secure frames, no calls to protected functions, no modifications to Blizzard UI elements inside the filter callback. Test thoroughly with `/run SetCVar("taintLog", 1)` and check `BugSack` / `!BugGrabber` for taint traces.
 
 **Custom Channel Resilience:**
 - WoW custom channels can be hijacked — the oldest member becomes "Owner" and can password-lock the channel, blocking all other users. Trolls do this on popular servers.
@@ -99,7 +101,8 @@
 1. Player opens their recipe list in the guild view and clicks "List for Sale" on up to 5 recipes.
 2. Listings are stored locally in SavedVariables.
 3. On login (after channel join) and on any listing change, the addon broadcasts up to 5 `[GC]L:` messages to the market channel, spaced 1–2 seconds apart.
-4. Other addon users passively receive and cache these listings.
+4. The seller's client automatically re-broadcasts every 25 minutes to keep listings alive in other users' caches (just under the 30-min TTL). A manual "Refresh My Listings" button (15-min cooldown) is also available.
+5. Other addon users passively receive and cache these listings.
 
 **Data Model per Listing (local cache):**
 ```
