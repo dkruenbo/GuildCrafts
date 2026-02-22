@@ -944,6 +944,35 @@ local SAMPLE_CATEGORIES = {
 
 local PROF_NAMES = { "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
 
+-- Sample reagent lists (arrays of {name, count, itemID})
+local SAMPLE_REAGENTS = {
+    { { name = "Fel Lotus", count = 1, itemID = 22794 }, { name = "Mana Thistle", count = 3, itemID = 22793 }, { name = "Imbued Vial", count = 1, itemID = 18256 } },
+    { { name = "Felsteel Bar", count = 6, itemID = 23449 }, { name = "Hardened Adamantite Bar", count = 2, itemID = 23573 }, { name = "Primal Fire", count = 4, itemID = 21884 } },
+    { { name = "Large Prismatic Shard", count = 4, itemID = 22449 }, { name = "Greater Planar Essence", count = 6, itemID = 22446 }, { name = "Void Crystal", count = 2, itemID = 22450 } },
+    { { name = "Khorium Bar", count = 8, itemID = 23449 }, { name = "Felsteel Stabilizer", count = 2, itemID = 23787 }, { name = "Hardened Adamantite Tube", count = 1, itemID = 23784 } },
+    { { name = "Living Ruby", count = 1, itemID = 24036 } },
+    { { name = "Heavy Knothide Leather", count = 4, itemID = 23793 }, { name = "Primal Earth", count = 2, itemID = 22452 } },
+    { { name = "Bolt of Imbued Netherweave", count = 8, itemID = 21844 }, { name = "Netherweb Spider Silk", count = 2, itemID = 21881 }, { name = "Primal Mooncloth", count = 4, itemID = 21845 } },
+    { { name = "Primal Nether", count = 1, itemID = 23572 }, { name = "Hardened Adamantite Bar", count = 8, itemID = 23573 } },
+    { { name = "Dawnstone", count = 1, itemID = 24048 } },
+    { { name = "Star of Elune", count = 1, itemID = 24051 } },
+}
+
+-- Profession → possible specialisation names
+local SAMPLE_SPECIALISATIONS = {
+    ["Alchemy"]         = { "Potion Master", "Elixir Master", "Transmutation Master" },
+    ["Blacksmithing"]   = { "Armorsmith", "Weaponsmith", "Master Swordsmith", "Master Hammersmith", "Master Axesmith" },
+    ["Engineering"]     = { "Gnomish Engineer", "Goblin Engineer" },
+    ["Leatherworking"]  = { "Dragonscale Leatherworking", "Elemental Leatherworking", "Tribal Leatherworking" },
+    ["Tailoring"]       = { "Mooncloth Tailoring", "Shadoweave Tailoring", "Spellfire Tailoring" },
+}
+
+-- Profession → possible cooldown recipe names
+local SAMPLE_COOLDOWNS = {
+    ["Alchemy"]    = { "Transmute: Primal Might", "Transmute: Earthstorm Diamond", "Transmute: Skyfire Diamond" },
+    ["Tailoring"]  = { "Primal Mooncloth", "Spellcloth", "Shadowcloth" },
+}
+
 function Data:HandleSimCommand(arg)
     if not GuildCrafts.debugMode then
         GuildCrafts:Print("Simulation requires debug mode. Run /gc debug first.")
@@ -1006,9 +1035,29 @@ function Data:SimGenerate(count)
                     name = SAMPLE_RECIPES[idx],
                     source = (math.random() > 0.5) and "Trainer" or "World Drop",
                     category = SAMPLE_CATEGORIES[math.random(#SAMPLE_CATEGORIES)],
+                    reagents = SAMPLE_REAGENTS[math.random(#SAMPLE_REAGENTS)],
                 }
             end
-            entry.professions[profName] = { recipes = recipes, skillLevel = math.random(300, 375), maxSkillLevel = 375 }
+
+            local profEntry = { recipes = recipes, skillLevel = math.random(300, 375), maxSkillLevel = 375 }
+
+            -- ~40% chance of having a specialisation (only for profs that have one)
+            local specs = SAMPLE_SPECIALISATIONS[profName]
+            if specs and math.random() < 0.4 then
+                profEntry.specialisation = specs[math.random(#specs)]
+            end
+
+            -- ~20% chance of an active cooldown (only for profs that have them)
+            local cds = SAMPLE_COOLDOWNS[profName]
+            if cds and math.random() < 0.2 then
+                local cdName = cds[math.random(#cds)]
+                local remaining = math.random(3600, 72 * 3600)  -- 1h to 3d
+                profEntry.cooldowns = {
+                    [cdName] = { endTime = time() + remaining, duration = remaining },
+                }
+            end
+
+            entry.professions[profName] = profEntry
         end
 
         self.db.global[memberKey] = entry
@@ -1044,10 +1093,24 @@ function Data:SimSync()
                 name = SAMPLE_RECIPES[math.random(#SAMPLE_RECIPES)],
                 source = "Simulated Sync",
                 category = SAMPLE_CATEGORIES[math.random(#SAMPLE_CATEGORIES)],
+                reagents = SAMPLE_REAGENTS[math.random(#SAMPLE_REAGENTS)],
+            }
+        end
+        local profEntry = { recipes = recipes, skillLevel = math.random(300, 375), maxSkillLevel = 375 }
+        local specs = SAMPLE_SPECIALISATIONS[profName]
+        if specs and math.random() < 0.4 then
+            profEntry.specialisation = specs[math.random(#specs)]
+        end
+        local cds = SAMPLE_COOLDOWNS[profName]
+        if cds and math.random() < 0.2 then
+            local cdName = cds[math.random(#cds)]
+            local remaining = math.random(3600, 72 * 3600)
+            profEntry.cooldowns = {
+                [cdName] = { endTime = time() + remaining, duration = remaining },
             }
         end
         fakeData[memberKey] = {
-            professions = { [profName] = { recipes = recipes, skillLevel = math.random(300, 375), maxSkillLevel = 375 } },
+            professions = { [profName] = profEntry },
             lastUpdate = time(),
             _simulated = true,
         }
@@ -1066,6 +1129,8 @@ function Data:SimDelta()
                 local recipe = {
                     name = SAMPLE_RECIPES[math.random(#SAMPLE_RECIPES)] .. " (NEW)",
                     source = "Simulated Delta",
+                    category = SAMPLE_CATEGORIES[math.random(#SAMPLE_CATEGORIES)],
+                    reagents = SAMPLE_REAGENTS[math.random(#SAMPLE_REAGENTS)],
                 }
                 self:MergeDelta(memberKey, profName, newKey, recipe, time())
                 GuildCrafts:Printf("Simulated delta: %s → %s → %s", memberKey, profName, recipe.name)
