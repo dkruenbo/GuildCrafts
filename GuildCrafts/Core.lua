@@ -103,8 +103,9 @@ function GuildCrafts:OnCraftShow()
 end
 
 function GuildCrafts:OnGuildRosterUpdate()
-    -- Guild roster changed — update online/offline status, prune ex-members
+    -- Rebuild online cache first so all downstream handlers see fresh data
     if self.Data then
+        self.Data:RebuildOnlineCache()
         self.Data:PruneRoster()
     end
     if self.Comms then
