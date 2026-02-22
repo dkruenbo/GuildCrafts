@@ -60,7 +60,7 @@ Alchemy · Blacksmithing · Enchanting · Engineering · Jewelcrafting · Leathe
 
 ## Requirements
 
-- World of Warcraft: The Burning Crusade Anniversary (Classic TBC, Interface 20504)
+- World of Warcraft: The Burning Crusade Anniversary (Classic TBC, Interface 20505)
 - Must be in a guild
 
 ## Libraries Used

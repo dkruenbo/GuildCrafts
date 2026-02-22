@@ -26,7 +26,7 @@ Once your recipes are scanned, the addon shares them automatically through invis
 
 4. Live updates — Whenever someone opens their profession window and the addon finds new recipes, a small update is broadcast to the guild. Everyone online gets it instantly, no full re-sync needed.
 
-5. Heartbeat — The DR sends a little "I'm still here" signal every 60 seconds. If 3 heartbeats are missed (3 minutes), the Backup takes over. If both go offline, any remaining addon user can respond to sync requests.
+5. Heartbeat — The DR sends a little "I'm still here" signal every 60 seconds. If 3 heartbeats are missed (3 minutes), the Backup takes over. If both DR and BDR go offline, the remaining addon users evict them and elect a new DR from the remaining pool — only that new DR responds to sync requests, so there's never a flood of replies.
 
 6. The more guildies who install it, the more complete the guild-wide recipe book becomes.
 

@@ -55,8 +55,8 @@ Recipe data propagates through the guild using an **incremental gossip protocol*
 When a player logs in and broadcasts a `SYNC_REQUEST`, without a DR **every** online peer would respond with potentially large `SYNC_RESPONSE` payloads, flooding the channel. With DR/BDR:
 - **Only the DR responds** to `SYNC_REQUEST` messages.
 - The DR sends its `SYNC_RESPONSE` via **addon WHISPER** (targeted to the requester, completely invisible — no chat text appears) rather than broadcasting over GUILD. This avoids forcing every online addon user to download data they already have.
-- If the requester does not receive a response within a timeout (e.g. 5 seconds), it broadcasts a **second `SYNC_REQUEST`** with a retry flag. The **BDR** recognizes the retry and takes over as acting DR, sending the response. (The BDR cannot directly observe the DR's WHISPER-based responses, so the requester's retry is the failure signal.)
-- If neither DR nor BDR responds, the requester falls back to a third `SYNC_REQUEST` round which any peer may answer (graceful degradation).
+- If the requester does not receive a response within **30 seconds** (`SYNC_TIMEOUT`), it broadcasts a **second `SYNC_REQUEST`** with `retry = 1`. Both the **DR and BDR** are eligible to respond to retry 1. (The BDR cannot directly observe the DR's WHISPER-based responses, so the requester's retry is the failure signal.)
+- If neither DR nor BDR responds after a further **15 seconds** (`SYNC_RETRY_TIMEOUT`), the requester broadcasts a third `SYNC_REQUEST` with `retry = 2`. All nodes (including the requester) **evict the unresponsive DR and BDR** from their `addonUsers` table and run `RecomputeElection()`. Only the **newly elected DR** responds — preventing a flood where every online node would answer simultaneously.
 
 ### Sync Rules
 
@@ -84,7 +84,7 @@ When a player logs in and broadcasts a `SYNC_REQUEST`, without a DR **every** on
    However, at the **member level**, sync uses **full replacement**: if the incoming data for a member has a newer `lastUpdate` than the local copy, the receiver replaces that member's entire entry (all professions and recipes) with the incoming version. This ensures that profession removals propagate correctly — if Player A drops Blacksmithing, their newer `lastUpdate` causes all syncing nodes to replace their stale copy (which included Blacksmithing) with the new one (which does not).
 
 5. **Throttling** 
-   Full sync responses are sent via WHISPER and are chunked by profession into separate messages, throttled via ChatThrottleLib at `BULK` priority to avoid disconnects. This means the requester receives data progressively (profession by profession) and can display partial results before the full sync completes. Delta updates are small (single recipe) and sent at `NORMAL` priority for faster delivery.
+   Full sync responses are sent via WHISPER and **chunked into batches of 10 members** per message, throttled via ChatThrottleLib at `BULK` priority to avoid disconnects. Each chunk carries `chunkIndex` / `chunkTotal` metadata so the receiver knows when the full sync is complete, resetting the sync timeout with each arriving chunk. Delta updates are small (single recipe) and sent at `NORMAL` priority for faster delivery.
 
 6. **Guild roster pruning** 
    On login and periodically while online, the addon checks the current guild roster via `GetGuildRosterInfo()`. Any `CharacterName-Realm` key in the local database that does **not** appear in the current guild roster is **deleted**. This ensures:
@@ -253,7 +253,7 @@ When the requester receives a response to their craft request, a notification is
 A subtle sound plays for accept and complete notifications.
 
 ### Tooltip Integration
-_Not included in v1. May be added in a future version (hover over items in bags/chat to see guild crafters)._
+When hovering over any item in the game (bags, auction house, chat links), the tooltip automatically shows which guild members can craft that item. Online crafters appear in green, offline in grey. Implemented in `Tooltip.lua` using `GameTooltip:HookScript("OnTooltipSetItem")`.
 
 ---
 
@@ -268,19 +268,31 @@ GuildCraftsDB = {
         recipes = {
           [itemID] = {                    -- itemID for professions that produce items
             name = "Lionheart Helm",
-            source = "World Drop",       -- optional metadata
+            source = "World Drop",        -- optional metadata
+            reagents = "6x Fel Iron Bar, 2x Hardened Adamantite Bar",  -- material list
+            category = "Armor",           -- profession window header group
           },
           ...
         },
+        specialisation = "Armorsmith",    -- TBC spec (nil if none)
+        cooldowns = {
+          ["Hardened Adamantite Bar"] = { start = timestamp, duration = 86400 },
+        },
+        skillLevel = 375,                 -- current skill rank
+        maxSkillLevel = 375,              -- skill cap
       },
       ["Enchanting"] = {
         recipes = {
-          [spellID] = {                  -- spellID for enchants (no item produced)
+          [spellID] = {                   -- spellID for enchants (no item produced)
             name = "Enchant Weapon - Mongoose",
             source = "Moroes - Karazhan",
+            reagents = "2x Large Prismatic Shard, ...",
+            category = "Weapon Enchantments",
           },
           ...
         },
+        skillLevel = 375,
+        maxSkillLevel = 375,
       },
       ...
     },
@@ -315,7 +327,9 @@ The addon tracks **all** learned recipes for each profession — both trainer-ta
 
 ---
 
-## Future Considerations (out of scope for v1)
-- Tooltip integration (hover over items to see who can craft them).
-- Minimap button.
+## Future Considerations
 - Integration with auction house pricing.
+- Server-wide craft marketplace (see improvements.md T5.16).
+- In-game craft request chat between requester and crafter.
+- Export to CSV / Text for guild website use.
+- Locale support for multi-language guilds (spellID-based keys with localized display names).
