@@ -681,6 +681,7 @@ end
 ----------------------------------------------------------------------
 
 function UI:ShowSearchResults(results)
+    self._searchActive = true
     self.detailWelcome:Hide()
     self:ClearDetailRows()
 
@@ -761,6 +762,25 @@ function UI:ShowSearchResults(results)
 
             self.detailRows[#self.detailRows + 1] = crafterRow
             yOffset = yOffset - 18
+        end
+
+        -- Reagents
+        if result.reagents and #result.reagents > 0 then
+            local parts = {}
+            for _, r in ipairs(result.reagents) do
+                parts[#parts + 1] = r.count .. "x " .. r.name
+            end
+            local reagentStr = table.concat(parts, ", ")
+            local reagentText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            reagentText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 16, yOffset)
+            reagentText:SetText("Reagents: " .. reagentStr)
+            reagentText:SetTextColor(0.6, 0.8, 1.0)
+            reagentText:SetWordWrap(true)
+            reagentText:SetWidth(360)
+            self.detailRows[#self.detailRows + 1] = reagentText
+            local textHeight = reagentText:GetStringHeight()
+            if not textHeight or textHeight < 12 then textHeight = 12 end
+            yOffset = yOffset - textHeight - 4
         end
 
         yOffset = yOffset - 8  -- spacing between recipes
@@ -1010,6 +1030,7 @@ end
 function UI:OnSearch(text)
     if not text or text == "" then
         -- Restore default view
+        self._searchActive = false
         self:PopulateProfessionList()
         self:UpdateDetailWelcome()
         return
@@ -1091,7 +1112,7 @@ end
 ----------------------------------------------------------------------
 
 function UI:UpdateDetailWelcome()
-    if self._selectedMember then
+    if self._selectedMember or self._searchActive then
         self.detailWelcome:Hide()
     else
         self.detailWelcome:Show()

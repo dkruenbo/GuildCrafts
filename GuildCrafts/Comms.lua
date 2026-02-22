@@ -355,6 +355,21 @@ function Comms:SendSyncRequest()
     if not IsInGuild() then return end
 
     local playerKey = GuildCrafts.Data:GetPlayerKey()
+
+    -- If we are the DR, nobody will respond to our request (we skip our
+    -- own messages in HandleSyncRequest). Mark sync as complete — the DR
+    -- already accumulates all data by processing everyone else's requests.
+    if self.myRole == "DR" then
+        GuildCrafts:Debug("We are DR — skipping SYNC_REQUEST (already authoritative)")
+        self.syncPending = false
+        self.syncRetryCount = 0
+        if self.syncTimer then
+            self:CancelTimer(self.syncTimer)
+            self.syncTimer = nil
+        end
+        return
+    end
+
     local vector = GuildCrafts.Data:GetVersionVector()
 
     self:SendMessage(MSG_SYNC_REQUEST, {
@@ -474,6 +489,14 @@ function Comms:ProcessSyncRequest(requester, incomingVector)
 
     if sendCount > 0 then
         self:SendChunked(MSG_SYNC_RESPONSE, toSend, requester, sendCount)
+    else
+        -- Always send at least an empty SYNC_RESPONSE so the requester
+        -- knows we heard them and can stop waiting (otherwise they time out).
+        self:SendMessage(MSG_SYNC_RESPONSE, {
+            data       = {},
+            chunkIndex = 1,
+            chunkTotal = 1,
+        }, "WHISPER", requester, PRIO_NORMAL)
     end
 
     -- Send SYNC_PULL if requester has data we need

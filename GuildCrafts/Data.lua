@@ -1315,6 +1315,7 @@ function Data:SearchRecipes(query)
                                     recipeKey = recipeKey,
                                     profName = profName,
                                     source = recipeData.source,
+                                    reagents = recipeData.reagents,
                                     crafters = {},
                                 }
                             end
