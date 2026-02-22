@@ -455,13 +455,18 @@ function UI:NavigateToMembers(profName)
         local isOnline = self:IsMemberOnline(memberInfo.key)
         local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
         local specTag = ""
+        local skillTag = ""
         if memberInfo.entry and memberInfo.entry.professions and memberInfo.entry.professions[profName] then
-            local spec = memberInfo.entry.professions[profName].specialisation
+            local profData = memberInfo.entry.professions[profName]
+            local spec = profData.specialisation
             if spec then
                 specTag = "  |cffaaddff[" .. spec .. "]|r"
             end
+            if profData.skillLevel and profData.maxSkillLevel then
+                skillTag = "  |cffffff99" .. profData.skillLevel .. "/" .. profData.maxSkillLevel .. "|r"
+            end
         end
-        local label = dot .. memberInfo.key:match("^(.+)-") .. "  |cff888888" .. memberInfo.recipeCount .. " recipes|r" .. specTag
+        local label = dot .. memberInfo.key:match("^(.+)-") .. skillTag .. "  |cff888888" .. memberInfo.recipeCount .. " recipes|r" .. specTag
         local row = self:CreateLeftRow(self.leftContent, yOffset, label)
         row.memberKey = memberInfo.key
         row:SetScript("OnClick", function()
@@ -513,7 +518,11 @@ function UI:ShowMemberRecipes(memberKey, profName)
     local header = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     header:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, -8)
     local headerText = memberKey:match("^(.+)-") .. " — " .. profName
-    local spec = entry.professions[profName].specialisation
+    local profData = entry.professions[profName]
+    if profData.skillLevel and profData.maxSkillLevel then
+        headerText = headerText .. "  " .. profData.skillLevel .. "/" .. profData.maxSkillLevel
+    end
+    local spec = profData.specialisation
     if spec then
         headerText = headerText .. "  |cffaaddff(" .. spec .. ")|r"
     end
@@ -524,7 +533,6 @@ function UI:ShowMemberRecipes(memberKey, profName)
     local yOffset = -32
 
     -- Cooldowns section (if any active)
-    local profData = entry.professions[profName]
     if profData.cooldowns then
         local hasCooldowns = false
         -- Collect and sort active cooldowns

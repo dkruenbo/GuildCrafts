@@ -143,10 +143,12 @@ function Data:DetectProfessions()
     local currentProfs = {}
 
     -- GetSkillLineInfo enumerates all skills including professions
+    local skillLevels = {}  -- profName -> { rank, max }
     for i = 1, GetNumSkillLines() do
-        local skillName, isHeader, _, skillRank, _, _, _, _, _, _, _, _, _ = GetSkillLineInfo(i)
+        local skillName, isHeader, _, skillRank, _, _, skillMaxRank, _, _, _, _, _, _ = GetSkillLineInfo(i)
         if not isHeader and TRACKED_PROFESSIONS[skillName] then
             currentProfs[skillName] = true
+            skillLevels[skillName] = { rank = skillRank, max = skillMaxRank }
         end
     end
 
@@ -160,10 +162,19 @@ function Data:DetectProfessions()
         end
     end
 
-    -- Ensure entries exist for current professions
+    -- Ensure entries exist for current professions and update skill levels
     for profName, _ in pairs(currentProfs) do
         if not entry.professions[profName] then
             entry.professions[profName] = { recipes = {} }
+        end
+        local sl = skillLevels[profName]
+        if sl then
+            local profData = entry.professions[profName]
+            if profData.skillLevel ~= sl.rank or profData.maxSkillLevel ~= sl.max then
+                profData.skillLevel = sl.rank
+                profData.maxSkillLevel = sl.max
+                changed = true
+            end
         end
     end
 
@@ -914,7 +925,7 @@ function Data:SimGenerate(count)
                     source = (math.random() > 0.5) and "Trainer" or "World Drop",
                 }
             end
-            entry.professions[profName] = { recipes = recipes }
+            entry.professions[profName] = { recipes = recipes, skillLevel = math.random(300, 375), maxSkillLevel = 375 }
         end
 
         self.db.global[memberKey] = entry
@@ -952,7 +963,7 @@ function Data:SimSync()
             }
         end
         fakeData[memberKey] = {
-            professions = { [profName] = { recipes = recipes } },
+            professions = { [profName] = { recipes = recipes, skillLevel = math.random(300, 375), maxSkillLevel = 375 } },
             lastUpdate = time(),
             _simulated = true,
         }

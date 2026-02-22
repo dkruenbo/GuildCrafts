@@ -71,6 +71,11 @@ COOLDOWNS
 When you open your profession window, the addon scans for active cooldowns on timed recipes like Transmutes, Primal Mooncloth, Spellcloth, and Shadowcloth. These cooldowns are displayed in the recipe detail view with time remaining (e.g. "1d 12h remaining") and sync to the guild so officers and raid leaders can see who is available for limited crafts.
 
 
+SKILL LEVELS
+------------
+Each member's profession skill level (e.g. "375/375") is shown next to their name in the member list and in the recipe detail header. This is detected automatically when you log in and syncs to the guild, so you can tell at a glance who is max-level and who is still levelling a profession — useful for knowing whether someone can actually learn a high-level recipe they don't have yet.
+
+
 SLASH COMMANDS
 --------------
 /gc            Open/close the window
