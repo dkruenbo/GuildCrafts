@@ -99,6 +99,12 @@
 - The addon **must** handle channel join failures gracefully: disable market features silently, notify the user, never error or block.
 - Fallback strategy: if the primary channel (`GCMarket`) is locked, try rotating fallback channels (`GCMarket1`, `GCMarket2`).
 - Consider a deterministic channel name that rotates (e.g. based on date or realm hash) to make hijacking harder to sustain.
+- **Channel join confirmation**: After calling `JoinChannelByName("GCMarket")`, listen for `CHAT_MSG_CHANNEL_NOTICE` to confirm success or detect rejection. The notice `type` arg indicates the result:
+  - `"YOU_JOINED"` — successfully joined. Store the channel index and begin broadcasting.
+    - **Immediately hide channel from chat windows**: WoW automatically adds joined channels to the player's primary chat frame (ChatFrame1), causing a visible "Joined Channel: GCMarket" message and letting the user accidentally type into it. After receiving `YOU_JOINED`, call `ChatFrame_RemoveChannel(ChatFrame1, "GCMarket")` (and any other chat frames) to remove the channel from display. The addon stays connected in the background and can still send/receive — this only hides the channel from the player's chat UI.
+  - `"WRONG_PASSWORD"` / `"BANNED"` — channel is hijacked/locked. Immediately try the next fallback channel (`GCMarket1`, `GCMarket2`, etc.).
+  - `"YOU_LEFT"` — unexpected leave. Attempt rejoin after a short delay.
+  - If all fallback channels fail, disable market features and show a single user-facing message: "Market unavailable — all channels locked."
 
 **Blizzard TOS & Spam Avoidance:**
 - Blizzard has broken addons that create large automated networks in public channels (e.g. ClassicLFG). To stay compliant:
