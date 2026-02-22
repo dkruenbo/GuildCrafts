@@ -61,6 +61,11 @@ REAGENTS
 When you view a guild member's recipe list and click on a profession, each recipe now shows the materials needed to craft it (e.g. "Reagents: 2x Fel Lotus, 1x Mana Thistle"). This lets you gather the right materials before requesting a craft, saving time and whispers.
 
 
+SPECIALISATIONS
+---------------
+The addon automatically detects TBC profession specialisations when you log in (e.g. Transmutation Master, Mooncloth Tailoring, Goblin Engineer). Your spec is shown next to your name in the member list and in the recipe detail header. This syncs to the guild so everyone can see who has which spec — useful for finding the right crafter for spec-exclusive recipes or proc benefits.
+
+
 SLASH COMMANDS
 --------------
 /gc            Open/close the window

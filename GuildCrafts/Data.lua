@@ -47,6 +47,32 @@ local TRACKED_PROFESSIONS = {
     ["Tailoring"] = true,
 }
 
+-- TBC profession specialisations keyed by spellID
+-- Each entry maps to { profession, specName }
+local SPECIALISATION_SPELLS = {
+    -- Alchemy
+    [28675] = { prof = "Alchemy",         spec = "Potion Master" },
+    [28677] = { prof = "Alchemy",         spec = "Elixir Master" },
+    [28672] = { prof = "Alchemy",         spec = "Transmutation Master" },
+    -- Blacksmithing
+    [9788]  = { prof = "Blacksmithing",   spec = "Armorsmith" },
+    [9787]  = { prof = "Blacksmithing",   spec = "Weaponsmith" },
+    [17039] = { prof = "Blacksmithing",   spec = "Master Swordsmith" },
+    [17040] = { prof = "Blacksmithing",   spec = "Master Hammersmith" },
+    [17041] = { prof = "Blacksmithing",   spec = "Master Axesmith" },
+    -- Engineering
+    [20219] = { prof = "Engineering",     spec = "Gnomish Engineer" },
+    [20222] = { prof = "Engineering",     spec = "Goblin Engineer" },
+    -- Leatherworking
+    [10656] = { prof = "Leatherworking",  spec = "Dragonscale Leatherworking" },
+    [10658] = { prof = "Leatherworking",  spec = "Elemental Leatherworking" },
+    [10660] = { prof = "Leatherworking",  spec = "Tribal Leatherworking" },
+    -- Tailoring
+    [26798] = { prof = "Tailoring",       spec = "Mooncloth Tailoring" },
+    [26801] = { prof = "Tailoring",       spec = "Shadoweave Tailoring" },
+    [26797] = { prof = "Tailoring",       spec = "Spellfire Tailoring" },
+}
+
 -- AceDB defaults
 local DB_DEFAULTS = {
     global = {
@@ -148,6 +174,35 @@ function Data:DetectProfessions()
 
     self._currentProfs = currentProfs
     GuildCrafts:Debug("Detected professions:", table.concat(self:GetProfessionList(), ", "))
+
+    -- Detect specialisations immediately after professions
+    self:DetectSpecialisations()
+end
+
+----------------------------------------------------------------------
+-- Specialisation Detection (login-time, uses IsSpellKnown)
+----------------------------------------------------------------------
+
+function Data:DetectSpecialisations()
+    local playerKey = self:GetPlayerKey()
+    local entry = self:GetMemberEntry(playerKey, false)
+    if not entry then return end
+
+    local changed = false
+    for spellID, info in pairs(SPECIALISATION_SPELLS) do
+        local profData = entry.professions[info.prof]
+        if profData and IsSpellKnown(spellID) then
+            if profData.specialisation ~= info.spec then
+                profData.specialisation = info.spec
+                changed = true
+                GuildCrafts:Debug("Specialisation detected:", info.prof, "→", info.spec)
+            end
+        end
+    end
+
+    if changed then
+        entry.lastUpdate = time()
+    end
 end
 
 function Data:GetProfessionList()

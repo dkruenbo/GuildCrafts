@@ -454,7 +454,14 @@ function UI:NavigateToMembers(profName)
     for _, memberInfo in ipairs(members) do
         local isOnline = self:IsMemberOnline(memberInfo.key)
         local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
-        local label = dot .. memberInfo.key:match("^(.+)-") .. "  |cff888888" .. memberInfo.recipeCount .. " recipes|r"
+        local specTag = ""
+        if memberInfo.entry and memberInfo.entry.professions and memberInfo.entry.professions[profName] then
+            local spec = memberInfo.entry.professions[profName].specialisation
+            if spec then
+                specTag = "  |cffaaddff[" .. spec .. "]|r"
+            end
+        end
+        local label = dot .. memberInfo.key:match("^(.+)-") .. "  |cff888888" .. memberInfo.recipeCount .. " recipes|r" .. specTag
         local row = self:CreateLeftRow(self.leftContent, yOffset, label)
         row.memberKey = memberInfo.key
         row:SetScript("OnClick", function()
@@ -505,7 +512,12 @@ function UI:ShowMemberRecipes(memberKey, profName)
     -- Header
     local header = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     header:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, -8)
-    header:SetText(memberKey:match("^(.+)-") .. " — " .. profName)
+    local headerText = memberKey:match("^(.+)-") .. " — " .. profName
+    local spec = entry.professions[profName].specialisation
+    if spec then
+        headerText = headerText .. "  |cffaaddff(" .. spec .. ")|r"
+    end
+    header:SetText(headerText)
     header:SetTextColor(1, 0.82, 0)
     self.detailRows[#self.detailRows + 1] = header
 
