@@ -23,8 +23,8 @@
 | # | Feature | Description | Why |
 |---|---------|-------------|-----|
 | 9 | In-Game Craft Request Chat | Small embedded chat box between requester and crafter to discuss mats, tips, meeting location. | Keeps the conversation in context instead of switching to whisper windows. |
-| 10 | Profession Icons | Use WoW's built-in profession icons next to each profession name in the left panel. | Visual polish. Makes the list easier to scan at a glance. |
-| 11 | Data Expiry / Staleness Indicator | Flag member data that hasn't been updated in 30+ days. Optional auto-hide for inactive players. | Keeps the recipe book relevant. Prevents clutter from long-offline alts. |
+| 10 | ~~Profession Icons~~ | ~~Use WoW's built-in profession icons next to each profession name in the left panel.~~ | **DONE** — Icon textures rendered next to profession names in the left panel via CreateLeftRow icon parameter |
+| 11 | ~~Data Expiry / Staleness Indicator~~ | ~~Flag member data that hasn't been updated in 30+ days. Optional auto-hide for inactive players.~~ | **DONE** — Red [30d ago] / [2mo ago] tag shown in member list and recipe detail header for entries older than 30 days |
 
 ## Tier 4 — Scale & Infrastructure
 

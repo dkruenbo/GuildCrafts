@@ -400,6 +400,20 @@ function UI:CreateCraftQueueBar(parent)
 end
 
 ----------------------------------------------------------------------
+-- Profession Icon Textures (TBC)
+----------------------------------------------------------------------
+
+local PROFESSION_ICONS = {
+    ["Alchemy"]        = "Interface\\Icons\\Trade_Alchemy",
+    ["Blacksmithing"]  = "Interface\\Icons\\Trade_BlackSmithing",
+    ["Enchanting"]     = "Interface\\Icons\\Trade_Engraving",
+    ["Engineering"]    = "Interface\\Icons\\Trade_Engineering",
+    ["Jewelcrafting"]  = "Interface\\Icons\\INV_Misc_Gem_01",
+    ["Leatherworking"] = "Interface\\Icons\\INV_Misc_ArmorKit_17",
+    ["Tailoring"]      = "Interface\\Icons\\Trade_Tailoring",
+}
+
+----------------------------------------------------------------------
 -- Populate Left Panel: Profession List
 ----------------------------------------------------------------------
 
@@ -417,7 +431,7 @@ function UI:PopulateProfessionList()
 
     for _, profName in ipairs(professions) do
         local count = GuildCrafts.Data:GetProfessionMemberCount(profName)
-        local row = self:CreateLeftRow(self.leftContent, yOffset, profName, "(" .. count .. ")")
+        local row = self:CreateLeftRow(self.leftContent, yOffset, profName, "(" .. count .. ")", PROFESSION_ICONS[profName])
         row:SetScript("OnClick", function()
             UI:NavigateToMembers(profName)
         end)
@@ -456,6 +470,7 @@ function UI:NavigateToMembers(profName)
         local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
         local specTag = ""
         local skillTag = ""
+        local staleTag = ""
         if memberInfo.entry and memberInfo.entry.professions and memberInfo.entry.professions[profName] then
             local profData = memberInfo.entry.professions[profName]
             local spec = profData.specialisation
@@ -466,7 +481,14 @@ function UI:NavigateToMembers(profName)
                 skillTag = "  |cffffff99" .. profData.skillLevel .. "/" .. profData.maxSkillLevel .. "|r"
             end
         end
-        local label = dot .. memberInfo.key:match("^(.+)-") .. skillTag .. "  |cff888888" .. memberInfo.recipeCount .. " recipes|r" .. specTag
+        -- Staleness indicator
+        if memberInfo.entry then
+            local stale = GuildCrafts.Data:GetStalenessTag(memberInfo.entry.lastUpdate)
+            if stale then
+                staleTag = "  |cffff6666[" .. stale .. "]|r"
+            end
+        end
+        local label = dot .. memberInfo.key:match("^(.+)-") .. skillTag .. "  |cff888888" .. memberInfo.recipeCount .. " recipes|r" .. specTag .. staleTag
         local row = self:CreateLeftRow(self.leftContent, yOffset, label)
         row.memberKey = memberInfo.key
         row:SetScript("OnClick", function()
@@ -525,6 +547,11 @@ function UI:ShowMemberRecipes(memberKey, profName)
     local spec = profData.specialisation
     if spec then
         headerText = headerText .. "  |cffaaddff(" .. spec .. ")|r"
+    end
+    -- Staleness warning in header
+    local stale = GuildCrafts.Data:GetStalenessTag(entry.lastUpdate)
+    if stale then
+        headerText = headerText .. "  |cffff6666[" .. stale .. "]|r"
     end
     header:SetText(headerText)
     header:SetTextColor(1, 0.82, 0)
@@ -1066,7 +1093,7 @@ end
 -- Row Factory
 ----------------------------------------------------------------------
 
-function UI:CreateLeftRow(parent, yOffset, text, badge)
+function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
     local row = CreateFrame("Button", nil, parent)
     row:SetHeight(22)
     row:SetPoint("TOPLEFT", parent, "TOPLEFT", 4, -yOffset)
@@ -1078,9 +1105,20 @@ function UI:CreateLeftRow(parent, yOffset, text, badge)
     highlight:SetTexture("Interface\\Buttons\\WHITE8x8")
     highlight:SetVertexColor(0.3, 0.3, 0.5, 0.2)
 
+    -- Optional profession icon
+    local labelAnchorX = 6
+    if iconPath then
+        local icon = row:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(18, 18)
+        icon:SetPoint("LEFT", row, "LEFT", 4, 0)
+        icon:SetTexture(iconPath)
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)  -- trim default icon border
+        labelAnchorX = 26
+    end
+
     -- Text
     local label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    label:SetPoint("LEFT", row, "LEFT", 6, 0)
+    label:SetPoint("LEFT", row, "LEFT", labelAnchorX, 0)
     label:SetTextColor(0.9, 0.9, 0.9)
     label:SetText(text)
 

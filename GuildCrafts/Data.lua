@@ -39,6 +39,9 @@ local time = time
 local pairs = pairs
 local tonumber = tonumber
 
+-- Data staleness threshold (seconds) — 30 days
+local STALE_THRESHOLD = 30 * 24 * 3600
+
 -- TBC crafting professions we track
 local TRACKED_PROFESSIONS = {
     ["Alchemy"] = true,
@@ -428,6 +431,26 @@ function Data:FormatCooldownRemaining(endTime)
         return string.format("%dh %dm", hours, mins)
     else
         return string.format("%dm", mins)
+    end
+end
+
+----------------------------------------------------------------------
+-- Data Staleness Helpers
+----------------------------------------------------------------------
+
+--- Check if a member's data is stale (not updated in 30+ days).
+--- Returns nil if fresh, or a human-readable age string if stale.
+function Data:GetStalenessTag(lastUpdate)
+    if not lastUpdate then return "unknown" end
+    local age = time() - lastUpdate
+    if age < STALE_THRESHOLD then return nil end
+
+    local days = math.floor(age / 86400)
+    if days < 60 then
+        return days .. "d ago"
+    else
+        local months = math.floor(days / 30)
+        return months .. "mo ago"
     end
 end
 
@@ -928,9 +951,11 @@ function Data:SimGenerate(count)
             prof2 = PROF_NAMES[math.random(#PROF_NAMES)]
         end
 
+        -- Some members have stale data (30-90 days old) for testing
+        local maxAge = (i % 5 == 0) and math.random(30 * 86400, 90 * 86400) or math.random(0, 604800)
         local entry = {
             professions = {},
-            lastUpdate = time() - math.random(0, 604800), -- within last 7 days
+            lastUpdate = time() - maxAge,
             _simulated = true,
         }
 

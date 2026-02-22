@@ -86,6 +86,16 @@ MINIMAP BUTTON
 A small book icon appears on your minimap after installing the addon. Left-click it to toggle the GuildCrafts window — same as typing /gc. You can drag the icon around the minimap edge to reposition it. If you prefer a clean minimap, type /gc minimap to hide it (and again to bring it back). The position is saved between sessions.
 
 
+PROFESSION ICONS
+----------------
+Each profession in the left-panel browse list is shown with its official WoW icon (the mortar-and-pestle for Alchemy, the anvil for Blacksmithing, etc.). This is purely visual polish — it makes the list easier to scan at a glance.
+
+
+STALE DATA
+----------
+If a guild member's data hasn't been updated in 30 or more days, a red tag like [30d ago] or [2mo ago] appears next to their name in the member list and in the recipe detail header. This helps you know whether someone's recipe list is still current or if they haven't logged in (or opened their profession window) in a long time.
+
+
 SLASH COMMANDS
 --------------
 /gc            Open/close the window
