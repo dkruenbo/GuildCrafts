@@ -18,6 +18,7 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Recipe categorization** — recipes are grouped by sub-type (Potions, Elixirs, Flasks, Weapons, Armor, etc.) with visual category headers
 - **Minimap button** — small icon on the minimap to toggle the window; drag to reposition, hide with `/gc minimap`
 - **Profession icons** — WoW's built-in profession icons displayed next to each profession name in the browse panel
+- **Chunked sync** — large sync payloads are split into batches of 10 members, preventing chat throttle issues in large guilds
 - **Data staleness indicator** — member data older than 30 days is flagged with a red age tag (e.g. "30d ago", "2mo ago")
 - **Profession change detection** — dropping a profession automatically purges stale data
 - **Guild roster pruning** — ex-guild members are cleaned up automatically

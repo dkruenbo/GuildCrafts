@@ -38,6 +38,7 @@ local HEARTBEAT_INTERVAL   = 60      -- DR heartbeat broadcast interval
 local HEARTBEAT_TIMEOUT    = 180     -- 3 missed heartbeats → DR presumed dead
 local SYNC_TIMEOUT         = 30      -- wait for SYNC_RESPONSE before retry
 local SYNC_RETRY_TIMEOUT   = 15      -- wait for retry response before open round
+local SYNC_CHUNK_SIZE      = 10      -- max members per sync chunk
 
 -- ChatThrottleLib priorities
 local PRIO_BULK   = "BULK"
@@ -427,15 +428,12 @@ function Comms:ProcessSyncRequest(requester, incomingVector)
         end
     end
 
-    -- Send SYNC_RESPONSE (chunked by member to avoid exceeding message limits)
+    -- Send SYNC_RESPONSE in chunks to avoid chat throttle issues
     local sendCount = 0
     for _ in pairs(toSend) do sendCount = sendCount + 1 end
 
     if sendCount > 0 then
-        GuildCrafts:Debug("Sending SYNC_RESPONSE to", requester, "(" .. sendCount .. " members)")
-        self:SendMessage(MSG_SYNC_RESPONSE, {
-            data = toSend,
-        }, "WHISPER", requester, PRIO_BULK)
+        self:SendChunked(MSG_SYNC_RESPONSE, toSend, requester, sendCount)
     end
 
     -- Send SYNC_PULL if requester has data we need
@@ -471,9 +469,20 @@ function Comms:HandleSyncResponse(payload, sender)
     if not payload.data then return end
 
     local merged = GuildCrafts.Data:MergeIncoming(payload.data)
-    GuildCrafts:Debug("Received SYNC_RESPONSE from", sender, "— merged:", tostring(merged))
+    GuildCrafts:Debug("Received SYNC_RESPONSE chunk", (payload.chunkIndex or 1),
+        "/", (payload.chunkTotal or 1), "from", sender, "— merged:", tostring(merged))
 
-    -- Cancel sync timeout — we got a response
+    -- If more chunks expected, reset the sync timeout but stay pending
+    if payload.chunkIndex and payload.chunkTotal and payload.chunkIndex < payload.chunkTotal then
+        -- Reset timeout — more chunks coming
+        if self.syncTimer then
+            self:CancelTimer(self.syncTimer)
+        end
+        self.syncTimer = self:ScheduleTimer("OnSyncTimeout", SYNC_TIMEOUT)
+        return
+    end
+
+    -- All chunks received (or single un-chunked response) — sync complete
     self.syncPending = false
     self.syncRetryCount = 0
     if self.syncTimer then
@@ -508,9 +517,7 @@ function Comms:HandleSyncPull(payload, sender)
 
     if count > 0 then
         GuildCrafts:Debug("Responding to SYNC_PULL from", sender, "with", count, "members")
-        self:SendMessage(MSG_SYNC_PUSH, {
-            data = responseData,
-        }, "WHISPER", sender, PRIO_BULK)
+        self:SendChunked(MSG_SYNC_PUSH, responseData, sender, count)
     end
 end
 
@@ -522,7 +529,8 @@ function Comms:HandleSyncPush(payload, sender)
     if not payload.data then return end
 
     local merged = GuildCrafts.Data:MergeIncoming(payload.data)
-    GuildCrafts:Debug("Received SYNC_PUSH from", sender, "— merged:", tostring(merged))
+    GuildCrafts:Debug("Received SYNC_PUSH chunk", (payload.chunkIndex or 1),
+        "/", (payload.chunkTotal or 1), "from", sender, "— merged:", tostring(merged))
 
     -- DR rebroadcasts new data as DELTA_UPDATEs so all online nodes converge
     if merged and self.myRole == "DR" then
@@ -687,6 +695,35 @@ end
 ----------------------------------------------------------------------
 -- Message Send / Receive Infrastructure
 ----------------------------------------------------------------------
+
+--- Send a member data table in chunks of SYNC_CHUNK_SIZE.
+--- Each chunk is a separate message with chunkIndex/chunkTotal metadata.
+function Comms:SendChunked(msgType, memberData, target, totalCount)
+    -- Collect keys into a list for deterministic ordering
+    local keys = {}
+    for k in pairs(memberData) do
+        keys[#keys + 1] = k
+    end
+    table_sort(keys)
+
+    local totalChunks = math.ceil(totalCount / SYNC_CHUNK_SIZE)
+    local chunkIndex = 0
+
+    for i = 1, #keys, SYNC_CHUNK_SIZE do
+        chunkIndex = chunkIndex + 1
+        local chunk = {}
+        for j = i, math.min(i + SYNC_CHUNK_SIZE - 1, #keys) do
+            chunk[keys[j]] = memberData[keys[j]]
+        end
+        self:SendMessage(msgType, {
+            data       = chunk,
+            chunkIndex = chunkIndex,
+            chunkTotal = totalChunks,
+        }, "WHISPER", target, PRIO_BULK)
+    end
+
+    GuildCrafts:Debug("Sent", msgType, "to", target, "in", totalChunks, "chunk(s),", totalCount, "members")
+end
 
 --- Serialize, optionally compress, and send a message.
 function Comms:SendMessage(msgType, payload, distribution, target, priority)

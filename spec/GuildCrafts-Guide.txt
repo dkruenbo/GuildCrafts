@@ -91,6 +91,11 @@ PROFESSION ICONS
 Each profession in the left-panel browse list is shown with its official WoW icon (the mortar-and-pestle for Alchemy, the anvil for Blacksmithing, etc.). This is purely visual polish — it makes the list easier to scan at a glance.
 
 
+CHUNKED SYNC
+------------
+In large guilds, syncing the entire recipe database at once could flood the chat channel and trigger WoW's built-in message throttle. GuildCrafts splits large sync payloads into smaller chunks (10 members per message). The receiver merges each chunk as it arrives and resets the sync timeout, so the full sync completes reliably even with hundreds of guild members.
+
+
 STALE DATA
 ----------
 If a guild member's data hasn't been updated in 30 or more days, a red tag like [30d ago] or [2mo ago] appears next to their name in the member list and in the recipe detail header. This helps you know whether someone's recipe list is still current or if they haven't logged in (or opened their profession window) in a long time.

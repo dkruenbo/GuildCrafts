@@ -30,7 +30,7 @@
 
 | # | Feature | Description | Why |
 |---|---------|-------------|-----|
-| 12 | Chunked Sync | Break large sync responses into smaller batches instead of one big payload. | Prevents chat throttle issues in large guilds (200+ members with dozens of recipes each). |
+| 12 | ~~Chunked Sync~~ | ~~Break large sync responses into smaller batches instead of one big payload.~~ | **DONE** — SYNC_RESPONSE and SYNC_PUSH payloads are split into chunks of 10 members each with chunkIndex/chunkTotal metadata; receivers merge incrementally and reset sync timeout per chunk |
 | 13 | Export to CSV / Text | Dump the full guild recipe database to a text file for guild websites or spreadsheets. | Useful for guild management outside the game. |
 | 14 | Locale Support | Handle multi-locale guilds where recipe names differ by client language. Use spellID-based keys (already partially implemented) with localized display names. | Relevant for EU servers where players may run different language clients. |
 | 15 | Code Modularisation | Split large files (Data.lua, MainFrame.lua, Comms.lua) into focused sub-modules for easier onboarding and contribution. | Files over 1,000 lines are harder for new contributors to navigate. Smaller, single-purpose modules reduce merge conflicts and make PRs easier to review. |
