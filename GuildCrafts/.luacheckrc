@@ -29,6 +29,9 @@ read_globals = {
     "GetCraftRecipeLink", "ExpandCraftSkillLine",
     "GetCraftNumReagents", "GetCraftReagentInfo", "GetCraftReagentItemLink",
 
+    -- WoW API — Cooldowns
+    "GetTradeSkillCooldown", "GetCraftCooldown",
+
     -- WoW API — Skills
     "GetNumSkillLines", "GetSkillLineInfo",
 

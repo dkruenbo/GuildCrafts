@@ -521,6 +521,41 @@ function UI:ShowMemberRecipes(memberKey, profName)
     header:SetTextColor(1, 0.82, 0)
     self.detailRows[#self.detailRows + 1] = header
 
+    local yOffset = -32
+
+    -- Cooldowns section (if any active)
+    local profData = entry.professions[profName]
+    if profData.cooldowns then
+        local hasCooldowns = false
+        -- Collect and sort active cooldowns
+        local cdList = {}
+        for cdName, cdInfo in pairs(profData.cooldowns) do
+            local remaining = GuildCrafts.Data:FormatCooldownRemaining(cdInfo.endTime)
+            if remaining then
+                cdList[#cdList + 1] = { name = cdName, remaining = remaining }
+                hasCooldowns = true
+            end
+        end
+        if hasCooldowns then
+            table.sort(cdList, function(a, b) return a.name < b.name end)
+            local cdHeader = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            cdHeader:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
+            cdHeader:SetText("Active Cooldowns")
+            cdHeader:SetTextColor(1, 0.5, 0.2)
+            self.detailRows[#self.detailRows + 1] = cdHeader
+            yOffset = yOffset - 16
+            for _, cd in ipairs(cdList) do
+                local cdText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                cdText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 16, yOffset)
+                cdText:SetText(cd.name .. "  |cffff8800" .. cd.remaining .. " remaining|r")
+                cdText:SetTextColor(0.9, 0.9, 0.9)
+                self.detailRows[#self.detailRows + 1] = cdText
+                yOffset = yOffset - 14
+            end
+            yOffset = yOffset - 8
+        end
+    end
+
     -- Sort recipes by name
     local sorted = {}
     for key, data in pairs(recipes) do

@@ -32,6 +32,9 @@ local GetTradeSkillReagentItemLink = GetTradeSkillReagentItemLink
 local GetCraftNumReagents = GetCraftNumReagents
 local GetCraftReagentInfo = GetCraftReagentInfo
 local GetCraftReagentItemLink = GetCraftReagentItemLink
+-- Cooldown APIs
+local GetTradeSkillCooldown = GetTradeSkillCooldown
+local GetCraftCooldown = GetCraftCooldown
 local time = time
 local pairs = pairs
 local tonumber = tonumber
@@ -71,6 +74,31 @@ local SPECIALISATION_SPELLS = {
     [26798] = { prof = "Tailoring",       spec = "Mooncloth Tailoring" },
     [26801] = { prof = "Tailoring",       spec = "Shadoweave Tailoring" },
     [26797] = { prof = "Tailoring",       spec = "Spellfire Tailoring" },
+}
+
+-- TBC profession cooldowns worth tracking (spellID → display info)
+-- These are the long shared/specialty cooldowns players care about
+local TRACKED_COOLDOWNS = {
+    -- Alchemy Transmutes (shared CD, any one triggers it)
+    [29688] = { prof = "Alchemy",    name = "Transmute: Primal Might" },
+    [28566] = { prof = "Alchemy",    name = "Transmute: Primal Air" },
+    [28567] = { prof = "Alchemy",    name = "Transmute: Primal Earth" },
+    [28568] = { prof = "Alchemy",    name = "Transmute: Primal Fire" },
+    [28569] = { prof = "Alchemy",    name = "Transmute: Primal Mana" },
+    [28570] = { prof = "Alchemy",    name = "Transmute: Primal Shadow" },
+    [28571] = { prof = "Alchemy",    name = "Transmute: Primal Water" },
+    [28580] = { prof = "Alchemy",    name = "Transmute: Primal Water to Shadow" },
+    [28581] = { prof = "Alchemy",    name = "Transmute: Primal Water to Air" },
+    [28582] = { prof = "Alchemy",    name = "Transmute: Primal Mana to Fire" },
+    [28583] = { prof = "Alchemy",    name = "Transmute: Primal Fire to Earth" },
+    [28584] = { prof = "Alchemy",    name = "Transmute: Primal Earth to Water" },
+    [28585] = { prof = "Alchemy",    name = "Transmute: Primal Shadow to Water" },
+    [32765] = { prof = "Alchemy",    name = "Transmute: Earthstorm Diamond" },
+    [32766] = { prof = "Alchemy",    name = "Transmute: Skyfire Diamond" },
+    -- Tailoring specialty cloths
+    [26751] = { prof = "Tailoring",  name = "Primal Mooncloth" },
+    [31373] = { prof = "Tailoring",  name = "Spellcloth" },
+    [36686] = { prof = "Tailoring",  name = "Shadowcloth" },
 }
 
 -- AceDB defaults
@@ -272,6 +300,101 @@ function Data:ScanCraftReagents(index)
 end
 
 ----------------------------------------------------------------------
+-- Cooldown Scanning Helpers
+----------------------------------------------------------------------
+
+--- Scan cooldowns for all TradeSkill recipes in the current open window.
+function Data:ScanTradeSkillCooldowns(profName, numSkills)
+    if not GetTradeSkillCooldown then return end
+
+    local playerKey = self:GetPlayerKey()
+    local entry = self:GetMemberEntry(playerKey, false)
+    if not entry or not entry.professions[profName] then return end
+
+    local profData = entry.professions[profName]
+    local cooldowns = {}
+    local now = time()
+
+    for i = 1, numSkills do
+        local skillName, skillType = GetTradeSkillInfo(i)
+        if skillType ~= "header" and skillName then
+            local cdRemaining = GetTradeSkillCooldown(i)
+            if cdRemaining and cdRemaining > 0 then
+                cooldowns[skillName] = {
+                    endTime = now + cdRemaining,
+                    duration = cdRemaining,
+                }
+            end
+        end
+    end
+
+    -- Only update if cooldowns changed
+    local hasCD = false
+    for _ in pairs(cooldowns) do hasCD = true; break end
+
+    if hasCD or profData.cooldowns then
+        profData.cooldowns = hasCD and cooldowns or nil
+        entry.lastUpdate = now
+        GuildCrafts:Debug("Cooldowns scanned for", profName, ":", hasCD and "active" or "none")
+    end
+end
+
+--- Scan cooldowns for all Craft API recipes (Enchanting).
+function Data:ScanCraftCooldowns(profName, numCrafts)
+    if not GetCraftCooldown then return end
+
+    local playerKey = self:GetPlayerKey()
+    local entry = self:GetMemberEntry(playerKey, false)
+    if not entry or not entry.professions[profName] then return end
+
+    local profData = entry.professions[profName]
+    local cooldowns = {}
+    local now = time()
+
+    for i = 1, numCrafts do
+        local craftName, _, craftType = GetCraftInfo(i)
+        if craftType ~= "header" and craftName then
+            local cdRemaining = GetCraftCooldown(i)
+            if cdRemaining and cdRemaining > 0 then
+                cooldowns[craftName] = {
+                    endTime = now + cdRemaining,
+                    duration = cdRemaining,
+                }
+            end
+        end
+    end
+
+    local hasCD = false
+    for _ in pairs(cooldowns) do hasCD = true; break end
+
+    if hasCD or profData.cooldowns then
+        profData.cooldowns = hasCD and cooldowns or nil
+        entry.lastUpdate = now
+        GuildCrafts:Debug("Cooldowns scanned for", profName, ":", hasCD and "active" or "none")
+    end
+end
+
+--- Format a duration in seconds to a human-readable string.
+function Data:FormatCooldownRemaining(endTime)
+    local remaining = endTime - time()
+    if remaining <= 0 then
+        return nil -- cooldown expired
+    end
+
+    local days = math.floor(remaining / 86400)
+    local hours = math.floor((remaining % 86400) / 3600)
+    local mins = math.floor((remaining % 3600) / 60)
+
+    if days > 0 then
+        return string.format("%dd %dh", days, hours)
+    elseif hours > 0 then
+        return string.format("%dh %dm", hours, mins)
+    else
+        return string.format("%dm", mins)
+    end
+end
+
+----------------------------------------------------------------------
 -- Recipe Scanning (requires profession window to be open)
 ----------------------------------------------------------------------
 
@@ -337,6 +460,9 @@ function Data:ScanTradeSkill()
     else
         GuildCrafts:Debug("Scanned " .. profName .. ": no new recipes.")
     end
+
+    -- Scan cooldowns while the window is open
+    self:ScanTradeSkillCooldowns(profName, numSkills)
 end
 
 --- Get the recipe key (itemID or spellID) for a given trade skill index.
@@ -447,9 +573,10 @@ function Data:ScanCraft()
     else
         GuildCrafts:Debug("Scanned " .. profName .. ": no new recipes.")
     end
-end
 
---- Get the recipe key for a Craft API index (Enchanting).
+    -- Scan cooldowns while the window is open
+    self:ScanCraftCooldowns(profName, numCrafts)
+end
 function Data:GetCraftRecipeKey(index)
     -- Try item link first
     if GetCraftItemLink then

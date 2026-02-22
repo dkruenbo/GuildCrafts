@@ -66,6 +66,11 @@ SPECIALISATIONS
 The addon automatically detects TBC profession specialisations when you log in (e.g. Transmutation Master, Mooncloth Tailoring, Goblin Engineer). Your spec is shown next to your name in the member list and in the recipe detail header. This syncs to the guild so everyone can see who has which spec — useful for finding the right crafter for spec-exclusive recipes or proc benefits.
 
 
+COOLDOWNS
+---------
+When you open your profession window, the addon scans for active cooldowns on timed recipes like Transmutes, Primal Mooncloth, Spellcloth, and Shadowcloth. These cooldowns are displayed in the recipe detail view with time remaining (e.g. "1d 12h remaining") and sync to the guild so officers and raid leaders can see who is available for limited crafts.
+
+
 SLASH COMMANDS
 --------------
 /gc            Open/close the window

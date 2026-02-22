@@ -13,6 +13,7 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Tooltip integration** — hover over any item in bags, AH, or chat links to see which guild members can craft it
 - **Reagent tracking** — see required materials for every recipe at a glance in the recipe detail view
 - **Specialisation tracking** — detects and displays TBC profession specs (Transmute Master, Weaponsmith, Mooncloth Tailoring, etc.)
+- **Cooldown tracking** — shows active profession cooldowns (Transmutes, Primal Mooncloth, Spellcloth, Shadowcloth) with time remaining
 - **Profession change detection** — dropping a profession automatically purges stale data
 - **Guild roster pruning** — ex-guild members are cleaned up automatically
 

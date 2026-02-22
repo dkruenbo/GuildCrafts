@@ -7,7 +7,7 @@
 | 1 | ~~Tooltip Integration~~ | ~~When hovering over any item in WoW (bags, AH, chat links), show "Craftable by: PlayerA, PlayerB" in the tooltip automatically.~~ | **DONE** — Implemented in Tooltip.lua |
 | 2 | ~~Reagent / Material Tracking~~ | ~~Show what materials each recipe requires. Scan `GetTradeSkillReagentInfo()` during profession scan.~~ | **DONE** — Reagents scanned during profession window open and displayed in recipe detail view |
 | 3 | ~~Specialisation Tracking~~ | ~~Detect and display profession specialisations (Potions/Elixir/Transmute Master, Weaponsmith/Armorsmith, Gnomish/Goblin Engineering, Mooncloth/Shadoweave/Spellfire Tailoring, Dragonscale/Elemental/Tribal Leatherworking).~~ | **DONE** — Detected via IsSpellKnown on login, shown in member list and recipe header |
-| 4 | Cooldown Tracking | Track shared cooldowns (Primal Mooncloth, Transmutes, Spellcloth, etc.) and show time remaining per player. | Guild officers and raid leaders can coordinate limited daily/multi-day crafts across the roster. |
+| 4 | ~~Cooldown Tracking~~ | ~~Track shared cooldowns (Primal Mooncloth, Transmutes, Spellcloth, etc.) and show time remaining per player.~~ | **DONE** — Scanned when profession window opens, displayed in recipe detail view with time remaining |
 
 ## Tier 2 — Strong Quality of Life
 
