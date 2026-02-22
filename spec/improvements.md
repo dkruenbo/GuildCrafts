@@ -67,14 +67,16 @@
 - AceSerializer + LibDeflate produce opaque binary-looking strings that trigger Blizzard's spam detector and look like bot output to other players.
 - Instead, use a **human-readable micro-format** that is trivially parseable but doesn't look like spam:
   ```
-  [GC]L:Flask of Supreme Power,Alchemy,Potions Master,Free for guildies
-  [GC]L:Enchant Weapon - Mongoose,Enchanting,,PST
-  [GC]R:Flask of Supreme Power
+  [GC]L:22861,Alchemy,Potions Master,Free for guildies
+  [GC]L:27984,Enchanting,,PST
+  [GC]R:22861
   ```
-  - `[GC]L:` = listing (create/update). Fields: item, profession, spec (optional), tip (optional).
+  - `[GC]L:` = listing (create/update). Fields: itemID, profession, spec (optional), tip (optional).
   - `[GC]R:` = remove listing.
+  - **Item IDs, not names** — EU servers mix English, German, and French clients on the same realm. Localized item names would break cross-language discovery. Item IDs are universal. Receivers call `GetItemInfo(itemID)` to resolve the local name and icon. Note: `GetItemInfo` can return `nil` on first call for unseen items — handle the `GET_ITEM_INFO_RECEIVED` event callback for async resolution.
   - Sender name comes from the chat message metadata (no need to include it in payload).
   - Max 5 `[GC]L:` messages per broadcast. Each message is a single short line.
+  - **255-character hard limit** — `SendChatMessage` silently truncates or drops messages exceeding 255 characters. The tip field is capped at 60 characters in the UI. As a safety net, the broadcast function must always apply `string.sub(payload, 1, 255)` before sending.
 - A `ChatFrame_AddMessageEventFilter` strips `[GC]` messages from addon users' chat windows so they never see them.
 - **UI Taint warning**: WoW's chat filters are notorious for causing UI taint (where standard Blizzard buttons stop working) if not implemented correctly. The filter must be a plain function reference — no closures over secure frames, no calls to protected functions, no modifications to Blizzard UI elements inside the filter callback. Test thoroughly with `/run SetCVar("taintLog", 1)` and check `BugSack` / `!BugGrabber` for taint traces.
 - **Reference implementation** — taint-safe filter (the filter's only job is hiding text; data collection happens in a separate `CHAT_MSG_CHANNEL` handler via AceEvent):
@@ -114,19 +116,21 @@
 **Listing Flow:**
 1. Player opens their recipe list in the guild view and clicks "List for Sale" on up to 5 recipes.
 2. Listings are stored locally in SavedVariables.
-3. On login (after channel join) and on any listing change, the addon broadcasts up to 5 `[GC]L:` messages to the market channel, spaced 1–2 seconds apart.
-4. The seller's client automatically re-broadcasts every 25 minutes to keep listings alive in other users' caches (just under the 30-min TTL). A manual "Refresh My Listings" button (15-min cooldown) is also available.
-5. Other addon users passively receive and cache these listings.
+3. On login, the addon waits 10–15 seconds (`C_Timer.After`) before joining the market channel and broadcasting. `PLAYER_LOGIN` / `PLAYER_ENTERING_WORLD` is the most stressed moment for the client — dozens of addons load data simultaneously, and the server floods the client with updates. Firing 5 `SendChatMessage` calls immediately risks messages being swallowed or triggering an instant disconnect from server-side throttling.
+4. After the initial delay, the addon broadcasts up to 5 `[GC]L:` messages to the market channel, spaced 1–2 seconds apart.
+5. The seller's client automatically re-broadcasts every 25 minutes to keep listings alive in other users' caches (just under the 30-min TTL). A manual "Refresh My Listings" button (15-min cooldown) is also available.
+6. Other addon users passively receive and cache these listings. Receivers resolve item IDs to local names via `GetItemInfo` (with `GET_ITEM_INFO_RECEIVED` fallback for uncached items).
 
 **Data Model per Listing (local cache):**
 ```
 {
-    seller    = "PlayerName-Realm",
-    item      = "Flask of Supreme Power",
-    profName  = "Alchemy",
-    spec      = "Potions Master",    -- optional
-    tip       = "Free for guildies", -- optional seller note (max 80 chars)
-    receivedAt = timestamp,          -- when we last heard this listing (for 30-min TTL)
+    seller     = "PlayerName-Realm",
+    itemID     = 22861,               -- universal item ID (language-independent)
+    itemName   = "Flask of Supreme Power", -- resolved locally via GetItemInfo
+    profName   = "Alchemy",
+    spec       = "Potions Master",    -- optional
+    tip        = "Free for guildies", -- optional seller note (max 60 chars)
+    receivedAt = timestamp,           -- when we last heard this listing (for 30-min TTL)
 }
 ```
 
