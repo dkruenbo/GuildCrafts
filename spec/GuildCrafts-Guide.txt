@@ -1,123 +1,182 @@
 ========================================
-  GuildCrafts — How It Works
+  GuildCrafts — User Guide
 ========================================
 
-WHAT IT DOES
-------------
-GuildCrafts is a recipe book for your entire guild. Instead of whispering every guildie asking "Hey, can anyone craft Flask of Supreme Power?" — you open one window and instantly see every recipe that every guild member knows, across all crafting professions. You can browse by profession, search by item name, and even send a craft request directly to someone who's online.
+
+WHAT IS GUILDCRAFTS?
+--------------------
+A recipe book for your entire guild. Instead of whispering
+every guildie asking "Can anyone craft Flask of Supreme Power?"
+you open one window and instantly see every recipe that every
+guild member knows, across all crafting professions.
+
+Browse by profession, search by item name, and send craft
+requests directly to online players — all from one UI.
 
 
-HOW YOUR RECIPES GET INTO THE SYSTEM
--------------------------------------
-The addon does NOT know your recipes automatically. It reads them only when you open a profession window in-game (e.g. you talk to a trainer or click your Alchemy skill). At that moment, it scans every recipe in the list and saves it locally. If you see "0 recipes" for yourself, just open your profession window once and they'll appear.
+GETTING STARTED
+---------------
+1. Copy the GuildCrafts folder into your WoW addons directory:
+     World of Warcraft/_classic_/Interface/AddOns/GuildCrafts
 
-Enchanting works too — it's handled separately under the hood because WoW treats it differently, but from your perspective it works the same way.
+2. Restart WoW (or type /reload).
 
+3. Open each of your profession windows once (e.g. click your
+   Alchemy skill). The addon scans your recipes at that moment.
 
-HOW RECIPES SPREAD TO OTHER GUILDIES
---------------------------------------
-Once your recipes are scanned, the addon shares them automatically through invisible guild chat messages (you never see them — they're hidden addon-to-addon messages). Here's how:
+4. Done. From now on, your recipes sync automatically with
+   every guildie who has the addon installed.
 
-1. "Hello, I'm here!" — When you log in, your addon announces itself to the guild. Every other guildie running the addon hears it.
+Note: The addon does NOT read your recipes on its own. It only
+scans when you open a profession window. If you see "0 recipes"
+for yourself, just open that profession once.
 
-2. Picking a coordinator — All addon users automatically elect one person as the Designated Router (DR) — basically the librarian who holds the master copy. There's also a Backup (BDR) in case the first goes offline. This is fully automatic — no player action needed.
-
-3. First sync — Your addon sends a summary of what data you already have. The DR compares it with theirs and sends back only the recipes you're missing. If you have data the DR doesn't, it pulls that from you too. Two-way exchange.
-
-4. Live updates — Whenever someone opens their profession window and the addon finds new recipes, a small update is broadcast to the guild. Everyone online gets it instantly, no full re-sync needed.
-
-5. Heartbeat — The DR sends a little "I'm still here" signal every 60 seconds. If 3 heartbeats are missed (3 minutes), the Backup takes over. If both DR and BDR go offline, the remaining addon users evict them and elect a new DR from the remaining pool — only that new DR responds to sync requests, so there's never a flood of replies.
-
-6. The more guildies who install it, the more complete the guild-wide recipe book becomes.
+Enchanting works the same way from your perspective, even though
+WoW treats it differently under the hood.
 
 
-THE WINDOW
-----------
-Type /gc to open or close the main window.
+THE MAIN WINDOW
+---------------
+Type /gc to open or close the window. You can also click the
+minimap button (see below).
 
-- Left panel — Lists all 7 TBC professions (Alchemy, Blacksmithing, Enchanting, Engineering, Jewelcrafting, Leatherworking, Tailoring) with a count of how many guild members have each one. Click a profession to see the members. Click a member to view their recipes.
+The window has two panels:
 
-- Right panel — Shows the recipe list for whoever you selected, or your search results.
+  LEFT PANEL                         RIGHT PANEL
+  ─────────                          ───────────
+  Browse professions → members       Recipes, search results,
+  → recipe lists                     or craft details
 
-- Search bar — Type any item name to find it across ALL guild members. Results show who can craft it, whether they're online (green dot) or offline (grey dot), and a "Request Craft" button for online players.
+  Alchemy          (3)               ┌─ Felsteel Longblade ──────┐
+  Blacksmithing    (5)               │  Source: Trainer           │
+  Enchanting       (2)               │  Reagents: 6x Fel Iron... │
+  Engineering      (1)               │  Category: Weapons        │
+  Jewelcrafting    (4)               └────────────────────────────┘
+  Leatherworking   (2)
+  Tailoring        (3)
 
-- Sync dot (top-right corner) — Green = synced, Yellow = syncing, Red = disconnected/alone. Hover for details.
+Click a profession → see members who have it.
+Click a member → see their recipes.
 
-- Craft Queue bar (bottom) — If someone requests you to craft something, it shows up here after you accept. Click "Done" when finished.
+SEARCH BAR (top of window)
+  Type any item name to search across ALL guild members.
+  Results show who can craft it, online status, and a
+  "Request Craft" button for online players.
+
+SYNC DOT (top-right corner)
+  Green  = fully synced
+  Yellow = sync in progress
+  Red    = no connection / alone
+  Hover for details (last sync time, DR identity, user count).
+
+CRAFT QUEUE BAR (bottom)
+  Shows pending craft requests you have accepted.
+  Click "Done" when finished crafting.
 
 
 CRAFT REQUESTS
 --------------
-When you find a recipe in the search and click "Request Craft", the crafter gets a popup asking them to Accept or Decline. If they accept, the item goes into their craft queue. When they're done, they click "Done" and you get a notification. If the crafter doesn't have the addon, a regular whisper is sent instead.
+Found a recipe you need? Click "Request Craft" next to an
+online crafter's name.
+
+  → The crafter gets a popup: Accept or Decline.
+  → If accepted, the item appears in their craft queue.
+  → When done, they click "Done" and you get a notification.
+  → If the crafter doesn't have the addon, a regular whisper
+    is sent instead.
+
+
+WHAT YOU SEE IN THE RECIPE VIEW
+-------------------------------
+When browsing a member's recipe list, each entry shows:
+
+  REAGENTS
+    Materials needed (e.g. "2x Fel Lotus, 1x Mana Thistle").
+    Lets you gather mats before requesting a craft.
+
+  CATEGORIES
+    Recipes are grouped by type — Potions, Elixirs, Flasks
+    for Alchemy; Weapons, Armor for Blacksmithing, etc.
+    Sorted alphabetically within each group.
+
+  SKILL LEVEL
+    Each member's skill (e.g. "375/375") appears next to their
+    name. Tells you if they can learn high-level recipes they
+    don't have yet.
+
+  SPECIALISATION
+    TBC profession specs are shown next to the member's name
+    (e.g. Transmutation Master, Mooncloth Tailoring, Goblin
+    Engineer). Useful for spec-exclusive recipes and procs.
+
+  COOLDOWNS
+    Timed recipes (Transmutes, Primal Mooncloth, Spellcloth,
+    Shadowcloth) show time remaining (e.g. "1d 12h remaining").
+    Syncs to the guild so raid leaders can plan.
+
+  STALE DATA
+    If a member's data is 30+ days old, a red tag appears
+    (e.g. [30d ago] or [2mo ago]). Means they haven't opened
+    their profession window with the addon in a while.
+
+  PROFESSION ICONS
+    Each profession shows its WoW icon (mortar-and-pestle for
+    Alchemy, anvil for Blacksmithing, etc.) for quick scanning.
 
 
 TOOLTIPS
 --------
-When you hover over any item in the game (in your bags, the auction house, or a link in chat), the tooltip will automatically show which guild members can craft that item. Online crafters are shown in green, offline in grey.
-
-
-REAGENTS
---------
-When you view a guild member's recipe list and click on a profession, each recipe now shows the materials needed to craft it (e.g. "Reagents: 2x Fel Lotus, 1x Mana Thistle"). This lets you gather the right materials before requesting a craft, saving time and whispers.
-
-
-SPECIALISATIONS
----------------
-The addon automatically detects TBC profession specialisations when you log in (e.g. Transmutation Master, Mooncloth Tailoring, Goblin Engineer). Your spec is shown next to your name in the member list and in the recipe detail header. This syncs to the guild so everyone can see who has which spec — useful for finding the right crafter for spec-exclusive recipes or proc benefits.
-
-
-COOLDOWNS
----------
-When you open your profession window, the addon scans for active cooldowns on timed recipes like Transmutes, Primal Mooncloth, Spellcloth, and Shadowcloth. These cooldowns are displayed in the recipe detail view with time remaining (e.g. "1d 12h remaining") and sync to the guild so officers and raid leaders can see who is available for limited crafts.
-
-
-SKILL LEVELS
-------------
-Each member's profession skill level (e.g. "375/375") is shown next to their name in the member list and in the recipe detail header. This is detected automatically when you log in and syncs to the guild, so you can tell at a glance who is max-level and who is still levelling a profession — useful for knowing whether someone can actually learn a high-level recipe they don't have yet.
-
-
-RECIPE CATEGORIES
------------------
-When you open a member's recipe list, recipes are grouped by category (e.g. Potions, Elixirs, Flasks for Alchemy; Weapons, Armor for Blacksmithing). These categories come straight from the profession window headers and are stored with each recipe. Within each category, recipes are sorted alphabetically. This makes browsing through large recipe lists much easier than a single flat alphabetical list.
+Hover over any item anywhere in the game — bags, auction house,
+chat links — and the tooltip shows which guild members can craft
+it. Online crafters in green, offline in grey.
 
 
 MINIMAP BUTTON
 --------------
-A small book icon appears on your minimap after installing the addon. Left-click it to toggle the GuildCrafts window — same as typing /gc. You can drag the icon around the minimap edge to reposition it. If you prefer a clean minimap, type /gc minimap to hide it (and again to bring it back). The position is saved between sessions.
+A small book icon on your minimap. Left-click to toggle the
+window. Drag to reposition. Type /gc minimap to hide or show it.
+Position is saved between sessions.
 
 
-PROFESSION ICONS
-----------------
-Each profession in the left-panel browse list is shown with its official WoW icon (the mortar-and-pestle for Alchemy, the anvil for Blacksmithing, etc.). This is purely visual polish — it makes the list easier to scan at a glance.
+HOW SYNCING WORKS (BEHIND THE SCENES)
+--------------------------------------
+You don't need to do anything — this all happens automatically.
 
+  1. LOGIN
+     Your addon says "hello" to the guild and requests any
+     recipe data you're missing.
 
-CHUNKED SYNC
-------------
-In large guilds, syncing the entire recipe database at once could flood the chat channel and trigger WoW's built-in message throttle. GuildCrafts splits large sync payloads into smaller chunks (10 members per message). The receiver merges each chunk as it arrives and resets the sync timeout, so the full sync completes reliably even with hundreds of guild members.
+  2. COORDINATOR (DR)
+     One addon user is automatically elected as the Designated
+     Router — the central sync point. A Backup (BDR) stands by.
+     No player action needed; it's based on character names.
 
+  3. TWO-WAY SYNC
+     The DR sends you recipes you're missing. If you have data
+     the DR doesn't, it pulls that from you too. Both sides
+     converge.
 
-STALE DATA
-----------
-If a guild member's data hasn't been updated in 30 or more days, a red tag like [30d ago] or [2mo ago] appears next to their name in the member list and in the recipe detail header. This helps you know whether someone's recipe list is still current or if they haven't logged in (or opened their profession window) in a long time.
+  4. LIVE UPDATES
+     When someone learns a new recipe, a small update is
+     broadcast to all online addon users instantly. No full
+     re-sync needed.
+
+  5. FAILOVER
+     The DR sends a heartbeat every 60 seconds. If 3 are missed,
+     the Backup takes over. If both go offline, a new DR is
+     elected from the remaining players automatically.
+
+  6. LARGE GUILDS
+     Sync data is split into small batches (10 members per
+     message) so it never overwhelms WoW's message system,
+     even with hundreds of guild members.
+
+The more guildies who install it, the more complete the
+guild-wide recipe book becomes.
 
 
 SLASH COMMANDS
 --------------
-/gc            Open/close the window
-/gc minimap    Toggle minimap button visibility
-/gc reset      Wipe all saved data and start fresh
-
-
-INSTALLATION
-------------
-1. Download the GuildCrafts folder.
-2. Put it in your WoW addons directory:
-   World of Warcraft/_classic_/Interface/AddOns/GuildCrafts
-3. Restart WoW (or type /reload in-game).
-4. Open each of your profession windows once so the addon can scan your recipes.
-5. Done! Your recipes will sync automatically with other guildies who have the addon.
-
-
-IN SHORT
---------
-Install the addon, open your profession windows once, and from that point on it automatically shares and receives everyone's recipe data in the background. The more people who install it, the better it works for everyone.
+  /gc            Open/close the window
+  /gc minimap    Toggle minimap button visibility
+  /gc reset      Wipe all saved data and start fresh
