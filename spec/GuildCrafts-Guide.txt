@@ -56,6 +56,11 @@ TOOLTIPS
 When you hover over any item in the game (in your bags, the auction house, or a link in chat), the tooltip will automatically show which guild members can craft that item. Online crafters are shown in green, offline in grey.
 
 
+REAGENTS
+--------
+When you view a guild member's recipe list and click on a profession, each recipe now shows the materials needed to craft it (e.g. "Reagents: 2x Fel Lotus, 1x Mana Thistle"). This lets you gather the right materials before requesting a craft, saving time and whispers.
+
+
 SLASH COMMANDS
 --------------
 /gc            Open/close the window

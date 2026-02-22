@@ -11,6 +11,7 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Craft requests** — request crafts from online guild members directly through the UI
 - **Craft queue** — crafters can manage incoming requests with accept/decline/complete workflow
 - **Tooltip integration** — hover over any item in bags, AH, or chat links to see which guild members can craft it
+- **Reagent tracking** — see required materials for every recipe at a glance in the recipe detail view
 - **Profession change detection** — dropping a profession automatically purges stale data
 - **Guild roster pruning** — ex-guild members are cleaned up automatically
 

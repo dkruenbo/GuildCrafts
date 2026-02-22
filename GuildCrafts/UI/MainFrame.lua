@@ -512,7 +512,7 @@ function UI:ShowMemberRecipes(memberKey, profName)
     -- Sort recipes by name
     local sorted = {}
     for key, data in pairs(recipes) do
-        sorted[#sorted + 1] = { key = key, name = data.name or "Unknown", source = data.source or "" }
+        sorted[#sorted + 1] = { key = key, name = data.name or "Unknown", source = data.source or "", reagents = data.reagents }
     end
     table.sort(sorted, function(a, b) return a.name < b.name end)
 
@@ -532,10 +532,31 @@ function UI:ShowMemberRecipes(memberKey, profName)
             sourceText:SetText(recipe.source)
             sourceText:SetTextColor(0.5, 0.5, 0.5)
             self.detailRows[#self.detailRows + 1] = sourceText
-            yOffset = yOffset - 30
-        else
-            yOffset = yOffset - 20
+            yOffset = yOffset - 14
         end
+
+        -- Reagents
+        if recipe.reagents and #recipe.reagents > 0 then
+            local parts = {}
+            for _, r in ipairs(recipe.reagents) do
+                parts[#parts + 1] = r.count .. "x " .. r.name
+            end
+            local reagentStr = table.concat(parts, ", ")
+            local reagentText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            reagentText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 16, yOffset - 14)
+            reagentText:SetText("Reagents: " .. reagentStr)
+            reagentText:SetTextColor(0.6, 0.8, 1.0)
+            reagentText:SetWordWrap(true)
+            reagentText:SetWidth(360)
+            self.detailRows[#self.detailRows + 1] = reagentText
+            -- Measure actual height for wrapped text
+            local textHeight = reagentText:GetStringHeight() or 12
+            yOffset = yOffset - 14 - textHeight - 4
+        else
+            yOffset = yOffset - 6
+        end
+
+        yOffset = yOffset - 14
     end
 
     self.detailContent:SetHeight(math.max(math.abs(yOffset), 1))

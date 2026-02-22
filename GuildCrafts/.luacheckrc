@@ -22,10 +22,12 @@ read_globals = {
     -- WoW API — Trade skills
     "GetNumTradeSkills", "GetTradeSkillInfo", "GetTradeSkillItemLink",
     "GetTradeSkillRecipeLink", "GetTradeSkillLine", "ExpandTradeSkillSubClass",
+    "GetTradeSkillNumReagents", "GetTradeSkillReagentInfo", "GetTradeSkillReagentItemLink",
 
     -- WoW API — Craft (Enchanting in Classic TBC)
     "GetNumCrafts", "GetCraftInfo", "GetCraftItemLink",
     "GetCraftRecipeLink", "ExpandCraftSkillLine",
+    "GetCraftNumReagents", "GetCraftReagentInfo", "GetCraftReagentItemLink",
 
     -- WoW API — Skills
     "GetNumSkillLines", "GetSkillLineInfo",

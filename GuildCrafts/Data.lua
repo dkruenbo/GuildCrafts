@@ -25,6 +25,13 @@ local GetNumCrafts = GetNumCrafts
 local GetCraftInfo = GetCraftInfo
 local GetCraftItemLink = GetCraftItemLink
 local GetCraftRecipeLink = GetCraftRecipeLink
+-- Reagent APIs
+local GetTradeSkillNumReagents = GetTradeSkillNumReagents
+local GetTradeSkillReagentInfo = GetTradeSkillReagentInfo
+local GetTradeSkillReagentItemLink = GetTradeSkillReagentItemLink
+local GetCraftNumReagents = GetCraftNumReagents
+local GetCraftReagentInfo = GetCraftReagentInfo
+local GetCraftReagentItemLink = GetCraftReagentItemLink
 local time = time
 local pairs = pairs
 local tonumber = tonumber
@@ -154,6 +161,62 @@ function Data:GetProfessionList()
 end
 
 ----------------------------------------------------------------------
+-- Reagent Scanning Helpers
+----------------------------------------------------------------------
+
+--- Scan reagents for a TradeSkill recipe at the given index.
+--- @return table|nil  Array of {name, count, itemID} or nil if none
+function Data:ScanTradeSkillReagents(index)
+    local numReagents = GetTradeSkillNumReagents(index)
+    if not numReagents or numReagents == 0 then
+        return nil
+    end
+    local reagents = {}
+    for j = 1, numReagents do
+        local reagentName, _, reagentCount = GetTradeSkillReagentInfo(index, j)
+        if reagentName then
+            local itemID
+            local link = GetTradeSkillReagentItemLink(index, j)
+            if link then
+                itemID = tonumber(link:match("item:(%d+)"))
+            end
+            reagents[#reagents + 1] = {
+                name = reagentName,
+                count = reagentCount or 1,
+                itemID = itemID,
+            }
+        end
+    end
+    return #reagents > 0 and reagents or nil
+end
+
+--- Scan reagents for an Enchanting craft at the given index.
+--- @return table|nil  Array of {name, count, itemID} or nil if none
+function Data:ScanCraftReagents(index)
+    local numReagents = GetCraftNumReagents(index)
+    if not numReagents or numReagents == 0 then
+        return nil
+    end
+    local reagents = {}
+    for j = 1, numReagents do
+        local reagentName, _, reagentCount = GetCraftReagentInfo(index, j)
+        if reagentName then
+            local itemID
+            local link = GetCraftReagentItemLink(index, j)
+            if link then
+                itemID = tonumber(link:match("item:(%d+)"))
+            end
+            reagents[#reagents + 1] = {
+                name = reagentName,
+                count = reagentCount or 1,
+                itemID = itemID,
+            }
+        end
+    end
+    return #reagents > 0 and reagents or nil
+end
+
+----------------------------------------------------------------------
 -- Recipe Scanning (requires profession window to be open)
 ----------------------------------------------------------------------
 
@@ -199,6 +262,7 @@ function Data:ScanTradeSkill()
                 local recipeData = {
                     name = skillName,
                     source = "",
+                    reagents = self:ScanTradeSkillReagents(i),
                 }
                 recipes[recipeKey] = recipeData
                 newRecipes[recipeKey] = recipeData
@@ -309,6 +373,7 @@ function Data:ScanCraft()
                 local recipeData = {
                     name = craftName,
                     source = "",
+                    reagents = self:ScanCraftReagents(i),
                 }
                 recipes[recipeKey] = recipeData
                 newRecipes[recipeKey] = recipeData
