@@ -11,3 +11,6 @@ Thumbs.db
 
 # WoW SavedVariables (generated at runtime)
 SavedVariables/
+
+# Build artifacts
+*.zip
