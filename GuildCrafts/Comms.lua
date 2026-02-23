@@ -204,10 +204,10 @@ function Comms:RecomputeElection()
     -- Log role change
     if self.myRole ~= oldRole then
         if self.myRole == "DR" then
-            GuildCrafts:Print("You are now the Designated Router (DR).")
+            GuildCrafts:Debug("You are now the Designated Router (DR).")
             self:StartHeartbeat()
         elseif self.myRole == "BDR" then
-            GuildCrafts:Print("You are now the Backup Designated Router (BDR).")
+            GuildCrafts:Debug("You are now the Backup Designated Router (BDR).")
             self:StopHeartbeat()
         else
             self:StopHeartbeat()
