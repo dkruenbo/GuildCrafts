@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3 — 2026-02-25
+
+### Bug Fixes
+
+- **Partial reagent scan fix**: Re-scans recipes when stored reagent count is less than expected, fixing cases where item cache misses caused incomplete reagent data (e.g. missing Large Prismatic Shards on Enchant Gloves - Spell Strike)
+
 ## 1.0.2 — 2026-02-23
 
 ### Other

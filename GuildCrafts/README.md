@@ -76,3 +76,7 @@ All libraries are embedded — no external dependencies needed.
 - Recipe scanning requires the profession window to be open; cached data is used until then
 - Enchanting recipes use spellID keys (since they don't produce items)
 - Each character is tracked independently (no alt-linking)
+
+## Development
+
+Built with AI-assisted development using a spec-driven approach. See [spec/](../spec/) for the design documents.
