@@ -160,7 +160,7 @@ end
 --- Strips the duplicated fields from per-crafter storage.
 function Data:MigrateToRecipeDB()
     local migrated = 0
-    for memberKey, entry in pairs(self.db.global) do
+    for _, entry in pairs(self.db.global) do
         if type(entry) == "table" and entry.professions then
             for _, profData in pairs(entry.professions) do
                 if profData.recipes then
@@ -1142,22 +1142,42 @@ function Data:PruneRoster()
         return
     end
 
-    -- Prune entries not in the roster
+    -- Prune entries not in the roster (with 30-day grace period)
     local pruned = 0
+    local marked = 0
+    local restored = 0
+    local now = time()
     local gdb = self:GetGuildDB()
     if not gdb then return end
     for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.lastUpdate and not rosterKeys[memberKey] then
             -- Don't prune simulated entries (they won't be in the roster)
             if not entry._simulated then
-                gdb[memberKey] = nil
-                pruned = pruned + 1
+                if not entry._absentSince then
+                    -- First time absent — mark with timestamp
+                    entry._absentSince = now
+                    marked = marked + 1
+                elseif now - entry._absentSince > STALE_THRESHOLD then
+                    -- Grace period expired — prune
+                    gdb[memberKey] = nil
+                    pruned = pruned + 1
+                end
             end
+        elseif type(entry) == "table" and entry._absentSince and rosterKeys[memberKey] then
+            -- Back in guild — clear absent flag
+            entry._absentSince = nil
+            restored = restored + 1
         end
     end
 
+    if marked > 0 then
+        GuildCrafts:Debug("Marked", marked, "absent member(s) for future pruning.")
+    end
+    if restored > 0 then
+        GuildCrafts:Debug("Restored", restored, "member(s) — back in guild.")
+    end
     if pruned > 0 then
-        GuildCrafts:Debug("Pruned", pruned, "ex-guild member(s) from database.")
+        GuildCrafts:Debug("Pruned", pruned, "ex-guild member(s) after 30-day grace period.")
     end
 end
 

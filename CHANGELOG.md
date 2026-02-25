@@ -5,6 +5,7 @@
 ### Improvements
 
 - **RecipeDB deduplication**: Reagent and category data is now stored once in a shared lookup table (`_recipeDB`) instead of duplicated per crafter. Reduces SavedVariables size and sync payload preparation overhead. Wire format unchanged — fully backward compatible with 1.0.x clients.
+- **Auto-prune stale members**: Members who leave the guild are marked absent and automatically pruned after 30 days. Returning members are restored. Absent members show a "(left guild)" indicator in the UI.
 
 ## 1.0.4 — 2026-02-26
 

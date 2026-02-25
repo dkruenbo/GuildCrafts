@@ -484,11 +484,14 @@ function UI:NavigateToMembers(profName)
                 skillTag = "  |cffffff99" .. profData.skillLevel .. "/" .. profData.maxSkillLevel .. "|r"
             end
         end
-        -- Staleness indicator
+        -- Staleness / absent indicator
         if memberInfo.entry then
             local stale = GuildCrafts.Data:GetStalenessTag(memberInfo.entry.lastUpdate)
             if stale then
                 staleTag = "  |cffff6666[" .. stale .. "]|r"
+            end
+            if memberInfo.entry._absentSince then
+                staleTag = staleTag .. "  |cff999999(left guild)|r"
             end
         end
         local label = dot .. memberInfo.key:match("^(.+)-") .. skillTag .. "  |cff888888" .. memberInfo.recipeCount .. " recipes|r" .. specTag .. staleTag
