@@ -104,9 +104,98 @@ function Data:OnInitialize()
     -- Set up AceDB
     GuildCrafts.db = LibStub("AceDB-3.0"):New("GuildCraftsDB", DB_DEFAULTS, true)
     self.db = GuildCrafts.db
+
+    -- Migrate legacy per-crafter reagents/categories into shared RecipeDB
+    self:MigrateToRecipeDB()
 end
 
 function Data:OnEnable()
+end
+
+----------------------------------------------------------------------
+-- RecipeDB — shared recipe lookup (reagents + category stored once)
+----------------------------------------------------------------------
+
+--- Return (and lazily create) the shared recipe lookup table.
+--- Keyed by recipeKey (positive itemID or negative spellID).
+function Data:GetRecipeDB()
+    if not self.db.global._recipeDB then
+        self.db.global._recipeDB = {}
+    end
+    return self.db.global._recipeDB
+end
+
+--- Store or update reagent/category data for a recipe in the shared DB.
+--- Only overwrites reagents when the new list is longer (more complete).
+function Data:SetRecipeInfo(recipeKey, name, category, reagents)
+    local rdb = self:GetRecipeDB()
+    if not rdb[recipeKey] then
+        rdb[recipeKey] = {}
+    end
+    local entry = rdb[recipeKey]
+    if name then entry.name = name end
+    if category then entry.category = category end
+    if reagents then
+        if not entry.reagents or #reagents > #entry.reagents then
+            entry.reagents = reagents
+        end
+    end
+end
+
+--- Look up reagents for a recipe from the shared DB.
+function Data:GetRecipeReagents(recipeKey)
+    local rdb = self:GetRecipeDB()
+    local entry = rdb[recipeKey]
+    return entry and entry.reagents or nil
+end
+
+--- Look up category for a recipe from the shared DB.
+function Data:GetRecipeCategory(recipeKey)
+    local rdb = self:GetRecipeDB()
+    local entry = rdb[recipeKey]
+    return entry and entry.category or nil
+end
+
+--- Extract reagents/categories from all per-crafter entries into RecipeDB.
+--- Strips the duplicated fields from per-crafter storage.
+function Data:MigrateToRecipeDB()
+    local migrated = 0
+    for memberKey, entry in pairs(self.db.global) do
+        if type(entry) == "table" and entry.professions then
+            for _, profData in pairs(entry.professions) do
+                if profData.recipes then
+                    for recipeKey, recipeData in pairs(profData.recipes) do
+                        if recipeData.reagents or recipeData.category then
+                            self:SetRecipeInfo(recipeKey, recipeData.name, recipeData.category, recipeData.reagents)
+                            recipeData.reagents = nil
+                            recipeData.category = nil
+                            migrated = migrated + 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if migrated > 0 then
+        GuildCrafts:Debug("RecipeDB migration: extracted", migrated, "recipe entries")
+    end
+end
+
+--- Extract reagents/categories from a single incoming entry into RecipeDB.
+--- Strips the fields from the entry in-place.
+function Data:ExtractToRecipeDB(entry)
+    if type(entry) ~= "table" or not entry.professions then return end
+    for _, profData in pairs(entry.professions) do
+        if profData.recipes then
+            for recipeKey, recipeData in pairs(profData.recipes) do
+                if recipeData.reagents or recipeData.category then
+                    self:SetRecipeInfo(recipeKey, recipeData.name, recipeData.category, recipeData.reagents)
+                    recipeData.reagents = nil
+                    recipeData.category = nil
+                end
+            end
+        end
+    end
 end
 
 ----------------------------------------------------------------------
@@ -620,29 +709,26 @@ function Data:ScanTradeSkill()
         elseif skillName then
             local recipeKey = self:GetRecipeKey(i)
             if recipeKey then
+                -- Store/update reagents + category in shared RecipeDB
+                local scannedReagents = self:ScanTradeSkillReagents(i)
+                local existingReagents = self:GetRecipeReagents(recipeKey)
+                local expectedCount = GetTradeSkillNumReagents(i)
+                if scannedReagents and (not existingReagents
+                        or (expectedCount and expectedCount > 0 and #existingReagents < expectedCount)) then
+                    self:SetRecipeInfo(recipeKey, skillName, currentCategory, scannedReagents)
+                    if recipes[recipeKey] then backfillChanged = true end
+                elseif currentCategory then
+                    self:SetRecipeInfo(recipeKey, skillName, currentCategory, nil)
+                end
+
                 if not recipes[recipeKey] then
                     local recipeData = {
                         name = skillName,
                         source = "",
-                        reagents = self:ScanTradeSkillReagents(i),
-                        category = currentCategory,
                     }
                     recipes[recipeKey] = recipeData
                     newRecipes[recipeKey] = recipeData
                     newCount = newCount + 1
-                else
-                    local existingReagents = recipes[recipeKey].reagents
-                    local expectedCount = GetTradeSkillNumReagents(i)
-                    if not existingReagents or (expectedCount and expectedCount > 0 and #existingReagents < expectedCount) then
-                        -- Backfill or fix partial reagent data
-                        recipes[recipeKey].reagents = self:ScanTradeSkillReagents(i)
-                        backfillChanged = true
-                    end
-                    if not recipes[recipeKey].category and currentCategory then
-                        -- Backfill category for recipes scanned before categorization
-                        recipes[recipeKey].category = currentCategory
-                        backfillChanged = true
-                    end
                 end
             end
         end
@@ -779,29 +865,26 @@ function Data:ScanCraft()
         elseif craftName then
             local recipeKey = self:GetCraftRecipeKey(i)
             if recipeKey then
+                -- Store/update reagents + category in shared RecipeDB
+                local scannedReagents = self:ScanCraftReagents(i)
+                local existingReagents = self:GetRecipeReagents(recipeKey)
+                local expectedCount = GetCraftNumReagents(i)
+                if scannedReagents and (not existingReagents
+                        or (expectedCount and expectedCount > 0 and #existingReagents < expectedCount)) then
+                    self:SetRecipeInfo(recipeKey, craftName, currentCategory, scannedReagents)
+                    if recipes[recipeKey] then backfillChanged = true end
+                elseif currentCategory then
+                    self:SetRecipeInfo(recipeKey, craftName, currentCategory, nil)
+                end
+
                 if not recipes[recipeKey] then
                     local recipeData = {
                         name = craftName,
                         source = "",
-                        reagents = self:ScanCraftReagents(i),
-                        category = currentCategory,
                     }
                     recipes[recipeKey] = recipeData
                     newRecipes[recipeKey] = recipeData
                     newCount = newCount + 1
-                else
-                    local existingReagents = recipes[recipeKey].reagents
-                    local expectedCount = GetCraftNumReagents(i)
-                    if not existingReagents or (expectedCount and expectedCount > 0 and #existingReagents < expectedCount) then
-                        -- Backfill or fix partial reagent data
-                        recipes[recipeKey].reagents = self:ScanCraftReagents(i)
-                        backfillChanged = true
-                    end
-                    if not recipes[recipeKey].category and currentCategory then
-                        -- Backfill category for recipes scanned before categorization
-                        recipes[recipeKey].category = currentCategory
-                        backfillChanged = true
-                    end
                 end
             end
         end
@@ -897,8 +980,8 @@ function Data:StripSyncFields(entry)
             profCopy.recipes[recipeKey] = {
                 name = recipeData.name,
                 source = recipeData.source,
-                category = recipeData.category,
-                reagents = recipeData.reagents,
+                category = recipeData.category or self:GetRecipeCategory(recipeKey),
+                reagents = recipeData.reagents or self:GetRecipeReagents(recipeKey),
             }
         end
         copy.professions[profName] = profCopy
@@ -907,7 +990,8 @@ function Data:StripSyncFields(entry)
     return copy
 end
 
---- Strip reagents from a recipes table (for delta payloads).
+--- Prepare a recipes table for delta payloads.
+--- Re-inflates reagents/category from RecipeDB for wire compatibility.
 function Data:StripRecipeReagents(recipes)
     if type(recipes) ~= "table" then return recipes end
 
@@ -916,8 +1000,8 @@ function Data:StripRecipeReagents(recipes)
         copy[recipeKey] = {
             name = recipeData.name,
             source = recipeData.source,
-            category = recipeData.category,
-            reagents = recipeData.reagents,
+            category = recipeData.category or self:GetRecipeCategory(recipeKey),
+            reagents = recipeData.reagents or self:GetRecipeReagents(recipeKey),
         }
     end
     return copy
@@ -966,6 +1050,7 @@ function Data:MergeIncoming(incomingData)
                         and (incomingEntry.dataFormat or 0) > (localEntry.dataFormat or 0))
                 if dominated then
                     gdb[memberKey] = incomingEntry
+                    self:ExtractToRecipeDB(incomingEntry)
                     changed = true
                     GuildCrafts:Debug("Merged data for:", memberKey)
                 end
@@ -986,6 +1071,12 @@ function Data:MergeDelta(memberKey, profName, recipeKey, recipeData, newLastUpda
         entry.professions[profName] = { recipes = {} }
     end
     entry.professions[profName].recipes[recipeKey] = recipeData
+    -- Extract reagents/category to shared RecipeDB
+    if recipeData.reagents or recipeData.category then
+        self:SetRecipeInfo(recipeKey, recipeData.name, recipeData.category, recipeData.reagents)
+        recipeData.reagents = nil
+        recipeData.category = nil
+    end
     if newLastUpdate and newLastUpdate > (entry.lastUpdate or 0) then
         entry.lastUpdate = newLastUpdate
     end
@@ -1271,6 +1362,7 @@ function Data:SimGenerate(count)
         end
 
         gdb[memberKey] = entry
+        self:ExtractToRecipeDB(entry)
         generated = generated + 1
     end
 
@@ -1445,7 +1537,7 @@ function Data:SearchRecipes(query)
                                     recipeKey = recipeKey,
                                     profName = profName,
                                     source = recipeData.source,
-                                    reagents = recipeData.reagents,
+                                    reagents = recipeData.reagents or self:GetRecipeReagents(recipeKey),
                                     crafters = {},
                                 }
                             end

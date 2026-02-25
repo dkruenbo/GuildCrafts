@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0 — 2026-02-25
+
+### Improvements
+
+- **RecipeDB deduplication**: Reagent and category data is now stored once in a shared lookup table (`_recipeDB`) instead of duplicated per crafter. Reduces SavedVariables size and sync payload preparation overhead. Wire format unchanged — fully backward compatible with 1.0.x clients.
+
 ## 1.0.4 — 2026-02-26
 
 ### Bug Fixes

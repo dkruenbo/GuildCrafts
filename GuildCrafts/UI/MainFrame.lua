@@ -598,7 +598,13 @@ function UI:ShowMemberRecipes(memberKey, profName)
     -- Sort recipes by category then name
     local sorted = {}
     for key, data in pairs(recipes) do
-        sorted[#sorted + 1] = { key = key, name = data.name or "Unknown", source = data.source or "", reagents = data.reagents, category = data.category or "" }
+        sorted[#sorted + 1] = {
+            key = key,
+            name = data.name or "Unknown",
+            source = data.source or "",
+            reagents = data.reagents or GuildCrafts.Data:GetRecipeReagents(key),
+            category = data.category or GuildCrafts.Data:GetRecipeCategory(key) or "",
+        }
     end
     table.sort(sorted, function(a, b)
         if a.category ~= b.category then
