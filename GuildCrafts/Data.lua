@@ -562,8 +562,10 @@ function Data:ScanTradeSkill()
                     newRecipes[recipeKey] = recipeData
                     newCount = newCount + 1
                 else
-                    if not recipes[recipeKey].reagents then
-                        -- Backfill reagent data for recipes scanned before reagent tracking
+                    local existingReagents = recipes[recipeKey].reagents
+                    local expectedCount = GetTradeSkillNumReagents(i)
+                    if not existingReagents or (expectedCount and expectedCount > 0 and #existingReagents < expectedCount) then
+                        -- Backfill or fix partial reagent data
                         recipes[recipeKey].reagents = self:ScanTradeSkillReagents(i)
                         backfillChanged = true
                     end
@@ -718,8 +720,10 @@ function Data:ScanCraft()
                     newRecipes[recipeKey] = recipeData
                     newCount = newCount + 1
                 else
-                    if not recipes[recipeKey].reagents then
-                        -- Backfill reagent data for recipes scanned before reagent tracking
+                    local existingReagents = recipes[recipeKey].reagents
+                    local expectedCount = GetCraftNumReagents(i)
+                    if not existingReagents or (expectedCount and expectedCount > 0 and #existingReagents < expectedCount) then
+                        -- Backfill or fix partial reagent data
                         recipes[recipeKey].reagents = self:ScanCraftReagents(i)
                         backfillChanged = true
                     end

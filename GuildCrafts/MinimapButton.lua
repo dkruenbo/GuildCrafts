@@ -5,6 +5,7 @@
 
 local GuildCrafts = LibStub("AceAddon-3.0"):GetAddon("GuildCrafts")
 local MinimapButton = GuildCrafts:NewModule("MinimapButton", "AceEvent-3.0")
+GuildCrafts.MinimapButton = MinimapButton
 
 ----------------------------------------------------------------------
 -- Constants
