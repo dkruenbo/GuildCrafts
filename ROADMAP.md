@@ -20,7 +20,15 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 | [#20](https://github.com/dkruenbo/GuildCrafts/issues/20) | Auto-prune stale member entries | Ready for 1.1.0 release |
 | [#5](https://github.com/dkruenbo/GuildCrafts/issues/5) | Favorites / Bookmarks | Ready for 1.1.0 release |
 
-## 1.2.0 — Network Efficiency
+## 1.2.0 — UI Polish & Visual Improvements
+
+| Issue | Title | Status |
+|-------|-------|--------|
+| [#37](https://github.com/dkruenbo/GuildCrafts/issues/37) | Styled profession sidebar buttons | Not started |
+| [#38](https://github.com/dkruenbo/GuildCrafts/issues/38) | Quality-colored recipe names and reagent icons | Not started |
+| [#39](https://github.com/dkruenbo/GuildCrafts/issues/39) | Collapsible reagent lists (click recipe to expand/collapse) | Not started |
+
+## 1.3.0 — Network Efficiency
 
 | Issue | Title | Status |
 |-------|-------|--------|
