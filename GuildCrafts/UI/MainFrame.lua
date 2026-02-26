@@ -301,9 +301,31 @@ function UI:CreateLeftPanel(parent)
     breadcrumb:SetScript("OnEnter", function(self)
         breadcrumbText:SetTextColor(0.6, 0.9, 1.0)
     end)
-    breadcrumb:SetScript("OnLeave", function(self)
+    breadcrumb:SetScript("OnLeave", function(_self)
         breadcrumbText:SetTextColor(0.4, 0.7, 1.0)
     end)
+
+    -- Favorites toggle button (top-right of left panel header)
+    local favBtn = CreateFrame("Button", nil, panel, "BackdropTemplate")
+    favBtn:SetSize(20, 20)
+    favBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -3)
+    local favBtnLabel = favBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    favBtnLabel:SetPoint("CENTER", 0, 0)
+    favBtnLabel:SetText("|cffffd100\226\152\133|r") -- ★
+    favBtn:SetScript("OnClick", function()
+        if UI._navState == "favorites" then
+            UI:PopulateProfessionList()
+        else
+            UI:ShowFavoritesTab()
+        end
+    end)
+    favBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Favorites", 1, 0.82, 0)
+        GameTooltip:Show()
+    end)
+    favBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    self.favButton = favBtn
 
     -- Scroll frame for list content
     local scrollFrame = CreateFrame("ScrollFrame", "GuildCraftsLeftScroll", panel, "UIPanelScrollFrameTemplate")
@@ -322,9 +344,10 @@ function UI:CreateLeftPanel(parent)
     self.leftRows = {}
 
     -- Navigation state
-    self._navState = "professions" -- "professions", "members", "allMembers"
+    self._navState = "professions" -- "professions", "members", "allMembers", "favorites"
     self._selectedProfession = nil
     self._selectedMember = nil
+    self._favSubTab = "members" -- "members" or "recipes"
 
     -- Populate default view
     self:PopulateProfessionList()
@@ -500,6 +523,14 @@ function UI:NavigateToMembers(profName)
         row:SetScript("OnClick", function()
             UI:ShowMemberRecipes(memberInfo.key, profName)
         end)
+        -- Member star
+        local capturedMemberKey = memberInfo.key
+        local memberStar = self:CreateStarButton(row, 14, function(btn)
+            local nowFav = GuildCrafts.Favorites:ToggleMember(capturedMemberKey)
+            UI:UpdateStarAppearance(btn, nowFav)
+        end)
+        memberStar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        self:UpdateStarAppearance(memberStar, GuildCrafts.Favorites:IsMemberFavorite(memberInfo.key))
         self.leftRows[#self.leftRows + 1] = row
         yOffset = yOffset + 24
     end
@@ -516,6 +547,8 @@ function UI:NavigateBack()
     if self._navState == "members" then
         self:PopulateProfessionList()
     elseif self._navState == "allMembers" then
+        self:PopulateProfessionList()
+    elseif self._navState == "favorites" then
         self:PopulateProfessionList()
     end
 end
@@ -641,12 +674,26 @@ function UI:ShowMemberRecipes(memberKey, profName)
             self.detailRows[#self.detailRows + 1] = catText
             yOffset = yOffset - 18
         end
-        -- Recipe name
-        local nameText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 12, yOffset)
+        -- Recipe row with star
+        local recipeRow = CreateFrame("Frame", nil, self.detailContent)
+        recipeRow:SetSize(400, 16)
+        recipeRow:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
+        self.detailRows[#self.detailRows + 1] = recipeRow
+
+        -- Star toggle
+        local capturedKey = recipe.key
+        local star = self:CreateStarButton(recipeRow, 16, function(btn)
+            local nowFav = GuildCrafts.Favorites:ToggleRecipe(capturedKey)
+            UI:UpdateStarAppearance(btn, nowFav)
+        end)
+        star:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
+        self:UpdateStarAppearance(star, GuildCrafts.Favorites:IsRecipeFavorite(recipe.key))
+        self.detailRows[#self.detailRows + 1] = star
+
+        local nameText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        nameText:SetPoint("LEFT", star, "RIGHT", 2, 0)
         nameText:SetText(recipe.name)
         nameText:SetTextColor(1, 1, 1)
-        self.detailRows[#self.detailRows + 1] = nameText
 
         -- Source (subdued)
         if recipe.source and recipe.source ~= "" then
@@ -706,11 +753,24 @@ function UI:ShowSearchResults(results)
 
     local yOffset = -8
     for _, result in ipairs(results) do
-        -- Recipe name
-        local nameText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
+        -- Recipe name row with star
+        local recipeRow = CreateFrame("Frame", nil, self.detailContent)
+        recipeRow:SetSize(400, 16)
+        recipeRow:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
+        self.detailRows[#self.detailRows + 1] = recipeRow
+
+        local capturedKey = result.recipeKey
+        local star = self:CreateStarButton(recipeRow, 16, function(btn)
+            local nowFav = GuildCrafts.Favorites:ToggleRecipe(capturedKey)
+            UI:UpdateStarAppearance(btn, nowFav)
+        end)
+        star:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
+        self:UpdateStarAppearance(star, GuildCrafts.Favorites:IsRecipeFavorite(result.recipeKey))
+        self.detailRows[#self.detailRows + 1] = star
+
+        local nameText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        nameText:SetPoint("LEFT", star, "RIGHT", 2, 0)
         nameText:SetText("|cffffd100" .. result.recipeName .. "|r  |cff888888(" .. result.profName .. ")|r")
-        self.detailRows[#self.detailRows + 1] = nameText
         yOffset = yOffset - 18
 
         -- Source
@@ -1120,6 +1180,303 @@ function UI:FilterMemberList(query)
 end
 
 ----------------------------------------------------------------------
+-- Favorites Tab
+----------------------------------------------------------------------
+
+function UI:ShowFavoritesTab()
+    self._navState = "favorites"
+    self._selectedProfession = nil
+    self._selectedMember = nil
+    self._searchActive = false
+
+    -- Breadcrumb
+    self.leftBreadcrumb:Show()
+    self.leftBreadcrumbText:SetText("< Back")
+
+    self:ClearLeftRows()
+
+    -- Sub-tab buttons (Members / Recipes) at top of left panel
+    local subTabHeight = 22
+    local tabContainer = CreateFrame("Frame", nil, self.leftContent)
+    tabContainer:SetSize(LEFT_PANEL_WIDTH - 28, subTabHeight)
+    tabContainer:SetPoint("TOPLEFT", self.leftContent, "TOPLEFT", 0, 0)
+    self.leftRows[#self.leftRows + 1] = tabContainer
+
+    local membersTab = CreateFrame("Button", nil, tabContainer, "BackdropTemplate")
+    membersTab:SetSize((LEFT_PANEL_WIDTH - 28) / 2, subTabHeight)
+    membersTab:SetPoint("LEFT", tabContainer, "LEFT", 0, 0)
+    membersTab:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    local membersTabText = membersTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    membersTabText:SetPoint("CENTER")
+    membersTabText:SetText("Members")
+
+    local recipesTab = CreateFrame("Button", nil, tabContainer, "BackdropTemplate")
+    recipesTab:SetSize((LEFT_PANEL_WIDTH - 28) / 2, subTabHeight)
+    recipesTab:SetPoint("RIGHT", tabContainer, "RIGHT", 0, 0)
+    recipesTab:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    local recipesTabText = recipesTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    recipesTabText:SetPoint("CENTER")
+    recipesTabText:SetText("Recipes")
+
+    -- Style active/inactive tabs
+    local function styleSubTabs()
+        if UI._favSubTab == "members" then
+            membersTab:SetBackdropColor(0.2, 0.2, 0.3, 1)
+            membersTab:SetBackdropBorderColor(0.4, 0.4, 0.6, 1)
+            membersTabText:SetTextColor(1, 0.82, 0)
+            recipesTab:SetBackdropColor(0.1, 0.1, 0.1, 1)
+            recipesTab:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
+            recipesTabText:SetTextColor(0.6, 0.6, 0.6)
+        else
+            recipesTab:SetBackdropColor(0.2, 0.2, 0.3, 1)
+            recipesTab:SetBackdropBorderColor(0.4, 0.4, 0.6, 1)
+            recipesTabText:SetTextColor(1, 0.82, 0)
+            membersTab:SetBackdropColor(0.1, 0.1, 0.1, 1)
+            membersTab:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
+            membersTabText:SetTextColor(0.6, 0.6, 0.6)
+        end
+    end
+
+    membersTab:SetScript("OnClick", function()
+        UI._favSubTab = "members"
+        UI:ShowFavoritesTab()
+    end)
+    recipesTab:SetScript("OnClick", function()
+        UI._favSubTab = "recipes"
+        UI:ShowFavoritesTab()
+    end)
+
+    styleSubTabs()
+
+    local yOffset = subTabHeight + 4
+
+    if self._favSubTab == "members" then
+        self:PopulateFavMembers(yOffset)
+    else
+        self:PopulateFavRecipes(yOffset)
+    end
+
+    self:UpdateDetailWelcome()
+end
+
+--- Favorites: Members sub-tab
+function UI:PopulateFavMembers(yOffset)
+    local members = GuildCrafts.Favorites:GetFavoriteMembersInfo()
+
+    if #members == 0 then
+        local empty = self.leftContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        empty:SetPoint("TOPLEFT", self.leftContent, "TOPLEFT", 8, -yOffset)
+        empty:SetText("No favorite members yet.\nClick the star on a member\nrow to add one.")
+        empty:SetTextColor(0.5, 0.5, 0.5)
+        empty:SetJustifyH("LEFT")
+        self.leftRows[#self.leftRows + 1] = empty
+        self.leftContent:SetHeight(yOffset + 60)
+        return
+    end
+
+    for _, info in ipairs(members) do
+        local dot = info.online and "|cff00ff00O|r " or "|cff666666O|r "
+        local label = dot .. info.key:match("^(.+)-") .. "  |cff888888" .. info.recipeCount .. " recipes|r"
+        local row = self:CreateLeftRow(self.leftContent, yOffset, label)
+        row.memberKey = info.key
+
+        -- Clicking shows first profession's recipes
+        local capturedKey = info.key
+        row:SetScript("OnClick", function()
+            local entry = info.entry
+            if entry and entry.professions then
+                local profName = next(entry.professions)
+                if profName then
+                    UI:ShowMemberRecipes(capturedKey, profName)
+                end
+            end
+        end)
+
+        -- Unfavorite star
+        local capturedMemberKey = info.key
+        local memberStar = self:CreateStarButton(row, 14, function(btn)
+            local nowFav = GuildCrafts.Favorites:ToggleMember(capturedMemberKey)
+            UI:UpdateStarAppearance(btn, nowFav)
+            -- Refresh favorites view after a short delay
+            GuildCrafts:ScheduleTimer(function() UI:ShowFavoritesTab() end, 0.1)
+        end)
+        memberStar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        self:UpdateStarAppearance(memberStar, true)
+
+        self.leftRows[#self.leftRows + 1] = row
+        yOffset = yOffset + 24
+    end
+
+    self.leftContent:SetHeight(math.max(yOffset + 8, 1))
+end
+
+--- Favorites: Recipes sub-tab (grouped by profession, shown in detail panel)
+function UI:PopulateFavRecipes(yOffset)
+    local grouped = GuildCrafts.Favorites:GetFavoriteRecipesGrouped()
+
+    -- Show professions in left panel, recipes in detail panel
+    local profNames = {}
+    for profName in pairs(grouped) do
+        profNames[#profNames + 1] = profName
+    end
+    table.sort(profNames)
+
+    if #profNames == 0 then
+        local empty = self.leftContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        empty:SetPoint("TOPLEFT", self.leftContent, "TOPLEFT", 8, -yOffset)
+        empty:SetText("No favorite recipes yet.\nClick the star on a recipe\nrow to add one.")
+        empty:SetTextColor(0.5, 0.5, 0.5)
+        empty:SetJustifyH("LEFT")
+        self.leftRows[#self.leftRows + 1] = empty
+        self.leftContent:SetHeight(yOffset + 60)
+        -- Show all favorites in detail panel
+        self:ShowFavRecipesDetail(grouped, nil)
+        return
+    end
+
+    -- "All" entry at top
+    local allRow = self:CreateLeftRow(self.leftContent, yOffset, "All Favorites")
+    allRow:SetScript("OnClick", function()
+        UI:ShowFavRecipesDetail(grouped, nil)
+    end)
+    self.leftRows[#self.leftRows + 1] = allRow
+    yOffset = yOffset + 24
+
+    for _, profName in ipairs(profNames) do
+        local count = #grouped[profName]
+        local row = self:CreateLeftRow(self.leftContent, yOffset, profName, "(" .. count .. ")", PROFESSION_ICONS[profName])
+        local capturedProfName = profName
+        row:SetScript("OnClick", function()
+            UI:ShowFavRecipesDetail(grouped, capturedProfName)
+        end)
+        self.leftRows[#self.leftRows + 1] = row
+        yOffset = yOffset + 24
+    end
+
+    self.leftContent:SetHeight(math.max(yOffset + 8, 1))
+
+    -- Default: show all
+    self:ShowFavRecipesDetail(grouped, nil)
+end
+
+--- Show favorited recipes in the detail panel.
+--- If filterProf is nil, show all; otherwise show only that profession.
+function UI:ShowFavRecipesDetail(grouped, filterProf)
+    self.detailWelcome:Hide()
+    self:ClearDetailRows()
+
+    -- Collect professions to show
+    local profNames = {}
+    if filterProf then
+        if grouped[filterProf] then
+            profNames[#profNames + 1] = filterProf
+        end
+    else
+        for profName in pairs(grouped) do
+            profNames[#profNames + 1] = profName
+        end
+        table.sort(profNames)
+    end
+
+    if #profNames == 0 then
+        local msg = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        msg:SetPoint("CENTER", self.detailPanel, "CENTER", 0, 0)
+        msg:SetText("No favorite recipes yet.\nClick the \226\152\134 star on any recipe to add it.")
+        msg:SetTextColor(0.5, 0.5, 0.5)
+        msg:SetJustifyH("CENTER")
+        self.detailRows[#self.detailRows + 1] = msg
+        return
+    end
+
+    local yOffset = -8
+
+    for _, profName in ipairs(profNames) do
+        -- Profession header
+        local profHeader = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        profHeader:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
+        profHeader:SetText(profName)
+        profHeader:SetTextColor(1, 0.82, 0)
+        self.detailRows[#self.detailRows + 1] = profHeader
+        yOffset = yOffset - 22
+
+        for _, recipe in ipairs(grouped[profName]) do
+            -- Star + recipe name row
+            local recipeRow = CreateFrame("Frame", nil, self.detailContent)
+            recipeRow:SetSize(400, 16)
+            recipeRow:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
+            self.detailRows[#self.detailRows + 1] = recipeRow
+
+            local capturedKey = recipe.recipeKey
+            local star = self:CreateStarButton(recipeRow, 16, function(btn)
+                local nowFav = GuildCrafts.Favorites:ToggleRecipe(capturedKey)
+                UI:UpdateStarAppearance(btn, nowFav)
+                -- Refresh after unfavorite
+                if not nowFav then
+                    GuildCrafts:ScheduleTimer(function()
+                        local newGrouped = GuildCrafts.Favorites:GetFavoriteRecipesGrouped()
+                        UI:ShowFavRecipesDetail(newGrouped, filterProf)
+                    end, 0.1)
+                end
+            end)
+            star:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
+            self:UpdateStarAppearance(star, true)
+            self.detailRows[#self.detailRows + 1] = star
+
+            local nameText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            nameText:SetPoint("LEFT", star, "RIGHT", 2, 0)
+            nameText:SetText(recipe.recipeName)
+            nameText:SetTextColor(1, 1, 1)
+            yOffset = yOffset - 18
+
+            -- Crafters list
+            for _, crafter in ipairs(recipe.crafters) do
+                local dot = crafter.online and "|cff00ff00O|r " or "|cff666666O|r "
+                local crafterName = crafter.key:match("^(.+)-") or crafter.key
+                local crafterText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                crafterText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 24, yOffset)
+                crafterText:SetText(dot .. crafterName)
+                crafterText:SetTextColor(0.8, 0.8, 0.8)
+                self.detailRows[#self.detailRows + 1] = crafterText
+                yOffset = yOffset - 14
+            end
+
+            -- Reagents
+            if recipe.reagents and #recipe.reagents > 0 then
+                local parts = {}
+                for _, r in ipairs(recipe.reagents) do
+                    parts[#parts + 1] = r.count .. "x " .. r.name
+                end
+                local reagentStr = table.concat(parts, ", ")
+                local reagentText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                reagentText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 24, yOffset)
+                reagentText:SetText("Reagents: " .. reagentStr)
+                reagentText:SetTextColor(0.6, 0.8, 1.0)
+                reagentText:SetWordWrap(true)
+                reagentText:SetWidth(340)
+                self.detailRows[#self.detailRows + 1] = reagentText
+                local textHeight = reagentText:GetStringHeight()
+                if not textHeight or textHeight < 12 then textHeight = 12 end
+                yOffset = yOffset - textHeight - 4
+            end
+
+            yOffset = yOffset - 6
+        end
+
+        yOffset = yOffset - 8
+    end
+
+    self.detailContent:SetHeight(math.max(math.abs(yOffset) + 8, 1))
+end
+
+----------------------------------------------------------------------
 -- Detail Panel Helpers
 ----------------------------------------------------------------------
 
@@ -1145,6 +1502,32 @@ function UI:ShowDetailEmpty(_memberKey, _profName)
     msg:SetTextColor(0.5, 0.5, 0.5)
     msg:SetJustifyH("CENTER")
     self.detailRows[#self.detailRows + 1] = msg
+end
+
+----------------------------------------------------------------------
+-- Star Button Factory
+----------------------------------------------------------------------
+
+function UI:CreateStarButton(parent, size, onClick)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(size, size)
+    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label:SetPoint("CENTER", 0, 0)
+    btn._starLabel = label
+
+    btn:SetScript("OnClick", function()
+        if onClick then onClick(btn) end
+    end)
+
+    return btn
+end
+
+function UI:UpdateStarAppearance(btn, isFavorite)
+    if isFavorite then
+        btn._starLabel:SetText("|cffffd100\226\152\133|r")  -- filled star ★
+    else
+        btn._starLabel:SetText("|cff555555\226\152\134|r")  -- outline star ☆
+    end
 end
 
 ----------------------------------------------------------------------
@@ -1313,6 +1696,8 @@ function UI:Refresh()
         self:PopulateProfessionList()
     elseif self._navState == "members" and self._selectedProfession then
         self:NavigateToMembers(self._selectedProfession)
+    elseif self._navState == "favorites" then
+        self:ShowFavoritesTab()
     end
 
     self._refreshing = false

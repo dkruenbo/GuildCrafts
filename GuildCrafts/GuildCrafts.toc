@@ -4,6 +4,7 @@
 ## Author: GuildCrafts Team
 ## Version: 1.0.4
 ## SavedVariables: GuildCraftsDB
+## SavedVariablesPerCharacter: GuildCraftsCharDB
 ## X-Category: Guild
 
 # Libraries
@@ -14,6 +15,7 @@ Core.lua
 Data.lua
 Comms.lua
 CraftRequest.lua
+Favorites.lua
 Tooltip.lua
 MinimapButton.lua
 

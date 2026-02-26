@@ -17,6 +17,7 @@ ignore = {
 
 globals = {
     "GuildCrafts",
+    "GuildCraftsCharDB",
     "GuildCraftsDB",
     -- Slash commands
     "SlashCmdList",
