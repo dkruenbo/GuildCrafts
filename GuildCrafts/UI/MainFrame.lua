@@ -306,13 +306,16 @@ function UI:CreateLeftPanel(parent)
     end)
 
     -- Favorites toggle button (top-right of left panel header)
-    local favBtn = CreateFrame("Button", nil, panel, "BackdropTemplate")
+    local favBtn = CreateFrame("Frame", nil, panel)
     favBtn:SetSize(20, 20)
     favBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -3)
-    local favBtnLabel = favBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    favBtn:EnableMouse(true)
+    local favBtnLabel = favBtn:CreateFontString(nil, "OVERLAY")
+    favBtnLabel:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
     favBtnLabel:SetPoint("CENTER", 0, 0)
-    favBtnLabel:SetText("|cffffd100\226\152\133|r") -- ★
-    favBtn:SetScript("OnClick", function()
+    favBtnLabel:SetText("*")
+    favBtnLabel:SetTextColor(1.0, 0.82, 0.0)  -- gold
+    favBtn:SetScript("OnMouseDown", function()
         if UI._navState == "favorites" then
             UI:PopulateProfessionList()
         else
