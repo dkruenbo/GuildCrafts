@@ -3,7 +3,7 @@
 -- SavedVariables management, recipe scanning, data merging,
 -- guild roster pruning, and simulation mode
 ----------------------------------------------------------------------
-local ADDON_NAME = "GuildCrafts"
+local _, _ns = ... -- luacheck: ignore (WoW addon bootstrap)
 local GuildCrafts = _G.GuildCrafts
 
 -- Create the Data module
@@ -438,8 +438,7 @@ function Data:ScanTradeSkillCooldowns(profName, numSkills)
     end
 
     -- Only update if cooldown state actually changed
-    local hasCD = false
-    for _ in pairs(cooldowns) do hasCD = true; break end
+    local hasCD = (next(cooldowns) ~= nil)
 
     local hadCD = profData.cooldowns ~= nil
     local changed = false
@@ -493,8 +492,7 @@ function Data:ScanCraftCooldowns(profName, numCrafts)
         end
     end
 
-    local hasCD = false
-    for _ in pairs(cooldowns) do hasCD = true; break end
+    local hasCD = (next(cooldowns) ~= nil)
 
     local hadCD = profData.cooldowns ~= nil
     local changed = false
@@ -1093,7 +1091,7 @@ function Data:DumpSummary()
         if type(entry) == "table" and entry.professions then
             totalMembers = totalMembers + 1
             local memberRecipes = 0
-            for profName, profData in pairs(entry.professions) do
+            for _, profData in pairs(entry.professions) do
                 if profData.recipes then
                     for _ in pairs(profData.recipes) do
                         memberRecipes = memberRecipes + 1
@@ -1340,7 +1338,8 @@ function Data:SimDelta()
     if not gdb then return end
     for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry._simulated then
-            for profName, profData in pairs(entry.professions) do
+            local profName = next(entry.professions)
+            if profName then
                 local newKey = 99000 + math.random(1, 9999)
                 local recipe = {
                     name = SAMPLE_RECIPES[math.random(#SAMPLE_RECIPES)] .. " (NEW)",

@@ -2,15 +2,32 @@
 std = "lua51"
 max_line_length = false
 
+-- Exclude vendored libraries
+exclude_files = {
+    "Libs/**",
+}
+
+-- Suppress WoW-convention noise:
+--   unused self    — WoW callbacks always receive self
+--   self shadowing — SetScript handlers shadow the outer self
+ignore = {
+    "212/self",   -- unused argument 'self'
+    "432/self",   -- shadowing upvalue argument 'self'
+}
+
 globals = {
     "GuildCrafts",
     "GuildCraftsDB",
+    -- Slash commands
+    "SlashCmdList",
+    "SLASH_GUILDCRAFTS1",
+    "SLASH_GUILDCRAFTS2",
 }
 
 read_globals = {
     -- WoW API — Frames & UI
     "CreateFrame", "UIParent", "GameTooltip", "ItemRefTooltip",
-    "GameFontNormal",
+    "GameFontNormal", "GameFontHighlight", "GameFontHighlightSmall",
     "GameFontNormalLarge", "GameFontNormalSmall", "GameFontDisableSmall",
     "ChatFontNormal", "UISpecialFrames",
     "UIDropDownMenu_Initialize", "UIDropDownMenu_AddButton",
@@ -37,7 +54,11 @@ read_globals = {
     "GetNumSkillLines", "GetSkillLineInfo",
 
     -- WoW API — Guild
-    "GetGuildRosterInfo", "GetNumGuildMembers", "GuildRoster", "IsInGuild",
+    "GetGuildInfo", "GetGuildRosterInfo", "GetNumGuildMembers",
+    "GuildRoster", "IsInGuild",
+
+    -- WoW API — Combat
+    "InCombatLockdown", "UnitAffectingCombat",
 
     -- WoW API — Chat
     "SendChatMessage",

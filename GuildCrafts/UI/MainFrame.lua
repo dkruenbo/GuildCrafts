@@ -3,7 +3,7 @@
 -- Main window: title bar, two-panel split, sync indicator,
 -- resize, drag, ESC-to-close
 ----------------------------------------------------------------------
-local ADDON_NAME = "GuildCrafts"
+local _, _ns = ... -- luacheck: ignore (WoW addon bootstrap)
 local GuildCrafts = _G.GuildCrafts
 
 -- UI namespace
@@ -1126,7 +1126,7 @@ function UI:UpdateDetailWelcome()
     end
 end
 
-function UI:ShowDetailEmpty(memberKey, profName)
+function UI:ShowDetailEmpty(_memberKey, _profName)
     self:ClearDetailRows()
     self.detailWelcome:Hide()
 
