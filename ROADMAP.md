@@ -18,7 +18,7 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 | [#18](https://github.com/dkruenbo/GuildCrafts/issues/18) | Deduplicate reagent data with shared RecipeDB lookup | Done in 1.1.0 |
 | [#19](https://github.com/dkruenbo/GuildCrafts/issues/19) | Incremental sync: send only changed professions | Not started |
 | [#20](https://github.com/dkruenbo/GuildCrafts/issues/20) | Auto-prune stale member entries | Done in 1.1.0 |
-| [#5](https://github.com/dkruenbo/GuildCrafts/issues/5) | Favorites / Bookmarks | Not started |
+| [#5](https://github.com/dkruenbo/GuildCrafts/issues/5) | Favorites / Bookmarks | Done in 1.1.0 |
 
 ## 1.2.0 — Network Efficiency
 
@@ -35,4 +35,4 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 | [#9](https://github.com/dkruenbo/GuildCrafts/issues/9) | Code Modularisation | Not started |
 | [#7](https://github.com/dkruenbo/GuildCrafts/issues/7) | Export to CSV / Text | Not started |
 | [#8](https://github.com/dkruenbo/GuildCrafts/issues/8) | Locale Support | Not started |
-| [#10](https://github.com/dkruenbo/GuildCrafts/issues/10) | Craft Marketplace | Not started |
+| [#10](https://github.com/dkruenbo/GuildCrafts/issues/10) | Craft Marketplace | **Moved to separate addon: MarketCrafts** |
