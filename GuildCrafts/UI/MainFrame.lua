@@ -1517,13 +1517,10 @@ end
 ----------------------------------------------------------------------
 
 function UI:CreateStarButton(parent, size, onClick)
-    local btn = CreateFrame("Button", nil, parent)
+    -- Use Frame instead of Button to avoid texture issues
+    local btn = CreateFrame("Frame", nil, parent)
     btn:SetSize(size, size)
-
-    -- Disable any default textures
-    btn:SetNormalTexture(nil)
-    btn:SetHighlightTexture(nil)
-    btn:SetPushedTexture(nil)
+    btn:EnableMouse(true)
 
     local label = btn:CreateFontString(nil, "OVERLAY")
     label:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
@@ -1531,7 +1528,7 @@ function UI:CreateStarButton(parent, size, onClick)
     label:SetText("*")
     btn._starLabel = label
 
-    btn:SetScript("OnClick", function()
+    btn:SetScript("OnMouseDown", function()
         if onClick then onClick(btn) end
     end)
 
