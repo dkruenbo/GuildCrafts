@@ -6,6 +6,10 @@
 
 - **Per-guild database partitioning**: Characters on the same account but in different guilds no longer share or corrupt each other's member data. Each guild's data is now stored in its own partition under `GuildCraftsDB.global["GuildName-Realm"]`. Existing data is automatically migrated on first login after the update.
 
+### Other
+
+- **Luacheck cleanup**: Resolved all 18 luacheck warnings (unused variables, shadowed locals, dead code). Added `.luacheckrc` config for WoW addon development. 0 warnings / 0 errors.
+
 ## 1.0.3 — 2026-02-25
 
 ### Bug Fixes
