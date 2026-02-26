@@ -1652,7 +1652,7 @@ function UI:ClearLeftRows()
             -- Hide and detach any star buttons that were added as children
             if row._star then
                 row._star:Hide()
-                row._star:SetScript("OnClick", nil)
+                row._star:SetScript("OnMouseDown", nil)
                 row._star = nil
             end
             self._leftRowPool[#self._leftRowPool + 1] = row
