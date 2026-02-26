@@ -920,8 +920,8 @@ function Comms:ProcessIncoming(message, distribution, sender)
         if not self._versionWarned then self._versionWarned = {} end
         if not self._versionWarned[sender] then
             self._versionWarned[sender] = true
-            GuildCrafts:Printf("|cffff8800%s is running a newer GuildCrafts version (v%d). Please update.|r",
-                sender, msgVersion)
+            GuildCrafts:Printf("|cffff8800%s is running a newer GuildCrafts version. Please update.|r",
+                sender)
         end
         -- Still attempt to process — forward compatible where possible
     end

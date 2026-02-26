@@ -15,8 +15,12 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 -- Make it globally accessible for other files
 _G.GuildCrafts = GuildCrafts
 
--- Addon version (parsed from .toc at runtime, fallback to hardcoded)
-GuildCrafts.VERSION = 1
+-- Addon version — keep in sync with .toc and CurseForge
+GuildCrafts.DISPLAY_VERSION = "1.0.4"
+
+-- Protocol version — integer used in sync envelope for compatibility checks.
+-- Bump when the wire format changes in a backward-incompatible way.
+GuildCrafts.VERSION = 2
 GuildCrafts.ADDON_PREFIX = "GuildCrafts"
 
 -- Data format version — bump when sync payload structure changes
@@ -35,7 +39,7 @@ function GuildCrafts:OnInitialize()
     -- Set up database, register slash commands.
     self:RegisterChatCommand("gc", "SlashHandler")
     local clientInterface = select(4, GetBuildInfo()) or "unknown"
-    self:Print("v" .. self.VERSION .. " loaded (client Interface: " .. clientInterface .. "). Type /gc to open.")
+    self:Print("v" .. self.DISPLAY_VERSION .. " loaded (client Interface: " .. clientInterface .. "). Type /gc to open.")
 end
 
 function GuildCrafts:OnEnable()
