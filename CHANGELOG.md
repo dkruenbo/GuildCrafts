@@ -1,11 +1,21 @@
 # Changelog
 
-## 1.1.0 — 2026-02-25
+## 1.1.0 — 2026-02-27
+
+### Features
+
+- **Favorites/Bookmarks**: Star your favorite recipes and crafters! New Favorites tab with Members and Recipes sub-tabs. Per-character favorites stored in `GuildCraftsCharDB`. Star toggle buttons on member rows, recipe rows, and search results.
 
 ### Improvements
 
 - **RecipeDB deduplication**: Reagent and category data is now stored once in a shared lookup table (`_recipeDB`) instead of duplicated per crafter. Reduces SavedVariables size and sync payload preparation overhead. Wire format unchanged — fully backward compatible with 1.0.x clients.
 - **Auto-prune stale members**: Members who leave the guild are marked absent and automatically pruned after 30 days. Returning members are restored. Absent members show a "(left guild)" indicator in the UI.
+
+### Bug Fixes
+
+- **Star icon rendering**: Fixed star icons appearing as rectangles. Changed from Unicode characters to ASCII asterisk (*) with proper font styling. Increased font size from 14pt to 18pt for better visibility.
+- **Favorites text overlap**: Fixed empty state messages overlapping in Favorites tab by adding word wrap and proper width constraints.
+- **Frame script cleanup**: Fixed Lua error when navigating between views caused by attempting to clear OnClick script from Frame widgets (should be OnMouseDown).
 
 ## 1.0.4 — 2026-02-26
 
