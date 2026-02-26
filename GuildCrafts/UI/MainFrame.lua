@@ -1275,11 +1275,13 @@ function UI:PopulateFavMembers(yOffset)
     if #members == 0 then
         local empty = self.leftContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         empty:SetPoint("TOPLEFT", self.leftContent, "TOPLEFT", 8, -yOffset)
-        empty:SetText("No favorite members yet.\nClick the star on a member\nrow to add one.")
+        empty:SetWidth(LEFT_PANEL_WIDTH - 30)
+        empty:SetWordWrap(true)
+        empty:SetText("No favorite members yet.\nClick the ★ star on a member row to add one.")
         empty:SetTextColor(0.5, 0.5, 0.5)
         empty:SetJustifyH("LEFT")
         self.leftRows[#self.leftRows + 1] = empty
-        self.leftContent:SetHeight(yOffset + 60)
+        self.leftContent:SetHeight(yOffset + 80)
         return
     end
 
@@ -1334,11 +1336,13 @@ function UI:PopulateFavRecipes(yOffset)
     if #profNames == 0 then
         local empty = self.leftContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         empty:SetPoint("TOPLEFT", self.leftContent, "TOPLEFT", 8, -yOffset)
-        empty:SetText("No favorite recipes yet.\nClick the star on a recipe\nrow to add one.")
+        empty:SetWidth(LEFT_PANEL_WIDTH - 30)
+        empty:SetWordWrap(true)
+        empty:SetText("No favorite recipes yet.\nClick the ☆ star on a recipe row to add one.")
         empty:SetTextColor(0.5, 0.5, 0.5)
         empty:SetJustifyH("LEFT")
         self.leftRows[#self.leftRows + 1] = empty
-        self.leftContent:SetHeight(yOffset + 60)
+        self.leftContent:SetHeight(yOffset + 80)
         -- Show all favorites in detail panel
         self:ShowFavRecipesDetail(grouped, nil)
         return
@@ -1391,7 +1395,9 @@ function UI:ShowFavRecipesDetail(grouped, filterProf)
     if #profNames == 0 then
         local msg = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         msg:SetPoint("CENTER", self.detailPanel, "CENTER", 0, 0)
-        msg:SetText("No favorite recipes yet.\nClick the \226\152\134 star on any recipe to add it.")
+        msg:SetWidth(400)
+        msg:SetWordWrap(true)
+        msg:SetText("No favorite recipes yet.\nClick the ☆ star on any recipe to add it.")
         msg:SetTextColor(0.5, 0.5, 0.5)
         msg:SetJustifyH("CENTER")
         self.detailRows[#self.detailRows + 1] = msg
@@ -1526,9 +1532,9 @@ end
 
 function UI:UpdateStarAppearance(btn, isFavorite)
     if isFavorite then
-        btn._starLabel:SetText("|cffffd100\226\152\133|r")  -- filled star ★
+        btn._starLabel:SetText("|cffffd100★|r")  -- filled star
     else
-        btn._starLabel:SetText("|cff555555\226\152\134|r")  -- outline star ☆
+        btn._starLabel:SetText("|cff555555☆|r")  -- outline star
     end
 end
 
