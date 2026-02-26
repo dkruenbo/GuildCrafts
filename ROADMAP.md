@@ -7,6 +7,7 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 | Issue | Title | Status |
 |-------|-------|--------|
 | [#27](https://github.com/dkruenbo/GuildCrafts/issues/27) | Per-guild database partitioning | Fixed in 1.0.4 |
+| [#30](https://github.com/dkruenbo/GuildCrafts/pull/30) | Luacheck cleanup — 0 warnings / 0 errors | Fixed in 1.0.4 |
 | [#23](https://github.com/dkruenbo/GuildCrafts/issues/23) | Lazy tooltip index rebuild (dirty flag) | Done (already implemented) |
 | [#24](https://github.com/dkruenbo/GuildCrafts/issues/24) | Wrong recipe for Enchant Gloves - Spell Strike | Fixed in 1.0.3 |
 
@@ -14,9 +15,9 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 
 | Issue | Title | Status |
 |-------|-------|--------|
-| [#18](https://github.com/dkruenbo/GuildCrafts/issues/18) | Deduplicate reagent data with shared RecipeDB lookup | Not started |
+| [#18](https://github.com/dkruenbo/GuildCrafts/issues/18) | Deduplicate reagent data with shared RecipeDB lookup | In progress (on release/1.1.0) |
 | [#19](https://github.com/dkruenbo/GuildCrafts/issues/19) | Incremental sync: send only changed professions | Not started |
-| [#20](https://github.com/dkruenbo/GuildCrafts/issues/20) | Auto-prune stale member entries | Not started |
+| [#20](https://github.com/dkruenbo/GuildCrafts/issues/20) | Auto-prune stale member entries | In progress (on release/1.1.0) |
 | [#5](https://github.com/dkruenbo/GuildCrafts/issues/5) | Favorites / Bookmarks | Not started |
 
 ## 1.2.0 — Network Efficiency
