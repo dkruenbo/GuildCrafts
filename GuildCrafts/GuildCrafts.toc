@@ -2,7 +2,7 @@
 ## Title: GuildCrafts
 ## Notes: Track all learned recipes across guild members' professions
 ## Author: GuildCrafts Team
-## Version: 0.1.0-dev
+## Version: 1.0.4
 ## SavedVariables: GuildCraftsDB
 ## X-Category: Guild
 
