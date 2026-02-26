@@ -16,11 +16,10 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 | Issue | Title | Status |
 |-------|-------|--------|
 | [#18](https://github.com/dkruenbo/GuildCrafts/issues/18) | Deduplicate reagent data with shared RecipeDB lookup | Ready for 1.1.0 release |
-| [#19](https://github.com/dkruenbo/GuildCrafts/issues/19) | Incremental sync: send only changed professions | Not started |
 | [#20](https://github.com/dkruenbo/GuildCrafts/issues/20) | Auto-prune stale member entries | Ready for 1.1.0 release |
 | [#5](https://github.com/dkruenbo/GuildCrafts/issues/5) | Favorites / Bookmarks | Ready for 1.1.0 release |
 
-## 1.2.0 — UI Polish & Visual Improvements
+## 1.1.5 — UI Polish & Visual Improvements
 
 | Issue | Title | Status |
 |-------|-------|--------|
@@ -28,10 +27,11 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 | [#38](https://github.com/dkruenbo/GuildCrafts/issues/38) | Quality-colored recipe names and reagent icons | Not started |
 | [#39](https://github.com/dkruenbo/GuildCrafts/issues/39) | Collapsible reagent lists (click recipe to expand/collapse) | Not started |
 
-## 1.3.0 — Network Efficiency
+## 1.2.0 — Network Efficiency & Incremental Sync
 
 | Issue | Title | Status |
 |-------|-------|--------|
+| [#19](https://github.com/dkruenbo/GuildCrafts/issues/19) | Incremental sync: send only changed professions | Not started |
 | [#21](https://github.com/dkruenbo/GuildCrafts/issues/21) | Coalesce login sync storms on DR | Not started |
 | [#22](https://github.com/dkruenbo/GuildCrafts/issues/22) | Piggyback version vector hash on HEARTBEAT | Not started |
 | [#6](https://github.com/dkruenbo/GuildCrafts/issues/6) | In-Game Craft Request Chat | Not started |
