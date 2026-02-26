@@ -311,7 +311,7 @@ function UI:CreateLeftPanel(parent)
     favBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -3)
     favBtn:EnableMouse(true)
     local favBtnLabel = favBtn:CreateFontString(nil, "OVERLAY")
-    favBtnLabel:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+    favBtnLabel:SetFont("Fonts\\FRIZQT__.TTF", 18, "OUTLINE")
     favBtnLabel:SetPoint("CENTER", 0, 0)
     favBtnLabel:SetText("*")
     favBtnLabel:SetTextColor(1.0, 0.82, 0.0)  -- gold
@@ -1526,7 +1526,7 @@ function UI:CreateStarButton(parent, size, onClick)
     btn:EnableMouse(true)
 
     local label = btn:CreateFontString(nil, "OVERLAY")
-    label:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+    label:SetFont("Fonts\\FRIZQT__.TTF", 18, "OUTLINE")
     label:SetPoint("CENTER", 0, 0)
     label:SetText("*")
     btn._starLabel = label
