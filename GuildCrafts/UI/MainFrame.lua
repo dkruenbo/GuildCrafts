@@ -531,6 +531,7 @@ function UI:NavigateToMembers(profName)
         end)
         memberStar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
         self:UpdateStarAppearance(memberStar, GuildCrafts.Favorites:IsMemberFavorite(memberInfo.key))
+        row._star = memberStar
         self.leftRows[#self.leftRows + 1] = row
         yOffset = yOffset + 24
     end
@@ -1310,6 +1311,7 @@ function UI:PopulateFavMembers(yOffset)
         end)
         memberStar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
         self:UpdateStarAppearance(memberStar, true)
+        row._star = memberStar
 
         self.leftRows[#self.leftRows + 1] = row
         yOffset = yOffset + 24
@@ -1485,7 +1487,7 @@ function UI:UpdateDetailWelcome()
     -- with the correct state to avoid flashing the welcome text.
     if self._refreshing then return end
 
-    if self._selectedMember or self._searchActive then
+    if self._selectedMember or self._searchActive or self._navState == "favorites" then
         self.detailWelcome:Hide()
     else
         self.detailWelcome:Show()
@@ -1629,9 +1631,18 @@ function UI:ClearLeftRows()
     for _, row in ipairs(self.leftRows) do
         row:Hide()
         row:ClearAllPoints()
-        row:SetScript("OnClick", nil)
-        row.memberKey = nil
-        self._leftRowPool[#self._leftRowPool + 1] = row
+        -- Only pool proper row frames (have _label), skip FontStrings/misc frames
+        if row._label then
+            row:SetScript("OnClick", nil)
+            row.memberKey = nil
+            -- Hide and detach any star buttons that were added as children
+            if row._star then
+                row._star:Hide()
+                row._star:SetScript("OnClick", nil)
+                row._star = nil
+            end
+            self._leftRowPool[#self._leftRowPool + 1] = row
+        end
     end
     self.leftRows = {}
 end
@@ -1687,6 +1698,7 @@ function UI:Refresh()
     -- Save state that will be cleared by NavigateToMembers/PopulateProfessionList
     local savedMember = self._selectedMember
     local savedSearch = self._searchActive
+    local savedProfession = self._selectedProfession
 
     -- Suppress intermediate UpdateDetailWelcome calls during refresh
     -- to prevent the welcome text from flashing over content.
@@ -1705,6 +1717,7 @@ function UI:Refresh()
     -- Restore state cleared by the left-panel rebuild
     self._selectedMember = savedMember
     self._searchActive = savedSearch
+    self._selectedProfession = savedProfession
 
     -- Refresh detail if a member was selected
     if self._selectedMember and self._selectedProfession then
