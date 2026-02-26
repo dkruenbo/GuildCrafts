@@ -1277,7 +1277,7 @@ function UI:PopulateFavMembers(yOffset)
         empty:SetPoint("TOPLEFT", self.leftContent, "TOPLEFT", 8, -yOffset)
         empty:SetWidth(LEFT_PANEL_WIDTH - 30)
         empty:SetWordWrap(true)
-        empty:SetText("No favorite members yet.\nClick the ★ star on a member row to add one.")
+        empty:SetText("No favorite members yet.\nClick the * star on a member row to add one.")
         empty:SetTextColor(0.5, 0.5, 0.5)
         empty:SetJustifyH("LEFT")
         self.leftRows[#self.leftRows + 1] = empty
@@ -1338,7 +1338,7 @@ function UI:PopulateFavRecipes(yOffset)
         empty:SetPoint("TOPLEFT", self.leftContent, "TOPLEFT", 8, -yOffset)
         empty:SetWidth(LEFT_PANEL_WIDTH - 30)
         empty:SetWordWrap(true)
-        empty:SetText("No favorite recipes yet.\nClick the ☆ star on a recipe row to add one.")
+        empty:SetText("No favorite recipes yet.\nClick the * star on a recipe row to add one.")
         empty:SetTextColor(0.5, 0.5, 0.5)
         empty:SetJustifyH("LEFT")
         self.leftRows[#self.leftRows + 1] = empty
@@ -1397,7 +1397,7 @@ function UI:ShowFavRecipesDetail(grouped, filterProf)
         msg:SetPoint("CENTER", self.detailPanel, "CENTER", 0, 0)
         msg:SetWidth(400)
         msg:SetWordWrap(true)
-        msg:SetText("No favorite recipes yet.\nClick the ☆ star on any recipe to add it.")
+        msg:SetText("No favorite recipes yet.\nClick the * star on any recipe to add it.")
         msg:SetTextColor(0.5, 0.5, 0.5)
         msg:SetJustifyH("CENTER")
         self.detailRows[#self.detailRows + 1] = msg
@@ -1532,9 +1532,11 @@ end
 
 function UI:UpdateStarAppearance(btn, isFavorite)
     if isFavorite then
-        btn._starLabel:SetText("|cffffd100★|r")  -- filled star
+        btn._starLabel:SetText("|cffffd100*|r")  -- filled star
+        btn._starLabel:SetFont("Fonts\\FRIZQT__.TTF", 16, "OUTLINE")
     else
-        btn._starLabel:SetText("|cff555555☆|r")  -- outline star
+        btn._starLabel:SetText("|cff888888*|r")  -- outline star
+        btn._starLabel:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
     end
 end
 
