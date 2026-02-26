@@ -60,7 +60,7 @@ end
 -- Event Handlers
 ----------------------------------------------------------------------
 
-function GuildCrafts:OnPlayerEnteringWorld(event, isLogin, isReload)
+function GuildCrafts:OnPlayerEnteringWorld(_event, isLogin, isReload)
     if not IsInGuild() then
         self:Debug("Not in a guild — sync disabled.")
         return

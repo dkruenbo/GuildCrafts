@@ -3,14 +3,13 @@
 -- Craft request/queue management: popup handling, queue persistence,
 -- accept/decline/complete logic
 ----------------------------------------------------------------------
-local ADDON_NAME = "GuildCrafts"
+local _, _ns = ... -- luacheck: ignore (WoW addon bootstrap)
 local GuildCrafts = _G.GuildCrafts
 
 local CraftRequest = GuildCrafts:NewModule("CraftRequest", "AceTimer-3.0")
 GuildCrafts.CraftRequest = CraftRequest
 
 local time = time
-local pairs = pairs
 
 ----------------------------------------------------------------------
 -- Lifecycle

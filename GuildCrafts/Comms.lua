@@ -4,7 +4,7 @@
 -- SYNC_REQUEST / SYNC_RESPONSE / SYNC_PULL / SYNC_PUSH,
 -- DELTA_UPDATE, CRAFT_* messages
 ----------------------------------------------------------------------
-local ADDON_NAME = "GuildCrafts"
+local _, _ns = ... -- luacheck: ignore (WoW addon bootstrap)
 local GuildCrafts = _G.GuildCrafts
 
 -- Create the Comms module (AceComm mixin for send/receive)
@@ -23,7 +23,6 @@ local pairs = pairs
 local ipairs = ipairs
 local type = type
 local table_sort = table.sort
-local table_concat = table.concat
 
 ----------------------------------------------------------------------
 -- Constants
@@ -43,7 +42,6 @@ local SYNC_CHUNK_SIZE      = 10      -- max members per sync chunk
 -- ChatThrottleLib priorities
 local PRIO_BULK   = "BULK"
 local PRIO_NORMAL = "NORMAL"
-local PRIO_ALERT  = "ALERT"
 
 -- Message types
 local MSG_HELLO              = "HELLO"
@@ -432,7 +430,6 @@ function Comms:HandleSyncRequest(payload, sender)
         -- DR and BDR both failed to respond — evict them and re-elect.
         -- Only the newly elected DR responds, preventing a flood.
         -- Never evict ourselves — we know we're online.
-        local playerKey = GuildCrafts.Data:GetPlayerKey()
         if self.currentDR  and self.currentDR  ~= playerKey then self.addonUsers[self.currentDR]  = nil end
         if self.currentBDR and self.currentBDR ~= playerKey then self.addonUsers[self.currentBDR] = nil end
         self:RecomputeElection()
@@ -748,7 +745,7 @@ function Comms:SendCraftComplete(requesterKey, itemName)
     }, "WHISPER", requesterKey, PRIO_NORMAL)
 end
 
-function Comms:HandleCraftRequest(payload, sender)
+function Comms:HandleCraftRequest(payload, _sender)
     GuildCrafts:Debug("CRAFT_REQUEST from", payload.requester, "for", payload.item)
     if GuildCrafts.CraftRequest and GuildCrafts.CraftRequest.OnIncomingRequest then
         GuildCrafts.CraftRequest:OnIncomingRequest(payload.requester, payload.item)
@@ -862,7 +859,7 @@ function Comms:OnCommReceived(prefix, message, distribution, sender)
     end
 end
 
-function Comms:ProcessIncoming(message, distribution, sender)
+function Comms:ProcessIncoming(message, _distribution, sender)
     -- Decompress if needed
     local flag = message:sub(1, 1)
     local data = message:sub(2)
