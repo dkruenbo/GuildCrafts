@@ -1519,7 +1519,14 @@ end
 function UI:CreateStarButton(parent, size, onClick)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(size, size)
-    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+
+    -- Disable any default textures
+    btn:SetNormalTexture(nil)
+    btn:SetHighlightTexture(nil)
+    btn:SetPushedTexture(nil)
+
+    local label = btn:CreateFontString(nil, "OVERLAY")
+    label:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
     label:SetPoint("CENTER", 0, 0)
     label:SetText("*")
     btn._starLabel = label
