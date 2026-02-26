@@ -526,7 +526,8 @@ function UI:ShowMemberRecipes(memberKey, profName)
     self.detailWelcome:Hide()
     self:ClearDetailRows()
 
-    local db = GuildCrafts.Data.db.global
+    local db = GuildCrafts.Data:GetGuildDB()
+    if not db then return end
     local entry = db[memberKey]
     if not entry or not entry.professions or not entry.professions[profName] then
         self:ShowDetailEmpty(memberKey, profName)
@@ -1082,10 +1083,11 @@ function UI:FilterMemberList(query)
     self:ClearLeftRows()
     self.leftBreadcrumb:Hide()
 
-    local db = GuildCrafts.Data.db.global
+    local db = GuildCrafts.Data:GetGuildDB()
+    if not db then return end
     local members = {}
     for memberKey, entry in pairs(db) do
-        if type(entry) == "table" and memberKey:lower():find(query, 1, true) then
+        if type(entry) == "table" and entry.lastUpdate and memberKey:lower():find(query, 1, true) then
             local totalRecipes = 0
             for _, profData in pairs(entry.professions or {}) do
                 for _ in pairs(profData.recipes or {}) do totalRecipes = totalRecipes + 1 end

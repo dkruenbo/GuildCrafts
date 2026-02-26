@@ -33,7 +33,7 @@ function Tooltip:RebuildIndex()
     indexByID   = {}
     indexByName = {}
 
-    local db = GuildCrafts.Data and GuildCrafts.Data.db and GuildCrafts.Data.db.global
+    local db = GuildCrafts.Data and GuildCrafts.Data.GetGuildDB and GuildCrafts.Data:GetGuildDB()
     if not db then return end
 
     for memberKey, entry in pairs(db) do

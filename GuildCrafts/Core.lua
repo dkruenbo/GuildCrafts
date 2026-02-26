@@ -91,6 +91,11 @@ function GuildCrafts:OnLoginReady()
         self.Comms:OnLoginReady()
     end
 
+    -- Restore craft queue (may have failed during OnEnable if guild info wasn't ready yet)
+    if self.CraftRequest then
+        self.CraftRequest:RestoreQueue()
+    end
+
     -- Remind the player to open profession windows so recipes get scanned
     self:Print("Open each profession window once so GuildCrafts can scan your recipes.")
 end

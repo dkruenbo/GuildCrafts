@@ -150,15 +150,84 @@ function Data:GetPlayerKey()
     return self._playerKey
 end
 
---- Get or create a member entry in the DB.
+----------------------------------------------------------------------
+-- Per-guild database partitioning
+-- Each guild's member data lives under db.global["GuildName-Realm"].
+-- UI preferences (_minimapAngle, _minimapHide) remain at db.global.
+----------------------------------------------------------------------
+
+--- Return the partition key for the current character's guild, or nil.
+function Data:GetGuildKey()
+    if self._guildKey then return self._guildKey end
+    local guildName = GetGuildInfo("player")
+    if not guildName or guildName == "" then return nil end
+    self._guildKey = guildName .. "-" .. GetRealmName()
+    return self._guildKey
+end
+
+--- Return the guild-scoped sub-table for the current guild, or nil
+--- if the player is not in a guild (yet).  Lazily creates the partition
+--- and runs a one-time migration of legacy flat data.
+function Data:GetGuildDB()
+    local guildKey = self:GetGuildKey()
+    if not guildKey then return nil end
+
+    -- Lazy migration on first access
+    if not self._guildMigrated then
+        self:MigrateToGuildPartition()
+        self._guildMigrated = true
+    end
+
+    if not self.db.global[guildKey] then
+        self.db.global[guildKey] = {}
+    end
+    return self.db.global[guildKey]
+end
+
+--- One-time migration: move flat member entries from db.global into
+--- the current guild's partition.  Safe to call multiple times.
+function Data:MigrateToGuildPartition()
+    local guildKey = self:GetGuildKey()
+    if not guildKey then return end
+
+    if not self.db.global[guildKey] then
+        self.db.global[guildKey] = {}
+    end
+    local gdb = self.db.global[guildKey]
+
+    local migrated = 0
+    for key, entry in pairs(self.db.global) do
+        -- A legacy member entry is a table with a lastUpdate field
+        -- sitting directly on db.global (not a guild partition table).
+        if type(entry) == "table" and entry.lastUpdate then
+            gdb[key] = entry
+            self.db.global[key] = nil
+            migrated = migrated + 1
+        end
+    end
+
+    -- Migrate _craftQueue into the guild partition
+    if self.db.global._craftQueue then
+        gdb._craftQueue = self.db.global._craftQueue
+        self.db.global._craftQueue = nil
+    end
+
+    if migrated > 0 then
+        GuildCrafts:Printf("Migrated %d member(s) to per-guild database.", migrated)
+    end
+end
+
+--- Get or create a member entry in the DB (guild-scoped).
 function Data:GetMemberEntry(memberKey, create)
-    local entry = self.db.global[memberKey]
+    local gdb = self:GetGuildDB()
+    if not gdb then return nil end
+    local entry = gdb[memberKey]
     if not entry and create then
         entry = {
             professions = {},
             lastUpdate = 0,
         }
-        self.db.global[memberKey] = entry
+        gdb[memberKey] = entry
     end
     return entry
 end
@@ -170,6 +239,7 @@ end
 function Data:DetectProfessions()
     local playerKey = self:GetPlayerKey()
     local entry = self:GetMemberEntry(playerKey, true)
+    if not entry then return end
     local currentProfs = {}
 
     -- GetSkillLineInfo enumerates all skills including professions
@@ -510,6 +580,7 @@ function Data:ScanTradeSkill()
 
     local playerKey = self:GetPlayerKey()
     local entry = self:GetMemberEntry(playerKey, true)
+    if not entry then return end
     if not entry.professions[profName] then
         entry.professions[profName] = { recipes = {} }
     end
@@ -667,6 +738,7 @@ function Data:ScanCraft()
     local profName = "Enchanting"
     local playerKey = self:GetPlayerKey()
     local entry = self:GetMemberEntry(playerKey, true)
+    if not entry then return end
     if not entry.professions[profName] then
         entry.professions[profName] = { recipes = {} }
     end
@@ -858,8 +930,10 @@ end
 ----------------------------------------------------------------------
 
 function Data:GetVersionVector()
+    local gdb = self:GetGuildDB()
+    if not gdb then return {} end
     local vector = {}
-    for memberKey, entry in pairs(self.db.global) do
+    for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.lastUpdate then
             vector[memberKey] = entry.lastUpdate
         end
@@ -875,6 +949,8 @@ end
 -- If incoming lastUpdate > local lastUpdate, replace entire member entry.
 -- Returns true if any data was merged.
 function Data:MergeIncoming(incomingData)
+    local gdb = self:GetGuildDB()
+    if not gdb then return false end
     local changed = false
     local playerKey = self:GetPlayerKey()
     for memberKey, incomingEntry in pairs(incomingData) do
@@ -885,13 +961,13 @@ function Data:MergeIncoming(incomingData)
             if memberKey == playerKey then
                 GuildCrafts:Debug("Skipped merge for own data:", memberKey)
             else
-                local localEntry = self.db.global[memberKey]
+                local localEntry = gdb[memberKey]
                 local dominated = not localEntry
                     or incomingEntry.lastUpdate > localEntry.lastUpdate
                     or (incomingEntry.lastUpdate == localEntry.lastUpdate
                         and (incomingEntry.dataFormat or 0) > (localEntry.dataFormat or 0))
                 if dominated then
-                    self.db.global[memberKey] = incomingEntry
+                    gdb[memberKey] = incomingEntry
                     changed = true
                     GuildCrafts:Debug("Merged data for:", memberKey)
                 end
@@ -907,6 +983,7 @@ end
 --- Merge a single delta (one recipe added to a member's profession).
 function Data:MergeDelta(memberKey, profName, recipeKey, recipeData, newLastUpdate)
     local entry = self:GetMemberEntry(memberKey, true)
+    if not entry then return end
     if not entry.professions[profName] then
         entry.professions[profName] = { recipes = {} }
     end
@@ -922,7 +999,9 @@ end
 
 --- Handle a profession removal delta.
 function Data:MergeProfessionRemoval(memberKey, profName, newLastUpdate)
-    local entry = self.db.global[memberKey]
+    local gdb = self:GetGuildDB()
+    if not gdb then return end
+    local entry = gdb[memberKey]
     if entry and entry.professions[profName] then
         entry.professions[profName] = nil
         if newLastUpdate and newLastUpdate > (entry.lastUpdate or 0) then
@@ -976,11 +1055,13 @@ function Data:PruneRoster()
 
     -- Prune entries not in the roster
     local pruned = 0
-    for memberKey, entry in pairs(self.db.global) do
-        if type(entry) == "table" and not rosterKeys[memberKey] then
+    local gdb = self:GetGuildDB()
+    if not gdb then return end
+    for memberKey, entry in pairs(gdb) do
+        if type(entry) == "table" and entry.lastUpdate and not rosterKeys[memberKey] then
             -- Don't prune simulated entries (they won't be in the roster)
             if not entry._simulated then
-                self.db.global[memberKey] = nil
+                gdb[memberKey] = nil
                 pruned = pruned + 1
             end
         end
@@ -998,10 +1079,17 @@ end
 function Data:DumpSummary()
     local playerKey = self:GetPlayerKey()
     GuildCrafts:Printf("Local player: %s", playerKey)
+    GuildCrafts:Printf("Guild key: %s", self:GetGuildKey() or "(none)")
+
+    local gdb = self:GetGuildDB()
+    if not gdb then
+        GuildCrafts:Print("No guild database available.")
+        return
+    end
 
     local totalMembers = 0
     local totalRecipes = 0
-    for memberKey, entry in pairs(self.db.global) do
+    for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.professions then
             totalMembers = totalMembers + 1
             local memberRecipes = 0
@@ -1117,6 +1205,11 @@ function Data:HandleSimCommand(arg)
 end
 
 function Data:SimGenerate(count)
+    local gdb = self:GetGuildDB()
+    if not gdb then
+        GuildCrafts:Print("Cannot simulate — not in a guild.")
+        return
+    end
     local generated = 0
     local realm = GetRealmName() or "SimRealm"
 
@@ -1179,7 +1272,7 @@ function Data:SimGenerate(count)
             entry.professions[profName] = profEntry
         end
 
-        self.db.global[memberKey] = entry
+        gdb[memberKey] = entry
         generated = generated + 1
     end
 
@@ -1187,10 +1280,12 @@ function Data:SimGenerate(count)
 end
 
 function Data:SimClear()
+    local gdb = self:GetGuildDB()
+    if not gdb then return end
     local cleared = 0
-    for memberKey, entry in pairs(self.db.global) do
+    for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry._simulated then
-            self.db.global[memberKey] = nil
+            gdb[memberKey] = nil
             cleared = cleared + 1
         end
     end
@@ -1241,7 +1336,9 @@ end
 
 function Data:SimDelta()
     -- Pick a random existing simulated member and add a recipe
-    for memberKey, entry in pairs(self.db.global) do
+    local gdb = self:GetGuildDB()
+    if not gdb then return end
+    for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry._simulated then
             for profName, profData in pairs(entry.professions) do
                 local newKey = 99000 + math.random(1, 9999)
@@ -1282,7 +1379,10 @@ function Data:GetMembersByProfession()
         result[profName] = {}
     end
 
-    for memberKey, entry in pairs(self.db.global) do
+    local gdb = self:GetGuildDB()
+    if not gdb then return result end
+
+    for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.professions then
             for profName, profData in pairs(entry.professions) do
                 if result[profName] then
@@ -1305,8 +1405,10 @@ end
 
 --- Get the count of members who have a given profession.
 function Data:GetProfessionMemberCount(profName)
+    local gdb = self:GetGuildDB()
+    if not gdb then return 0 end
     local count = 0
-    for _, entry in pairs(self.db.global) do
+    for _, entry in pairs(gdb) do
         if type(entry) == "table" and entry.professions and entry.professions[profName] then
             count = count + 1
         end
@@ -1328,7 +1430,10 @@ function Data:SearchRecipes(query)
     -- Build a map: recipeName → { recipeKey, profName, crafters }
     local resultMap = {}
 
-    for memberKey, entry in pairs(self.db.global) do
+    local gdb = self:GetGuildDB()
+    if not gdb then return {} end
+
+    for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.professions then
             for profName, profData in pairs(entry.professions) do
                 if profData.recipes then

@@ -34,15 +34,17 @@ end
 ----------------------------------------------------------------------
 
 function CraftRequest:RestoreQueue()
-    if GuildCrafts.db and GuildCrafts.db.global._craftQueue then
-        self.craftQueue = GuildCrafts.db.global._craftQueue
+    local gdb = GuildCrafts.Data and GuildCrafts.Data.GetGuildDB and GuildCrafts.Data:GetGuildDB()
+    if gdb and gdb._craftQueue then
+        self.craftQueue = gdb._craftQueue
         GuildCrafts:Debug("Restored craft queue:", #self.craftQueue, "items")
     end
 end
 
 function CraftRequest:SaveQueue()
-    if GuildCrafts.db then
-        GuildCrafts.db.global._craftQueue = self.craftQueue
+    local gdb = GuildCrafts.Data and GuildCrafts.Data.GetGuildDB and GuildCrafts.Data:GetGuildDB()
+    if gdb then
+        gdb._craftQueue = self.craftQueue
     end
 end
 
@@ -214,9 +216,7 @@ function CraftRequest:PruneQueue()
     local changed = false
     for i = #self.craftQueue, 1, -1 do
         local req = self.craftQueue[i]
-        local entry = GuildCrafts.Data and GuildCrafts.Data.db and GuildCrafts.Data.db.global[req.requester]
-        -- If the requester is no longer in the DB (pruned from guild), remove
-        -- We check the guild roster directly for accuracy
+        -- If the requester is no longer in the guild roster, remove
         if not self:IsInGuildRoster(req.requester) then
             table.remove(self.craftQueue, i)
             changed = true

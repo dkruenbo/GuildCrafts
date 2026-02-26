@@ -6,6 +6,7 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 
 | Issue | Title | Status |
 |-------|-------|--------|
+| [#27](https://github.com/dkruenbo/GuildCrafts/issues/27) | Per-guild database partitioning | Fixed in 1.0.4 |
 | [#23](https://github.com/dkruenbo/GuildCrafts/issues/23) | Lazy tooltip index rebuild (dirty flag) | Done (already implemented) |
 | [#24](https://github.com/dkruenbo/GuildCrafts/issues/24) | Wrong recipe for Enchant Gloves - Spell Strike | Fixed in 1.0.3 |
 
