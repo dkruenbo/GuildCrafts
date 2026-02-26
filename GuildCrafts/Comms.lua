@@ -459,7 +459,11 @@ function Comms:ProcessSyncRequest(requester, incomingVector)
     self.syncProcessing = true
 
     local localVector = GuildCrafts.Data:GetVersionVector()
-    local db = GuildCrafts.Data.db.global
+    local db = GuildCrafts.Data:GetGuildDB()
+    if not db then
+        self.syncProcessing = false
+        return
+    end
 
     -- Compute what we need to send (DR ahead) and what we need to pull (requester ahead)
     local toSend = {}   -- member entries where DR is ahead or requester doesn't have
@@ -574,7 +578,8 @@ end
 function Comms:HandleSyncPull(payload, sender)
     if not payload.memberKeys then return end
 
-    local db = GuildCrafts.Data.db.global
+    local db = GuildCrafts.Data:GetGuildDB()
+    if not db then return end
     local responseData = {}
 
     for _, memberKey in ipairs(payload.memberKeys) do
@@ -627,19 +632,21 @@ end
 ----------------------------------------------------------------------
 
 function Comms:BroadcastNewRecipes(memberKey, profName, recipes)
+    local gdb = GuildCrafts.Data:GetGuildDB()
+    local entry = gdb and gdb[memberKey]
     self:SendMessage(MSG_DELTA_UPDATE, {
         type       = "add",
         member     = memberKey,
         profession = profName,
         recipes    = GuildCrafts.Data:StripRecipeReagents(recipes),
-        lastUpdate = GuildCrafts.Data.db.global[memberKey] and
-                     GuildCrafts.Data.db.global[memberKey].lastUpdate or time(),
+        lastUpdate = entry and entry.lastUpdate or time(),
     }, "GUILD", nil, PRIO_NORMAL)
     GuildCrafts:Debug("Broadcast DELTA_UPDATE (add) for", memberKey, profName)
 end
 
 function Comms:BroadcastProfessionRemoval(memberKey, profName)
-    local entry = GuildCrafts.Data.db.global[memberKey]
+    local gdb = GuildCrafts.Data:GetGuildDB()
+    local entry = gdb and gdb[memberKey]
     self:SendMessage(MSG_DELTA_UPDATE, {
         type       = "remove_profession",
         member     = memberKey,
@@ -664,7 +671,8 @@ function Comms:HandleDeltaUpdate(payload, sender)
 
     elseif payload.type == "remove_profession" then
         -- Remove entire profession
-        local entry = GuildCrafts.Data.db.global[payload.member]
+        local gdb = GuildCrafts.Data:GetGuildDB()
+        local entry = gdb and gdb[payload.member]
         if entry then
             -- We need the profession name... if not provided, do full replacement
             -- using lastUpdate comparison
