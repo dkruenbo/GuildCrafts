@@ -1519,8 +1519,9 @@ end
 function UI:CreateStarButton(parent, size, onClick)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(size, size)
-    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     label:SetPoint("CENTER", 0, 0)
+    label:SetText("*")
     btn._starLabel = label
 
     btn:SetScript("OnClick", function()
@@ -1532,11 +1533,9 @@ end
 
 function UI:UpdateStarAppearance(btn, isFavorite)
     if isFavorite then
-        btn._starLabel:SetText("|cffffd100*|r")  -- filled star
-        btn._starLabel:SetFont("Fonts\\FRIZQT__.TTF", 16, "OUTLINE")
+        btn._starLabel:SetTextColor(1.0, 0.82, 0.0)  -- gold
     else
-        btn._starLabel:SetText("|cff888888*|r")  -- outline star
-        btn._starLabel:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+        btn._starLabel:SetTextColor(0.5, 0.5, 0.5)  -- gray
     end
 end
 
