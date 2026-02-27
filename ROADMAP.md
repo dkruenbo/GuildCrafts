@@ -19,13 +19,17 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 | [#20](https://github.com/dkruenbo/GuildCrafts/issues/20) | Auto-prune stale member entries | Done in 1.1.0 |
 | [#5](https://github.com/dkruenbo/GuildCrafts/issues/5) | Favorites / Bookmarks | Done in 1.1.0 |
 
-## 1.1.5 — UI Polish & Visual Improvements
+## 1.1.5 — Complete UI Overhaul 
+
+**Theme:** Modern dark UI inspired by GuildCraft Classic Era addon. Adds professional icons, quality colors, dual navigation modes, and collapsible content for information-dense browsing.
 
 | Issue | Title | Status |
 |-------|-------|--------|
-| [#37](https://github.com/dkruenbo/GuildCrafts/issues/37) | Styled profession sidebar buttons | Not started |
-| [#38](https://github.com/dkruenbo/GuildCrafts/issues/38) | Quality-colored recipe names and reagent icons | Not started |
+| [#37](https://github.com/dkruenbo/GuildCrafts/issues/37) | Dark mode profession sidebar buttons with WoW icons | Not started |
+| [#38](https://github.com/dkruenbo/GuildCrafts/issues/38) | Quality-colored recipe/reagent names + raid target star for favorites | Not started |
 | [#39](https://github.com/dkruenbo/GuildCrafts/issues/39) | Collapsible reagent lists (click recipe to expand/collapse) | Not started |
+| [#44](https://github.com/dkruenbo/GuildCrafts/issues/44) | Recipe-centric view with inline crafter preview | Not started |
+| [#45](https://github.com/dkruenbo/GuildCrafts/issues/45) | Members/Recipes view toggle for professions | Not started |
 
 ## 1.2.0 — Network Efficiency & Incremental Sync
 
