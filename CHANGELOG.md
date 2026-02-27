@@ -17,6 +17,10 @@
 - **Favorites text overlap**: Fixed empty state messages overlapping in Favorites tab by adding word wrap and proper width constraints.
 - **Frame script cleanup**: Fixed Lua error when navigating between views caused by attempting to clear OnClick script from Frame widgets (should be OnMouseDown).
 
+### Note
+
+- **CurseForge release**: Initial upload was incorrect (contained 1.0.4 code). Re-uploaded as **1.1.0a** with correct features.
+
 ## 1.0.4 — 2026-02-26
 
 ### Bug Fixes
