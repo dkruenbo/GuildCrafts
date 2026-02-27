@@ -15,9 +15,9 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 
 | Issue | Title | Status |
 |-------|-------|--------|
-| [#18](https://github.com/dkruenbo/GuildCrafts/issues/18) | Deduplicate reagent data with shared RecipeDB lookup | Ready for 1.1.0 release |
-| [#20](https://github.com/dkruenbo/GuildCrafts/issues/20) | Auto-prune stale member entries | Ready for 1.1.0 release |
-| [#5](https://github.com/dkruenbo/GuildCrafts/issues/5) | Favorites / Bookmarks | Ready for 1.1.0 release |
+| [#18](https://github.com/dkruenbo/GuildCrafts/issues/18) | Deduplicate reagent data with shared RecipeDB lookup | Done in 1.1.0 |
+| [#20](https://github.com/dkruenbo/GuildCrafts/issues/20) | Auto-prune stale member entries | Done in 1.1.0 |
+| [#5](https://github.com/dkruenbo/GuildCrafts/issues/5) | Favorites / Bookmarks | Done in 1.1.0 |
 
 ## 1.1.5 — UI Polish & Visual Improvements
 
