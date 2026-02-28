@@ -31,20 +31,24 @@ Issue tracker: https://github.com/dkruenbo/GuildCrafts/issues
 | [#44](https://github.com/dkruenbo/GuildCrafts/issues/44) | Recipe-centric view with inline crafter preview | Not started |
 | [#45](https://github.com/dkruenbo/GuildCrafts/issues/45) | Members/Recipes view toggle for professions | Not started |
 
-## 1.2.0 — Network Efficiency & Incremental Sync
+## 1.2.0 — Protocol Correctness & Incremental Sync
+
+**Theme:** Close formal safety gaps (split-brain protection, documented guarantees) and improve replication efficiency for large guilds.
 
 | Issue | Title | Status |
 |-------|-------|--------|
+| [#47](https://github.com/dkruenbo/GuildCrafts/issues/47) | Term-based authority enforcement (split-brain protection) | Not started |
+| [#48](https://github.com/dkruenbo/GuildCrafts/issues/48) | Document safety guarantees and convergence properties | Not started |
 | [#19](https://github.com/dkruenbo/GuildCrafts/issues/19) | Incremental sync: send only changed professions | Not started |
-| [#21](https://github.com/dkruenbo/GuildCrafts/issues/21) | Coalesce login sync storms on DR | Not started |
-| [#22](https://github.com/dkruenbo/GuildCrafts/issues/22) | Piggyback version vector hash on HEARTBEAT | Not started |
-| [#6](https://github.com/dkruenbo/GuildCrafts/issues/6) | In-Game Craft Request Chat | Not started |
 
-## 2.0.0 — Major Features & Architecture
+**Note:** Issues [#21](https://github.com/dkruenbo/GuildCrafts/issues/21) (login storm coalescing) and [#22](https://github.com/dkruenbo/GuildCrafts/issues/22) (heartbeat hash piggybacking) removed from roadmap as premature optimizations. Retained as issues for potential future relevance if real-world performance issues emerge.
+
+## 2.0.0 — User Features & Extensibility
 
 | Issue | Title | Status |
 |-------|-------|--------|
-| [#9](https://github.com/dkruenbo/GuildCrafts/issues/9) | Code Modularisation | Not started |
+| [#6](https://github.com/dkruenbo/GuildCrafts/issues/6) | In-Game Craft Request Chat | Not started |
 | [#7](https://github.com/dkruenbo/GuildCrafts/issues/7) | Export to CSV / Text | Not started |
 | [#8](https://github.com/dkruenbo/GuildCrafts/issues/8) | Locale Support | Not started |
+| [#9](https://github.com/dkruenbo/GuildCrafts/issues/9) | Code Modularisation | Not started |
 | [#10](https://github.com/dkruenbo/GuildCrafts/issues/10) | Craft Marketplace | **Moved to separate addon: MarketCrafts** |
