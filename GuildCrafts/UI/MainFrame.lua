@@ -1621,8 +1621,8 @@ function UI:ShowFavRecipesDetail(grouped, filterProf)
 
             local nameText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             nameText:SetPoint("LEFT", star, "RIGHT", 2, 0)
-            nameText:SetText(recipe.recipeName)
-            nameText:SetTextColor(1, 1, 1)
+            local qColor = self:GetRecipeQualityColor(recipe.recipeKey)
+            nameText:SetText(qColor .. recipe.recipeName .. "|r")
             yOffset = yOffset - 18
 
             -- Crafters list
