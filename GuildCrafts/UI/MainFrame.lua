@@ -1409,6 +1409,8 @@ function UI:ShowFavoritesTab()
     self._selectedMember = nil
     self._searchActive = false
     self:HideProfessionToggle()
+    -- Ensure welcome text is always hidden when entering favorites
+    if self.detailWelcome then self.detailWelcome:Hide() end
 
     -- Breadcrumb
     self.leftBreadcrumb:Show()
@@ -1490,6 +1492,8 @@ end
 
 --- Favorites: Members sub-tab
 function UI:PopulateFavMembers(yOffset)
+    -- Members sub-tab doesn't rebuild the detail panel, so explicitly hide welcome
+    if self.detailWelcome then self.detailWelcome:Hide() end
     local members = GuildCrafts.Favorites:GetFavoriteMembersInfo()
 
     if #members == 0 then
@@ -1793,6 +1797,7 @@ function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
         -- Update text
         row._label:ClearAllPoints()
         row._label:SetText(text)
+        row._label:SetJustifyH("LEFT")
         -- Update icon
         if iconPath then
             if not row._icon then
@@ -1875,6 +1880,7 @@ function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
     label:SetTextColor(0.9, 0.9, 0.9)
     label:SetText(text)
     label:SetWordWrap(false)
+    label:SetJustifyH("LEFT")
     row._label = label
 
     -- Badge (count)

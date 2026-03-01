@@ -1545,7 +1545,12 @@ function Data:GetAllRecipesForProfession(profName)
                 for recipeKey, recipeData in pairs(profData.recipes) do
                     local name = recipeData.name or "Unknown"
                     if not recipeMap[recipeKey] then
-                        recipeMap[recipeKey] = { key = recipeKey, name = name, crafters = {} }
+                        recipeMap[recipeKey] = {
+                            key      = recipeKey,
+                            name     = name,
+                            crafters = {},
+                            reagents = recipeData.reagents or self:GetRecipeReagents(recipeKey),
+                        }
                     end
                     recipeMap[recipeKey].crafters[#recipeMap[recipeKey].crafters + 1] = { key = memberKey }
                 end
