@@ -551,6 +551,7 @@ function UI:PopulateProfessionList()
         local row = self:CreateLeftRow(self.leftContent, yOffset, profName, "(" .. count .. ")", PROFESSION_ICONS[profName])
         local capturedProfName = profName
         local capturedRow = row
+        row.profName = profName  -- stored so active-row restoration can find the correct row
         row:SetScript("OnClick", function()
             UI:SetActiveLeftRow(capturedRow)
             UI:NavigateToProfession(capturedProfName)
@@ -1635,7 +1636,10 @@ function UI:UpdateDetailWelcome()
     -- with the correct state to avoid flashing the welcome text.
     if self._refreshing then return end
 
-    if self._selectedMember or self._searchActive or self._navState == "favorites" then
+    -- Hide welcome if: a member is selected, search is active, favorites tab is open,
+    -- OR the recipes view is showing content for a profession.
+    if self._selectedMember or self._searchActive or self._navState == "favorites"
+       or (self._viewMode == "recipes" and self._selectedProfession) then
         self.detailWelcome:Hide()
     else
         self.detailWelcome:Show()
@@ -1898,6 +1902,8 @@ function UI:Refresh()
     if self._viewMode == "recipes" and savedProfession then
         self:ShowRecipesView(savedProfession)
         self:ShowProfessionToggle(savedProfession)
+        -- Re-highlight the active profession row in the left panel
+        self:RestoreActiveRow(savedProfession)
     elseif self._selectedMember and self._selectedProfession then
         -- Refresh detail if a member was selected (members mode)
         self:ShowMemberRecipes(self._selectedMember, self._selectedProfession)
@@ -1953,6 +1959,18 @@ end
 ----------------------------------------------------------------------
 -- Active Left Row Tracking (#37)
 ----------------------------------------------------------------------
+
+--- Find and re-activate the row in the current left panel that matches profName.
+--- Called after a panel rebuild (Refresh, SetViewMode) to restore visual state.
+function UI:RestoreActiveRow(profName)
+    if not profName then return end
+    for _, row in ipairs(self.leftRows) do
+        if row.profName == profName then
+            self:SetActiveLeftRow(row)
+            return
+        end
+    end
+end
 
 --- Highlight a left-panel row as the active (selected) item.
 --- Shows gold accent bar; restores previous row to default.
@@ -2047,11 +2065,13 @@ function UI:SetViewMode(mode)
         -- Ensure left panel shows profession list
         if self._navState ~= "professions" then
             local savedProf = profName
-            self:PopulateProfessionList()   -- resets left panel + clears savedProf
+            self:PopulateProfessionList()   -- resets left panel + clears _selectedProfession
             self._selectedProfession = savedProf
         end
         self:ShowRecipesView(profName)
         self:ShowProfessionToggle(profName)
+        -- Re-highlight the active profession row in the left panel
+        self:RestoreActiveRow(profName)
     else  -- "members"
         self:NavigateToMembers(profName)
         -- ShowProfessionToggle called inside NavigateToMembers
