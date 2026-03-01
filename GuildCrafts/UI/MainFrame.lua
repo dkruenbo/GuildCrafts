@@ -672,7 +672,7 @@ function UI:ShowMemberRecipes(memberKey, profName)
     end
 
     local recipes = entry.professions[profName].recipes
-    if not recipes then
+    if not recipes or next(recipes) == nil then
         self:ShowDetailEmpty(memberKey, profName)
         return
     end
@@ -1017,7 +1017,7 @@ function UI:ShowSearchResults(results)
 
         yOffset = yOffset - 22
 
-        -- Expanded section: vertical reagents then crafter list with Request Craft
+        -- Expanded section: vertical reagents only (crafters already shown inline on the right)
         if isExpanded then
             if hasReagents then
                 for _, r in ipairs(result.reagents) do
@@ -1029,41 +1029,6 @@ function UI:ShowSearchResults(results)
                     yOffset = yOffset - 14
                 end
                 yOffset = yOffset - 2
-            end
-            -- Crafter list with Request Craft for online members
-            for _, crafter in ipairs(result.crafters) do
-                local isOnline = GuildCrafts.Data:IsMemberOnline(crafter.key)
-                local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
-                local crafterName = crafter.key:match("^(.+)-") or crafter.key
-                local crafterRow = CreateFrame("Frame", nil, self.detailContent)
-                crafterRow:SetHeight(18)
-                crafterRow:SetPoint("TOPLEFT",  self.detailContent, "TOPLEFT",  36, yOffset)
-                crafterRow:SetPoint("TOPRIGHT", self.detailContent, "TOPRIGHT", -8, yOffset)
-                local crafterLabel = crafterRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                crafterLabel:SetPoint("LEFT", crafterRow, "LEFT", 0, 0)
-                crafterLabel:SetText(dot .. crafterName)
-                if isOnline then
-                    local reqBtn = CreateFrame("Button", nil, crafterRow, "BackdropTemplate")
-                    reqBtn:SetSize(80, 16)
-                    reqBtn:SetPoint("RIGHT", crafterRow, "RIGHT", 0, 0)
-                    reqBtn:SetBackdrop({ bgFile="Interface\\Buttons\\WHITE8x8", edgeFile="Interface\\Buttons\\WHITE8x8", edgeSize=1 })
-                    reqBtn:SetBackdropColor(0.15, 0.4, 0.15, 0.8)
-                    reqBtn:SetBackdropBorderColor(0.3, 0.6, 0.3, 0.5)
-                    local btnText = reqBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                    btnText:SetPoint("CENTER")
-                    btnText:SetText("Request Craft")
-                    btnText:SetTextColor(0.8, 1, 0.8)
-                    local capturedCrafterKey = crafter.key
-                    local capturedItemName   = result.recipeName
-                    reqBtn:SetScript("OnClick", function()
-                        if GuildCrafts.Comms then GuildCrafts.Comms:SendCraftRequest(capturedCrafterKey, capturedItemName) end
-                    end)
-                    reqBtn:SetScript("OnEnter", function(self) self:SetBackdropColor(0.2, 0.5, 0.2, 0.9) end)
-                    reqBtn:SetScript("OnLeave", function(self) self:SetBackdropColor(0.15, 0.4, 0.15, 0.8) end)
-                    self.detailRows[#self.detailRows + 1] = reqBtn
-                end
-                self.detailRows[#self.detailRows + 1] = crafterRow
-                yOffset = yOffset - 18
             end
             yOffset = yOffset - 4
         end
