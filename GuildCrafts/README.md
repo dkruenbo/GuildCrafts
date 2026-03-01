@@ -11,11 +11,16 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Craft requests** — request crafts from online guild members directly through the UI
 - **Craft queue** — crafters can manage incoming requests with accept/decline/complete workflow
 - **Tooltip integration** — hover over any item in bags, AH, or chat links to see which guild members can craft it
-- **Reagent tracking** — see required materials for every recipe at a glance in the recipe detail view
+- **Reagent tracking** — see required materials for every recipe at a glance; click any recipe row to expand or collapse its reagent list
+- **Quality colors** — recipe names are tinted by item rarity (grey/white/green/blue/purple/orange) using WoW's item quality data; Enchanting spells default to white
+- **Dark professional sidebar** — profession and member rows use a polished dark style with a gold accent bar on the selected row and a blue hover highlight
+- **Members / Recipes view toggle** — when browsing a profession, switch between the existing per-member recipe list and an aggregated view showing every recipe the guild can craft, with an inline crafter preview and hover tooltip
+- **Recipe-centric view** — aggregated view shows all guild recipes for a profession sorted alphabetically; each row shows up to two crafter names with a `+N more` indicator and full crafter list on hover
 - **Specialisation tracking** — detects and displays TBC profession specs (Transmute Master, Weaponsmith, Mooncloth Tailoring, etc.)
 - **Cooldown tracking** — shows active profession cooldowns (Transmutes, Primal Mooncloth, Spellcloth, Shadowcloth) with time remaining
 - **Skill level display** — see each member's current profession skill level (e.g. "375/375") in the member list and recipe detail view
 - **Recipe categorization** — recipes are grouped by sub-type (Potions, Elixirs, Flasks, Weapons, Armor, etc.) with visual category headers
+- **Favorites / Bookmarks** — star any recipe or member; dedicated Favorites tab with profession filter and quick access to your most-used crafters
 - **Minimap button** — small icon on the minimap to toggle the window; drag to reposition, hide with `/gc minimap`
 - **Profession icons** — WoW's built-in profession icons displayed next to each profession name in the browse panel
 - **Chunked sync** — large sync payloads are split into batches of 10 members, preventing chat throttle issues in large guilds

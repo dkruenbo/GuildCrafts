@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.1.5 — UI Overhaul — 2026-03-01
+
+### Features
+
+- **Dark sidebar style**: Profession and member list rows now use a dark background (0.07 alpha) that deepens on selection (0.12), a gold accent bar on the left edge of the active row, and a blue hover highlight. Consistent with GuildCraft Classic Era UI conventions.
+
+- **Quality colors**: Recipe names are now tinted by item quality — grey (Poor), white (Common), green (Uncommon), blue (Rare), purple (Epic), orange (Legendary) — using `GetItemInfo` for item-linked recipes. Enchanting spells (negative recipe keys) default to white. Applies to the recipe detail view, collapsible reagent rows, and search results. Favorite star widgets use a WoW raid-target texture instead of an ASCII asterisk for crisp rendering at any size.
+
+- **Collapsible reagent rows**: Recipe rows in the member recipe view and Recipe-centric view now show a `+` expand indicator when reagents are available. Clicking the row toggles a vertical reagent list below it. All rows default to collapsed. Expansion state is preserved within the session. Recipes whose reagent data has not yet synced show a `~` placeholder with a tooltip.
+
+- **Recipe-centric profession view**: Selecting a profession while in Recipes mode shows an aggregated list of all guild recipes for that profession in the detail panel. Each row displays the quality-colored recipe name on the left and up to two crafter names on the right, with a "+N more" indicator in green when there are additional crafters. Hovering shows a tooltip with the full crafter list and online status. Your own character is indicated with a star icon prefix.
+
+- **Members / Recipes view toggle**: A profession header bar appears at the top of the detail panel whenever a profession is selected, showing its icon and name. Below it, a "Members" / "Recipes" toggle switches the detail panel between the existing per-member recipe list and the new aggregated recipe view. The toggle is hidden on the search, favorites, and top-level profession list screens.
+
+### Bug Fixes
+
+- **Welcome text bleedthrough**: The "Select a profession" welcome message no longer overlaps recipe content. It is now only shown at true root idle state (profession list visible, nothing drilled into, no search active).
+
+- **Detail panel not cleared on back navigation**: Navigating back to the profession list now always clears the right panel before showing the welcome message, preventing old member recipe content or empty-state messages from persisting underneath it.
+
+- **Empty member detail blank**: Members recorded by the addon who have not yet synced any recipes (empty `recipes` table) now correctly show a "No recipes synced yet" message instead of a blank panel.
+
+- **Search crafter duplication**: Crafters were being shown twice in search results — once inline on the right side of each row and again in the expanded dropdown. The redundant crafter list in the expanded section has been removed.
+
+- **All recipes showing `~` in Recipe view**: `GetAllRecipesForProfession` was omitting the `reagents` field from recipe map entries, causing every recipe to appear as if its reagent data had not been synced. Fixed.
+
+- **Member names centered / word-wrapped**: Member rows in the left panel now correctly use left-justified, non-wrapping single-line labels.
+
+- **Favorites welcome bleedthrough**: `ShowFavoritesTab` and `PopulateFavMembers` now explicitly hide the welcome message when the Favorites tab is opened.
+
+- **Quality color cache poisoning**: `GetItemInfo` results are no longer cached when the item cache returns nil (i.e. before the client has loaded the item). A `GET_ITEM_INFO_RECEIVED` listener triggers a one-time panel refresh when outstanding items load in, resolving recipes that appeared white on first open.
+
+- **Expand icons on non-TBC fonts**: Unicode arrow characters (`►`/`▼`) are not present in all TBC client fonts and were rendering as rectangles. Replaced with ASCII `+`/`-`.
+
 ## 1.1.0 — 2026-02-27
 
 ### Features
