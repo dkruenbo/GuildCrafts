@@ -787,7 +787,7 @@ function UI:ShowMemberRecipes(memberKey, profName)
         recipeRow:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
         self.detailRows[#self.detailRows + 1] = recipeRow
 
-        -- Expand/collapse indicator (► collapsed, ▼ expanded)
+        -- Expand/collapse indicator (+/-) or ~ when no reagent data synced
         local expandIcon
         if hasReagents then
             expandIcon = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -795,19 +795,30 @@ function UI:ShowMemberRecipes(memberKey, profName)
             expandIcon:SetWidth(14)
             expandIcon:SetText(isExpanded and "-" or "+")
             expandIcon:SetTextColor(0.6, 0.6, 0.6)
+        else
+            -- Tilde placeholder: reagents not yet synced for this recipe
+            local noReagIcon = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            noReagIcon:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
+            noReagIcon:SetWidth(14)
+            noReagIcon:SetText("~")
+            noReagIcon:SetTextColor(0.35, 0.35, 0.35)
+            recipeRow:EnableMouse(true)
+            recipeRow:SetScript("OnEnter", function()
+                GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
+                GameTooltip:AddLine("Reagents not synced", 0.85, 0.85, 0.55)
+                GameTooltip:AddLine("Open your profession window to sync.", 0.55, 0.55, 0.55)
+                GameTooltip:Show()
+            end)
+            recipeRow:SetScript("OnLeave", function() GameTooltip:Hide() end)
         end
 
-        -- Star toggle (shifted right when expand icon present)
+        -- Star toggle (always offset 16 to align with the icon column)
         local capturedKey = recipe.key
         local star = self:CreateStarButton(recipeRow, 14, function(btn)
             local nowFav = GuildCrafts.Favorites:ToggleRecipe(capturedKey)
             UI:UpdateStarAppearance(btn, nowFav)
         end)
-        if hasReagents then
-            star:SetPoint("LEFT", recipeRow, "LEFT", 16, 0)
-        else
-            star:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
-        end
+        star:SetPoint("LEFT", recipeRow, "LEFT", 16, 0)
         self:UpdateStarAppearance(star, GuildCrafts.Favorites:IsRecipeFavorite(recipe.key))
         self.detailRows[#self.detailRows + 1] = star
 
@@ -847,26 +858,17 @@ function UI:ShowMemberRecipes(memberKey, profName)
             yOffset = yOffset - 14
         end
 
-        -- Reagents (only rendered when expanded)
+        -- Reagents (vertical list, only rendered when expanded)
         if hasReagents and isExpanded then
-            local parts = {}
             for _, r in ipairs(recipe.reagents) do
-                parts[#parts + 1] = r.count .. "x " .. r.name
+                local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 32, yOffset - 14)
+                reagentLine:SetText(r.count .. "x " .. r.name)
+                reagentLine:SetTextColor(0.6, 0.8, 1.0)
+                self.detailRows[#self.detailRows + 1] = reagentLine
+                yOffset = yOffset - 14
             end
-            local reagentStr = table.concat(parts, ", ")
-            local reagentText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            reagentText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 16, yOffset - 14)
-            reagentText:SetText("Reagents: " .. reagentStr)
-            reagentText:SetTextColor(0.6, 0.8, 1.0)
-            reagentText:SetWordWrap(true)
-            reagentText:SetWidth(360)
-            self.detailRows[#self.detailRows + 1] = reagentText
-            -- Measure actual height for wrapped text
-            local textHeight = reagentText:GetStringHeight()
-            if not textHeight or textHeight < 12 then textHeight = 12 end
-            yOffset = yOffset - 14 - textHeight - 4
-        elseif not hasReagents then
-            yOffset = yOffset - 6
+            yOffset = yOffset - 4
         end
 
         yOffset = yOffset - 14
@@ -899,23 +901,24 @@ function UI:ShowSearchResults(results)
     end
 
     self.expandedRecipes = self.expandedRecipes or {}
+    local myKey = GuildCrafts.Data:GetPlayerKey()
 
     local yOffset = -8
     for _, result in ipairs(results) do
         local hasReagents = result.reagents and #result.reagents > 0
         local isExpanded  = self.expandedRecipes[result.recipeKey] or false
 
-        -- Recipe name row
+        -- Main compact row (matches Recipes-view layout)
         local recipeRow = CreateFrame("Frame", nil, self.detailContent)
-        recipeRow:SetHeight(18)
+        recipeRow:SetHeight(20)
         recipeRow:SetPoint("TOPLEFT",  self.detailContent, "TOPLEFT",  8, yOffset)
         recipeRow:SetPoint("TOPRIGHT", self.detailContent, "TOPRIGHT", -8, yOffset)
+        recipeRow:EnableMouse(true)
         self.detailRows[#self.detailRows + 1] = recipeRow
 
-        -- Expand/collapse indicator (only when has reagents)
+        -- +/- toggle or ~ placeholder (always 16px icon column)
         local expandIcon
         if hasReagents then
-            recipeRow:EnableMouse(true)
             expandIcon = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             expandIcon:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
             expandIcon:SetWidth(14)
@@ -928,108 +931,146 @@ function UI:ShowSearchResults(results)
                     UI:ShowSearchResults(UI._lastSearchResults)
                 end
             end)
-            recipeRow:SetScript("OnEnter", function()
-                if expandIcon then expandIcon:SetTextColor(1, 1, 1) end
-            end)
-            recipeRow:SetScript("OnLeave", function()
-                if expandIcon then expandIcon:SetTextColor(0.6, 0.6, 0.6) end
-            end)
+        else
+            local noReagIcon = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            noReagIcon:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
+            noReagIcon:SetWidth(14)
+            noReagIcon:SetText("~")
+            noReagIcon:SetTextColor(0.35, 0.35, 0.35)
         end
 
-        -- Star button (shifted right when expand icon present)
-        local iconOffset = hasReagents and 16 or 0
+        -- Shared hover: icon highlight + tooltip
+        local capturedExpandIcon = expandIcon
+        local capturedHasReagents = hasReagents
+        local capturedResult = result
+        recipeRow:SetScript("OnEnter", function(self)
+            if capturedExpandIcon then capturedExpandIcon:SetTextColor(1, 1, 1) end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:ClearLines()
+            if capturedHasReagents then
+                GameTooltip:AddLine(capturedResult.recipeName, 1, 0.82, 0)
+                GameTooltip:AddLine(" ")
+                for _, c in ipairs(capturedResult.crafters) do
+                    local cname  = c.key:match("^(.+)-") or c.key
+                    local isSelf = (c.key == myKey)
+                    local isOn   = GuildCrafts.Data:IsMemberOnline(c.key)
+                    local line   = (isSelf and "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" or "  ") .. cname
+                    if isOn then line = line .. " |cff00ff00(online)|r" end
+                    GameTooltip:AddLine(line, 0.9, 0.9, 0.9)
+                end
+            else
+                GameTooltip:AddLine("Reagents not synced", 0.85, 0.85, 0.55)
+                GameTooltip:AddLine("Open your profession window to sync.", 0.55, 0.55, 0.55)
+            end
+            GameTooltip:Show()
+        end)
+        recipeRow:SetScript("OnLeave", function()
+            if capturedExpandIcon then capturedExpandIcon:SetTextColor(0.6, 0.6, 0.6) end
+            GameTooltip:Hide()
+        end)
+
+        -- Star button (always at 16px offset)
         local capturedKey = result.recipeKey
         local star = self:CreateStarButton(recipeRow, 16, function(btn)
             local nowFav = GuildCrafts.Favorites:ToggleRecipe(capturedKey)
             UI:UpdateStarAppearance(btn, nowFav)
         end)
-        star:SetPoint("LEFT", recipeRow, "LEFT", iconOffset, 0)
+        star:SetPoint("LEFT", recipeRow, "LEFT", 16, 0)
         self:UpdateStarAppearance(star, GuildCrafts.Favorites:IsRecipeFavorite(result.recipeKey))
         self.detailRows[#self.detailRows + 1] = star
 
-        -- Quality-colored recipe name + profession label
-        local nameText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("LEFT",  star,     "RIGHT", 2, 0)
-        nameText:SetPoint("RIGHT", recipeRow, "RIGHT", 0, 0)
+        -- Quality-colored recipe name + profession (left section)
         local qColor = self:GetRecipeQualityColor(result.recipeKey)
-        nameText:SetText(qColor .. result.recipeName .. "|r  |cff888888(" .. result.profName .. ")|r")
-        yOffset = yOffset - 20
+        local nameText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        nameText:SetPoint("LEFT",  star,      "RIGHT", 2, 0)
+        nameText:SetPoint("RIGHT", recipeRow, "RIGHT", -175, 0)
+        nameText:SetJustifyH("LEFT")
+        nameText:SetWordWrap(false)
+        nameText:SetText(qColor .. result.recipeName .. "|r  |cff666666(" .. result.profName .. ")|r")
 
-        -- Source
-        if result.source and result.source ~= "" then
-            local sourceText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            sourceText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 12 + iconOffset, yOffset)
-            sourceText:SetText(result.source)
-            sourceText:SetTextColor(0.5, 0.5, 0.5)
-            self.detailRows[#self.detailRows + 1] = sourceText
-            yOffset = yOffset - 14
-        end
-
-        -- Crafters
-        for _, crafter in ipairs(result.crafters) do
-            local isOnline = GuildCrafts.Data:IsMemberOnline(crafter.key)
-            local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
-            local crafterName = crafter.key:match("^(.+)-") or crafter.key
-
-            local crafterRow = CreateFrame("Frame", nil, self.detailContent)
-            crafterRow:SetSize(380, 18)
-            crafterRow:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 16 + iconOffset, yOffset)
-
-            local crafterLabel = crafterRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            crafterLabel:SetPoint("LEFT", crafterRow, "LEFT", 0, 0)
-            crafterLabel:SetText(dot .. crafterName)
-
-            if isOnline then
-                local reqBtn = CreateFrame("Button", nil, crafterRow, "BackdropTemplate")
-                reqBtn:SetSize(80, 16)
-                reqBtn:SetPoint("LEFT", crafterLabel, "RIGHT", 8, 0)
-                reqBtn:SetBackdrop({
-                    bgFile   = "Interface\\Buttons\\WHITE8x8",
-                    edgeFile = "Interface\\Buttons\\WHITE8x8",
-                    edgeSize = 1,
-                })
-                reqBtn:SetBackdropColor(0.15, 0.4, 0.15, 0.8)
-                reqBtn:SetBackdropBorderColor(0.3, 0.6, 0.3, 0.5)
-                local btnText = reqBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                btnText:SetPoint("CENTER")
-                btnText:SetText("Request Craft")
-                btnText:SetTextColor(0.8, 1, 0.8)
-                local capturedCrafterKey = crafter.key
-                local capturedItemName   = result.recipeName
-                reqBtn:SetScript("OnClick", function()
-                    if GuildCrafts.Comms then
-                        GuildCrafts.Comms:SendCraftRequest(capturedCrafterKey, capturedItemName)
-                    end
-                end)
-                reqBtn:SetScript("OnEnter", function(self) self:SetBackdropColor(0.2, 0.5, 0.2, 0.9) end)
-                reqBtn:SetScript("OnLeave", function(self) self:SetBackdropColor(0.15, 0.4, 0.15, 0.8) end)
-                self.detailRows[#self.detailRows + 1] = reqBtn
+        -- Inline crafter preview (right section, max 2 + overflow count)
+        table.sort(result.crafters, function(a, b)
+            if a.key == myKey then return true end
+            if b.key == myKey then return false end
+            local aOn = GuildCrafts.Data:IsMemberOnline(a.key)
+            local bOn = GuildCrafts.Data:IsMemberOnline(b.key)
+            if aOn ~= bOn then return aOn end
+            return a.key < b.key
+        end)
+        local total = #result.crafters
+        local cParts = {}
+        for i = 1, math.min(total, 2) do
+            local c = result.crafters[i]
+            local cname = c.key:match("^(.+)-") or c.key
+            if c.key == myKey then
+                cname = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" .. cname
             end
-
-            self.detailRows[#self.detailRows + 1] = crafterRow
-            yOffset = yOffset - 18
+            cParts[#cParts + 1] = cname
         end
+        local crafterStr = table.concat(cParts, ", ")
+        if total > 2 then crafterStr = crafterStr .. " |cff1eff00(+" .. (total - 2) .. ")|r" end
+        local crafterText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        crafterText:SetPoint("RIGHT", recipeRow, "RIGHT", 0, 0)
+        crafterText:SetWidth(170)
+        crafterText:SetJustifyH("RIGHT")
+        crafterText:SetWordWrap(false)
+        crafterText:SetText(crafterStr)
+        crafterText:SetTextColor(0.8, 0.8, 0.8)
 
-        -- Reagents (collapsible)
-        if hasReagents and isExpanded then
-            local parts = {}
-            for _, r in ipairs(result.reagents) do
-                parts[#parts + 1] = r.count .. "x " .. r.name
+        yOffset = yOffset - 22
+
+        -- Expanded section: vertical reagents then crafter list with Request Craft
+        if isExpanded then
+            if hasReagents then
+                for _, r in ipairs(result.reagents) do
+                    local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                    reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 36, yOffset)
+                    reagentLine:SetText(r.count .. "x " .. r.name)
+                    reagentLine:SetTextColor(0.6, 0.8, 1.0)
+                    self.detailRows[#self.detailRows + 1] = reagentLine
+                    yOffset = yOffset - 14
+                end
+                yOffset = yOffset - 2
             end
-            local reagentStr = table.concat(parts, ", ")
-            local reagentText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            reagentText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 16 + iconOffset, yOffset)
-            reagentText:SetText("Reagents: " .. reagentStr)
-            reagentText:SetTextColor(0.6, 0.8, 1.0)
-            reagentText:SetWordWrap(true)
-            reagentText:SetWidth(360)
-            self.detailRows[#self.detailRows + 1] = reagentText
-            local textHeight = reagentText:GetStringHeight()
-            if not textHeight or textHeight < 12 then textHeight = 12 end
-            yOffset = yOffset - textHeight - 4
+            -- Crafter list with Request Craft for online members
+            for _, crafter in ipairs(result.crafters) do
+                local isOnline = GuildCrafts.Data:IsMemberOnline(crafter.key)
+                local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
+                local crafterName = crafter.key:match("^(.+)-") or crafter.key
+                local crafterRow = CreateFrame("Frame", nil, self.detailContent)
+                crafterRow:SetHeight(18)
+                crafterRow:SetPoint("TOPLEFT",  self.detailContent, "TOPLEFT",  36, yOffset)
+                crafterRow:SetPoint("TOPRIGHT", self.detailContent, "TOPRIGHT", -8, yOffset)
+                local crafterLabel = crafterRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                crafterLabel:SetPoint("LEFT", crafterRow, "LEFT", 0, 0)
+                crafterLabel:SetText(dot .. crafterName)
+                if isOnline then
+                    local reqBtn = CreateFrame("Button", nil, crafterRow, "BackdropTemplate")
+                    reqBtn:SetSize(80, 16)
+                    reqBtn:SetPoint("RIGHT", crafterRow, "RIGHT", 0, 0)
+                    reqBtn:SetBackdrop({ bgFile="Interface\\Buttons\\WHITE8x8", edgeFile="Interface\\Buttons\\WHITE8x8", edgeSize=1 })
+                    reqBtn:SetBackdropColor(0.15, 0.4, 0.15, 0.8)
+                    reqBtn:SetBackdropBorderColor(0.3, 0.6, 0.3, 0.5)
+                    local btnText = reqBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                    btnText:SetPoint("CENTER")
+                    btnText:SetText("Request Craft")
+                    btnText:SetTextColor(0.8, 1, 0.8)
+                    local capturedCrafterKey = crafter.key
+                    local capturedItemName   = result.recipeName
+                    reqBtn:SetScript("OnClick", function()
+                        if GuildCrafts.Comms then GuildCrafts.Comms:SendCraftRequest(capturedCrafterKey, capturedItemName) end
+                    end)
+                    reqBtn:SetScript("OnEnter", function(self) self:SetBackdropColor(0.2, 0.5, 0.2, 0.9) end)
+                    reqBtn:SetScript("OnLeave", function(self) self:SetBackdropColor(0.15, 0.4, 0.15, 0.8) end)
+                    self.detailRows[#self.detailRows + 1] = reqBtn
+                end
+                self.detailRows[#self.detailRows + 1] = crafterRow
+                yOffset = yOffset - 18
+            end
+            yOffset = yOffset - 4
         end
 
-        yOffset = yOffset - 8  -- spacing between recipes
+        yOffset = yOffset - 6  -- gap between recipes
     end
 
     self.detailContent:SetHeight(math.max(math.abs(yOffset) + 8, 1))
@@ -1575,12 +1616,13 @@ function UI:ShowFavRecipesDetail(grouped, filterProf)
 
     if #profNames == 0 then
         local msg = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        msg:SetPoint("CENTER", self.detailPanel, "CENTER", 0, 0)
+        msg:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 0, -80)
         msg:SetWidth(400)
         msg:SetWordWrap(true)
         msg:SetText("No favorite recipes yet.\nClick the * star on any recipe to add it.")
         msg:SetTextColor(0.5, 0.5, 0.5)
         msg:SetJustifyH("CENTER")
+        self.detailContent:SetHeight(160)
         self.detailRows[#self.detailRows + 1] = msg
         return
     end
@@ -1828,12 +1870,13 @@ function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
         labelAnchorX = 26
     end
 
-    -- Text (right-anchored to leave room for the star button)
+    -- Text (right-anchored to leave room for the star button; no word-wrap)
     local label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     label:SetPoint("LEFT",  row, "LEFT",  labelAnchorX, 0)
     label:SetPoint("RIGHT", row, "RIGHT", -22, 0)
     label:SetTextColor(0.9, 0.9, 0.9)
     label:SetText(text)
+    label:SetWordWrap(false)
     row._label = label
 
     -- Badge (count)
@@ -2143,7 +2186,8 @@ end
 
 --- Show all guild recipes for a profession in the detail panel.
 --- Left panel remains on the profession list.
---- Each row: quality-colored name (left) + inline crafter preview (right).
+--- Each row: +/- toggle, quality-colored name (left), inline crafter preview (right).
+--- Click +/- to expand vertical reagent list below the row.
 function UI:ShowRecipesView(profName)
     self._navState         = "professions"
     self._selectedMember   = nil
@@ -2167,9 +2211,13 @@ function UI:ShowRecipesView(profName)
     end
 
     local myKey   = GuildCrafts.Data:GetPlayerKey()
+    self.expandedRecipes = self.expandedRecipes or {}
     local yOffset = -8
 
     for _, recipe in ipairs(recipes) do
+        local hasReagents = recipe.reagents and #recipe.reagents > 0
+        local isExpanded  = self.expandedRecipes[recipe.key] or false
+
         local row = CreateFrame("Frame", nil, self.detailContent)
         row:SetHeight(20)
         row:SetPoint("TOPLEFT",  self.detailContent, "TOPLEFT",  8, yOffset)
@@ -2177,11 +2225,35 @@ function UI:ShowRecipesView(profName)
         row:EnableMouse(true)
         self.detailRows[#self.detailRows + 1] = row
 
-        -- Quality-colored recipe name (left-aligned)
+        -- +/- toggle or ~ placeholder (always 16px icon column)
+        local expandIcon
+        if hasReagents then
+            expandIcon = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            expandIcon:SetPoint("LEFT", row, "LEFT", 0, 0)
+            expandIcon:SetWidth(14)
+            expandIcon:SetText(isExpanded and "-" or "+")
+            expandIcon:SetTextColor(0.6, 0.6, 0.6)
+            local capturedKey  = recipe.key
+            local capturedProf = profName
+            row:SetScript("OnMouseDown", function(_, button)
+                if button == "LeftButton" then
+                    UI.expandedRecipes[capturedKey] = not UI.expandedRecipes[capturedKey]
+                    UI:ShowRecipesView(capturedProf)
+                end
+            end)
+        else
+            local noReagIcon = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            noReagIcon:SetPoint("LEFT", row, "LEFT", 0, 0)
+            noReagIcon:SetWidth(14)
+            noReagIcon:SetText("~")
+            noReagIcon:SetTextColor(0.35, 0.35, 0.35)
+        end
+
+        -- Quality-colored recipe name (shifted 16px for icon column)
         local qColor   = self:GetRecipeQualityColor(recipe.key)
         local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("LEFT", row, "LEFT", 0, 0)
-        nameText:SetWidth(280)
+        nameText:SetPoint("LEFT",  row, "LEFT",  16, 0)
+        nameText:SetPoint("RIGHT", row, "RIGHT", -180, 0)
         nameText:SetJustifyH("LEFT")
         nameText:SetWordWrap(false)
         nameText:SetText(qColor .. recipe.name .. "|r")
@@ -2197,7 +2269,7 @@ function UI:ShowRecipesView(profName)
             return a.key < b.key
         end)
 
-        -- Build crafter preview (max 2 names shown inline)
+        -- Inline crafter preview (max 2 names, right-aligned)
         local total = #recipe.crafters
         local parts = {}
         for i = 1, math.min(total, 2) do
@@ -2209,39 +2281,61 @@ function UI:ShowRecipesView(profName)
             parts[#parts + 1] = name
         end
         local crafterStr = table.concat(parts, ", ")
-        if total > 2 then
-            crafterStr = crafterStr .. " |cff1eff00(+" .. (total - 2) .. ")|r"
-        end
+        if total > 2 then crafterStr = crafterStr .. " |cff1eff00(+" .. (total - 2) .. ")|r" end
 
         local crafterText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         crafterText:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-        crafterText:SetWidth(180)
+        crafterText:SetWidth(175)
         crafterText:SetJustifyH("RIGHT")
         crafterText:SetWordWrap(false)
         crafterText:SetText(crafterStr)
         crafterText:SetTextColor(0.8, 0.8, 0.8)
 
-        -- Hover tooltip: full crafter list with online status
-        local capturedRecipe = recipe
-        local capturedMyKey  = myKey
+        -- Hover: highlight icon + crafter tooltip (or reagents-not-synced message)
+        local capturedExpandIcon = expandIcon
+        local capturedRecipe     = recipe
+        local capturedMyKey      = myKey
+        local capturedHasReag    = hasReagents
         row:SetScript("OnEnter", function(self)
+            if capturedExpandIcon then capturedExpandIcon:SetTextColor(1, 1, 1) end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:ClearLines()
-            GameTooltip:AddLine(capturedRecipe.name, 1, 0.82, 0)
-            GameTooltip:AddLine(" ")
-            for _, c in ipairs(capturedRecipe.crafters) do
-                local name   = c.key:match("^(.+)-") or c.key
-                local isSelf = (c.key == capturedMyKey)
-                local isOn   = GuildCrafts.Data:IsMemberOnline(c.key)
-                local line   = (isSelf and "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" or "  ") .. name
-                if isOn then line = line .. " |cff00ff00(online)|r" end
-                GameTooltip:AddLine(line, 0.9, 0.9, 0.9)
+            if capturedHasReag then
+                GameTooltip:AddLine(capturedRecipe.name, 1, 0.82, 0)
+                GameTooltip:AddLine(" ")
+                for _, c in ipairs(capturedRecipe.crafters) do
+                    local cname  = c.key:match("^(.+)-") or c.key
+                    local isSelf = (c.key == capturedMyKey)
+                    local isOn   = GuildCrafts.Data:IsMemberOnline(c.key)
+                    local line   = (isSelf and "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" or "  ") .. cname
+                    if isOn then line = line .. " |cff00ff00(online)|r" end
+                    GameTooltip:AddLine(line, 0.9, 0.9, 0.9)
+                end
+            else
+                GameTooltip:AddLine("Reagents not synced", 0.85, 0.85, 0.55)
+                GameTooltip:AddLine("Open your profession window to sync.", 0.55, 0.55, 0.55)
             end
             GameTooltip:Show()
         end)
-        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        row:SetScript("OnLeave", function()
+            if capturedExpandIcon then capturedExpandIcon:SetTextColor(0.6, 0.6, 0.6) end
+            GameTooltip:Hide()
+        end)
 
         yOffset = yOffset - 22
+
+        -- Vertical reagent list (collapsed by default, shown when expanded)
+        if hasReagents and isExpanded then
+            for _, r in ipairs(recipe.reagents) do
+                local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 28, yOffset)
+                reagentLine:SetText(r.count .. "x " .. r.name)
+                reagentLine:SetTextColor(0.6, 0.8, 1.0)
+                self.detailRows[#self.detailRows + 1] = reagentLine
+                yOffset = yOffset - 14
+            end
+            yOffset = yOffset - 4
+        end
     end
 
     self.detailContent:SetHeight(math.max(math.abs(yOffset) + 8, 1))
