@@ -561,6 +561,7 @@ function UI:PopulateProfessionList()
     end
 
     self.leftContent:SetHeight(math.max(yOffset + 8, 1))
+    self:ClearDetailRows()   -- remove any leftover detail content before showing welcome
     self:UpdateDetailWelcome()
 end
 
