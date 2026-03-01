@@ -29,6 +29,22 @@ local COLOR_GREEN    = { 0.2, 0.9, 0.2, 1 }
 local COLOR_YELLOW   = { 1.0, 0.8, 0.0, 1 }
 local COLOR_RED      = { 0.9, 0.2, 0.2, 1 }
 
+-- Quality color codes (Blizzard standard)
+local QUALITY_COLORS = {
+    [0] = "|cff9d9d9d", -- Poor (grey)
+    [1] = "|cffffffff", -- Common (white)
+    [2] = "|cff1eff00", -- Uncommon (green)
+    [3] = "|cff0070dd", -- Rare (blue)
+    [4] = "|cffa335ee", -- Epic (purple)
+    [5] = "|cffff8000", -- Legendary (orange)
+}
+
+-- Raid target star texture — used for favorites and self-indicator in recipe view
+local STAR_TEXTURE = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1"
+
+-- Item quality lookup cache (avoids repeated GetItemInfo calls per frame render)
+local _qualityCache = {}
+
 ----------------------------------------------------------------------
 -- Main Frame Creation
 ----------------------------------------------------------------------
@@ -310,11 +326,10 @@ function UI:CreateLeftPanel(parent)
     favBtn:SetSize(20, 20)
     favBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -3)
     favBtn:EnableMouse(true)
-    local favBtnLabel = favBtn:CreateFontString(nil, "OVERLAY")
-    favBtnLabel:SetFont("Fonts\\FRIZQT__.TTF", 18, "OUTLINE")
-    favBtnLabel:SetPoint("CENTER", 0, 0)
-    favBtnLabel:SetText("*")
-    favBtnLabel:SetTextColor(1.0, 0.82, 0.0)  -- gold
+    local favBtnTex = favBtn:CreateTexture(nil, "OVERLAY")
+    favBtnTex:SetAllPoints()
+    favBtnTex:SetTexture(STAR_TEXTURE)
+    favBtnTex:SetVertexColor(1.0, 0.82, 0.0)  -- gold always (favorites nav button)
     favBtn:SetScript("OnMouseDown", function()
         if UI._navState == "favorites" then
             UI:PopulateProfessionList()
@@ -351,6 +366,7 @@ function UI:CreateLeftPanel(parent)
     self._selectedProfession = nil
     self._selectedMember = nil
     self._favSubTab = "members" -- "members" or "recipes"
+    self._viewMode   = "members" -- profession view mode: "members" or "recipes"
 
     -- Populate default view
     self:PopulateProfessionList()
@@ -381,6 +397,71 @@ function UI:CreateDetailPanel(parent)
     content:SetSize(400, 1)
     scrollFrame:SetScrollChild(content)
 
+    -- Profession header bar (hidden until a profession is selected)
+    local profHeader = CreateFrame("Frame", nil, panel, "BackdropTemplate")
+    profHeader:SetHeight(28)
+    profHeader:SetPoint("TOPLEFT",  panel, "TOPLEFT",  4, -4)
+    profHeader:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -4)
+    profHeader:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    profHeader:SetBackdropColor(0.10, 0.10, 0.10, 1)
+    profHeader:SetBackdropBorderColor(0.25, 0.25, 0.25, 1)
+    profHeader:Hide()
+
+    local profHeaderIcon = profHeader:CreateTexture(nil, "ARTWORK")
+    profHeaderIcon:SetSize(20, 20)
+    profHeaderIcon:SetPoint("LEFT", profHeader, "LEFT", 6, 0)
+    profHeaderIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    local profHeaderText = profHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    profHeaderText:SetPoint("LEFT", profHeaderIcon, "RIGHT", 6, 0)
+    profHeaderText:SetTextColor(1, 0.82, 0)
+
+    -- View toggle container (Members / Recipes buttons), anchored below header
+    local toggleContainer = CreateFrame("Frame", nil, panel)
+    toggleContainer:SetHeight(26)
+    toggleContainer:SetPoint("TOPLEFT",  profHeader, "BOTTOMLEFT",  0, -2)
+    toggleContainer:SetPoint("TOPRIGHT", profHeader, "BOTTOMRIGHT", 0, -2)
+    toggleContainer:Hide()
+
+    local function makeToggleBtn(label, anchorLeft, anchorPoint, offX)
+        local btn = CreateFrame("Button", nil, toggleContainer, "BackdropTemplate")
+        btn:SetSize(80, 22)
+        btn:SetPoint("LEFT", anchorLeft, anchorPoint, offX, 0)
+        btn:SetBackdrop({
+            bgFile   = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        btn:SetBackdropColor(0.07, 0.07, 0.07, 0.9)
+        btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetPoint("CENTER")
+        fs:SetText(label)
+        fs:SetTextColor(0.7, 0.7, 0.7)
+        btn._textFS = fs
+        btn:SetScript("OnEnter", function(self)
+            if self:IsEnabled() then
+                self:SetBackdropColor(0.15, 0.35, 0.6, 0.4)
+            end
+        end)
+        btn:SetScript("OnLeave", function(self)
+            if self:IsEnabled() then
+                self:SetBackdropColor(0.07, 0.07, 0.07, 0.9)
+            end
+        end)
+        return btn
+    end
+
+    local membersBtn = makeToggleBtn("Members", toggleContainer, "LEFT", 4)
+    local recipesBtn = makeToggleBtn("Recipes",  membersBtn,      "RIGHT", 4)
+
+    membersBtn:SetScript("OnClick", function() UI:SetViewMode("members") end)
+    recipesBtn:SetScript("OnClick", function() UI:SetViewMode("recipes") end)
+
     -- Welcome text (default state) — child of panel so it layers independently
     local welcome = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     welcome:SetPoint("CENTER", panel, "CENTER", 0, 0)
@@ -388,10 +469,16 @@ function UI:CreateDetailPanel(parent)
     welcome:SetTextColor(0.5, 0.5, 0.5)
     welcome:SetJustifyH("CENTER")
 
-    self.detailPanel = panel
-    self.detailScrollFrame = scrollFrame
-    self.detailContent = content
-    self.detailWelcome = welcome
+    self.detailPanel           = panel
+    self.detailScrollFrame     = scrollFrame
+    self.detailContent         = content
+    self.detailWelcome         = welcome
+    self._profHeader           = profHeader
+    self._profHeaderIcon       = profHeaderIcon
+    self._profHeaderText       = profHeaderText
+    self._viewToggleContainer  = toggleContainer
+    self._viewToggleMembersBtn = membersBtn
+    self._viewToggleRecipesBtn = recipesBtn
     self.detailRows = {}
 end
 
@@ -451,6 +538,7 @@ function UI:PopulateProfessionList()
     self._selectedProfession = nil
     self._selectedMember = nil
     self.leftBreadcrumb:Hide()
+    self:HideProfessionToggle()
 
     -- Clear existing rows
     self:ClearLeftRows()
@@ -461,8 +549,11 @@ function UI:PopulateProfessionList()
     for _, profName in ipairs(professions) do
         local count = GuildCrafts.Data:GetProfessionMemberCount(profName)
         local row = self:CreateLeftRow(self.leftContent, yOffset, profName, "(" .. count .. ")", PROFESSION_ICONS[profName])
+        local capturedProfName = profName
+        local capturedRow = row
         row:SetScript("OnClick", function()
-            UI:NavigateToMembers(profName)
+            UI:SetActiveLeftRow(capturedRow)
+            UI:NavigateToProfession(capturedProfName)
         end)
         self.leftRows[#self.leftRows + 1] = row
         yOffset = yOffset + 24
@@ -480,6 +571,10 @@ function UI:NavigateToMembers(profName)
     self._navState = "members"
     self._selectedProfession = profName
     self._selectedMember = nil
+    self.expandedRecipes = {}
+
+    -- Show profession title + view toggle in detail panel
+    self:ShowProfessionToggle(profName)
 
     -- Show breadcrumb
     self.leftBreadcrumb:Show()
@@ -548,6 +643,7 @@ end
 ----------------------------------------------------------------------
 
 function UI:NavigateBack()
+    self._viewMode = "members"  -- reset view mode on back navigation
     if self._navState == "members" then
         self:PopulateProfessionList()
     elseif self._navState == "allMembers" then
@@ -657,6 +753,7 @@ function UI:ShowMemberRecipes(memberKey, profName)
     end)
 
     local lastCategory = nil
+    self.expandedRecipes = self.expandedRecipes or {}
     for _, recipe in ipairs(sorted) do
         -- Category header
         local displayCategory = recipe.category ~= "" and recipe.category or nil
@@ -678,26 +775,66 @@ function UI:ShowMemberRecipes(memberKey, profName)
             self.detailRows[#self.detailRows + 1] = catText
             yOffset = yOffset - 18
         end
-        -- Recipe row with star
+
+        -- Determine expand state for this recipe
+        local hasReagents = recipe.reagents and #recipe.reagents > 0
+        local isExpanded  = self.expandedRecipes[recipe.key] or false
+
+        -- Recipe row (clickable when has reagents, for expand/collapse)
         local recipeRow = CreateFrame("Frame", nil, self.detailContent)
         recipeRow:SetSize(400, 16)
         recipeRow:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
         self.detailRows[#self.detailRows + 1] = recipeRow
 
-        -- Star toggle
+        -- Expand/collapse indicator (► collapsed, ▼ expanded)
+        local expandIcon
+        if hasReagents then
+            expandIcon = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            expandIcon:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
+            expandIcon:SetWidth(14)
+            expandIcon:SetText(isExpanded and "▼" or "►")
+            expandIcon:SetTextColor(0.6, 0.6, 0.6)
+        end
+
+        -- Star toggle (shifted right when expand icon present)
         local capturedKey = recipe.key
-        local star = self:CreateStarButton(recipeRow, 16, function(btn)
+        local star = self:CreateStarButton(recipeRow, 14, function(btn)
             local nowFav = GuildCrafts.Favorites:ToggleRecipe(capturedKey)
             UI:UpdateStarAppearance(btn, nowFav)
         end)
-        star:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
+        if hasReagents then
+            star:SetPoint("LEFT", recipeRow, "LEFT", 16, 0)
+        else
+            star:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
+        end
         self:UpdateStarAppearance(star, GuildCrafts.Favorites:IsRecipeFavorite(recipe.key))
         self.detailRows[#self.detailRows + 1] = star
 
+        -- Recipe name (quality colored)
         local nameText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         nameText:SetPoint("LEFT", star, "RIGHT", 2, 0)
-        nameText:SetText(recipe.name)
-        nameText:SetTextColor(1, 1, 1)
+        local qColor = self:GetRecipeQualityColor(recipe.key)
+        nameText:SetText(qColor .. recipe.name .. "|r")
+
+        -- Click recipe row to toggle reagents (only when has reagents)
+        if hasReagents then
+            local capturedMemberKey = memberKey
+            local capturedProfName  = profName
+            local capturedExpKey    = recipe.key
+            recipeRow:EnableMouse(true)
+            recipeRow:SetScript("OnMouseDown", function(_, button)
+                if button == "LeftButton" then
+                    UI.expandedRecipes[capturedExpKey] = not UI.expandedRecipes[capturedExpKey]
+                    UI:ShowMemberRecipes(capturedMemberKey, capturedProfName)
+                end
+            end)
+            recipeRow:SetScript("OnEnter", function()
+                if expandIcon then expandIcon:SetTextColor(1, 1, 1) end
+            end)
+            recipeRow:SetScript("OnLeave", function()
+                if expandIcon then expandIcon:SetTextColor(0.6, 0.6, 0.6) end
+            end)
+        end
 
         -- Source (subdued)
         if recipe.source and recipe.source ~= "" then
@@ -709,8 +846,8 @@ function UI:ShowMemberRecipes(memberKey, profName)
             yOffset = yOffset - 14
         end
 
-        -- Reagents
-        if recipe.reagents and #recipe.reagents > 0 then
+        -- Reagents (only rendered when expanded)
+        if hasReagents and isExpanded then
             local parts = {}
             for _, r in ipairs(recipe.reagents) do
                 parts[#parts + 1] = r.count .. "x " .. r.name
@@ -727,7 +864,7 @@ function UI:ShowMemberRecipes(memberKey, profName)
             local textHeight = reagentText:GetStringHeight()
             if not textHeight or textHeight < 12 then textHeight = 12 end
             yOffset = yOffset - 14 - textHeight - 4
-        else
+        elseif not hasReagents then
             yOffset = yOffset - 6
         end
 
@@ -774,7 +911,8 @@ function UI:ShowSearchResults(results)
 
         local nameText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         nameText:SetPoint("LEFT", star, "RIGHT", 2, 0)
-        nameText:SetText("|cffffd100" .. result.recipeName .. "|r  |cff888888(" .. result.profName .. ")|r")
+        local qColor = self:GetRecipeQualityColor(result.recipeKey)
+        nameText:SetText(qColor .. result.recipeName .. "|r  |cff888888(" .. result.profName .. ")|r")
         yOffset = yOffset - 18
 
         -- Source
@@ -1192,6 +1330,7 @@ function UI:ShowFavoritesTab()
     self._selectedProfession = nil
     self._selectedMember = nil
     self._searchActive = false
+    self:HideProfessionToggle()
 
     -- Breadcrumb
     self.leftBreadcrumb:Show()
@@ -1520,16 +1659,15 @@ end
 ----------------------------------------------------------------------
 
 function UI:CreateStarButton(parent, size, onClick)
-    -- Use Frame instead of Button to avoid texture issues
     local btn = CreateFrame("Frame", nil, parent)
     btn:SetSize(size, size)
     btn:EnableMouse(true)
 
-    local label = btn:CreateFontString(nil, "OVERLAY")
-    label:SetFont("Fonts\\FRIZQT__.TTF", 18, "OUTLINE")
-    label:SetPoint("CENTER", 0, 0)
-    label:SetText("*")
-    btn._starLabel = label
+    local icon = btn:CreateTexture(nil, "OVERLAY")
+    icon:SetAllPoints()
+    icon:SetTexture(STAR_TEXTURE)
+    icon:SetVertexColor(0.5, 0.5, 0.5)  -- grey by default
+    btn._starIcon = icon
 
     btn:SetScript("OnMouseDown", function()
         if onClick then onClick(btn) end
@@ -1539,10 +1677,12 @@ function UI:CreateStarButton(parent, size, onClick)
 end
 
 function UI:UpdateStarAppearance(btn, isFavorite)
-    if isFavorite then
-        btn._starLabel:SetTextColor(1.0, 0.82, 0.0)  -- gold
-    else
-        btn._starLabel:SetTextColor(0.5, 0.5, 0.5)  -- gray
+    if btn._starIcon then
+        if isFavorite then
+            btn._starIcon:SetVertexColor(1.0, 0.82, 0.0)  -- gold
+        else
+            btn._starIcon:SetVertexColor(0.5, 0.5, 0.5)  -- grey
+        end
     end
 end
 
@@ -1559,6 +1699,9 @@ function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", parent, "TOPLEFT", 4, -yOffset)
         row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -yOffset)
+        -- Reset active-state visuals
+        if row._bg     then row._bg:SetVertexColor(0.07, 0.07, 0.07, 0.95) end
+        if row._accent then row._accent:Hide() end
         -- Update text
         row._label:ClearAllPoints()
         row._label:SetText(text)
@@ -1600,11 +1743,28 @@ function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
     row:SetPoint("TOPLEFT", parent, "TOPLEFT", 4, -yOffset)
     row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -yOffset)
 
-    -- Hover highlight
+    -- Dark background
+    local bg = row:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture("Interface\\Buttons\\WHITE8x8")
+    bg:SetVertexColor(0.07, 0.07, 0.07, 0.95)
+    row._bg = bg
+
+    -- Gold accent bar (left edge, shown only for active row)
+    local accent = row:CreateTexture(nil, "ARTWORK")
+    accent:SetWidth(3)
+    accent:SetTexture("Interface\\Buttons\\WHITE8x8")
+    accent:SetVertexColor(1, 0.82, 0, 1)
+    accent:SetPoint("TOPLEFT",    row, "TOPLEFT",    0, -2)
+    accent:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0,  2)
+    accent:Hide()
+    row._accent = accent
+
+    -- Blue hover highlight
     local highlight = row:CreateTexture(nil, "HIGHLIGHT")
     highlight:SetAllPoints()
     highlight:SetTexture("Interface\\Buttons\\WHITE8x8")
-    highlight:SetVertexColor(0.3, 0.3, 0.5, 0.2)
+    highlight:SetVertexColor(0.15, 0.35, 0.6, 0.35)
 
     -- Optional profession icon
     local labelAnchorX = 6
@@ -1659,6 +1819,7 @@ function UI:ClearLeftRows()
         end
     end
     self.leftRows = {}
+    self._activeLeftRow = nil
 end
 
 function UI:ClearDetailRows()
@@ -1733,8 +1894,12 @@ function UI:Refresh()
     self._searchActive = savedSearch
     self._selectedProfession = savedProfession
 
-    -- Refresh detail if a member was selected
-    if self._selectedMember and self._selectedProfession then
+    -- Restore recipe view if in recipe mode
+    if self._viewMode == "recipes" and savedProfession then
+        self:ShowRecipesView(savedProfession)
+        self:ShowProfessionToggle(savedProfession)
+    elseif self._selectedMember and self._selectedProfession then
+        -- Refresh detail if a member was selected (members mode)
         self:ShowMemberRecipes(self._selectedMember, self._selectedProfession)
     end
 
@@ -1742,6 +1907,264 @@ function UI:Refresh()
     self:UpdateDetailWelcome()
 
     self:RefreshCraftQueue()
+end
+
+----------------------------------------------------------------------
+-- Quality Color Helper (#38)
+----------------------------------------------------------------------
+
+--- Return a quality color escape code for a recipe key.
+--- Positive key = itemID → query GetItemInfo for quality.
+--- Negative key = spellID (Enchanting) → no quality, returns white.
+function UI:GetRecipeQualityColor(recipeKey)
+    local key = tonumber(recipeKey)
+    if not key or key <= 0 then
+        return QUALITY_COLORS[1]  -- white for Enchanting / unknown
+    end
+    -- Return cached value if available
+    if _qualityCache[key] ~= nil then
+        return QUALITY_COLORS[_qualityCache[key]] or QUALITY_COLORS[1]
+    end
+    -- Query WoW client item cache (may return nil if not loaded yet)
+    local _, _, q = GetItemInfo(key)
+    local quality = q or 1
+    _qualityCache[key] = quality
+    return QUALITY_COLORS[quality] or QUALITY_COLORS[1]
+end
+
+----------------------------------------------------------------------
+-- Profession Navigation Entry Point (#44/#45)
+----------------------------------------------------------------------
+
+--- Navigate into a profession, respecting the current view mode.
+--- Members mode: drill into member list (left panel).
+--- Recipes mode: show all recipes in detail panel, profession list stays left.
+function UI:NavigateToProfession(profName)
+    self._selectedProfession = profName
+    if self._viewMode == "recipes" then
+        self:ShowRecipesView(profName)
+        self:ShowProfessionToggle(profName)
+    else
+        self:NavigateToMembers(profName)
+        -- ShowProfessionToggle is called inside NavigateToMembers
+    end
+end
+
+----------------------------------------------------------------------
+-- Active Left Row Tracking (#37)
+----------------------------------------------------------------------
+
+--- Highlight a left-panel row as the active (selected) item.
+--- Shows gold accent bar; restores previous row to default.
+function UI:SetActiveLeftRow(newRow)
+    if self._activeLeftRow and self._activeLeftRow ~= newRow then
+        local prev = self._activeLeftRow
+        if prev._bg     then prev._bg:SetVertexColor(0.07, 0.07, 0.07, 0.95) end
+        if prev._accent then prev._accent:Hide() end
+    end
+    self._activeLeftRow = newRow
+    if newRow then
+        if newRow._bg     then newRow._bg:SetVertexColor(0.12, 0.12, 0.12, 0.98) end
+        if newRow._accent then newRow._accent:Show() end
+    end
+end
+
+----------------------------------------------------------------------
+-- Profession Header + View Toggle (#45)
+----------------------------------------------------------------------
+
+--- Show profession title + Members/Recipes toggle in the detail panel.
+--- Reanchors the scroll frame below the toggle bar.
+function UI:ShowProfessionToggle(profName)
+    if not self._profHeader then return end
+
+    -- Update header text and icon
+    self._profHeaderText:SetText(profName)
+    local icon = PROFESSION_ICONS[profName]
+    if icon then
+        self._profHeaderIcon:SetTexture(icon)
+        self._profHeaderIcon:Show()
+    else
+        self._profHeaderIcon:Hide()
+    end
+    self._profHeader:Show()
+    self._viewToggleContainer:Show()
+
+    -- Sync toggle button visuals with current view mode
+    self:_UpdateViewToggleVisuals()
+
+    -- Reanchor scroll frame below toggle bar
+    self.detailScrollFrame:ClearAllPoints()
+    self.detailScrollFrame:SetPoint("TOPLEFT",     self._viewToggleContainer, "BOTTOMLEFT",  0, -2)
+    self.detailScrollFrame:SetPoint("BOTTOMRIGHT", self.detailPanel,          "BOTTOMRIGHT", -22, 4)
+end
+
+--- Hide profession title and toggle; restore scroll frame to full height.
+function UI:HideProfessionToggle()
+    if not self._profHeader then return end
+    self._profHeader:Hide()
+    self._viewToggleContainer:Hide()
+    -- Restore default scroll frame anchoring
+    self.detailScrollFrame:ClearAllPoints()
+    self.detailScrollFrame:SetPoint("TOPLEFT",     self.detailPanel, "TOPLEFT",     4,   -4)
+    self.detailScrollFrame:SetPoint("BOTTOMRIGHT", self.detailPanel, "BOTTOMRIGHT", -22,  4)
+end
+
+--- Update visual state of Members/Recipes toggle buttons.
+function UI:_UpdateViewToggleVisuals()
+    if not self._viewToggleMembersBtn then return end
+    local mem = self._viewToggleMembersBtn
+    local rec = self._viewToggleRecipesBtn
+    if self._viewMode == "members" then
+        mem:SetBackdropColor(0.12, 0.12, 0.12, 1)
+        mem:SetBackdropBorderColor(1, 0.82, 0, 1)
+        mem._textFS:SetTextColor(1, 0.82, 0)
+        mem:Disable()
+        rec:SetBackdropColor(0.07, 0.07, 0.07, 0.9)
+        rec:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        rec._textFS:SetTextColor(0.7, 0.7, 0.7)
+        rec:Enable()
+    else
+        rec:SetBackdropColor(0.12, 0.12, 0.12, 1)
+        rec:SetBackdropBorderColor(1, 0.82, 0, 1)
+        rec._textFS:SetTextColor(1, 0.82, 0)
+        rec:Disable()
+        mem:SetBackdropColor(0.07, 0.07, 0.07, 0.9)
+        mem:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        mem._textFS:SetTextColor(0.7, 0.7, 0.7)
+        mem:Enable()
+    end
+end
+
+--- Switch the profession view mode and refresh content accordingly.
+function UI:SetViewMode(mode)
+    self._viewMode = mode
+    self:_UpdateViewToggleVisuals()
+    local profName = self._selectedProfession
+    if not profName then return end
+
+    if mode == "recipes" then
+        -- Ensure left panel shows profession list
+        if self._navState ~= "professions" then
+            local savedProf = profName
+            self:PopulateProfessionList()   -- resets left panel + clears savedProf
+            self._selectedProfession = savedProf
+        end
+        self:ShowRecipesView(profName)
+        self:ShowProfessionToggle(profName)
+    else  -- "members"
+        self:NavigateToMembers(profName)
+        -- ShowProfessionToggle called inside NavigateToMembers
+    end
+end
+
+----------------------------------------------------------------------
+-- Recipe-Centric View (#44)
+----------------------------------------------------------------------
+
+--- Show all guild recipes for a profession in the detail panel.
+--- Left panel remains on the profession list.
+--- Each row: quality-colored name (left) + inline crafter preview (right).
+function UI:ShowRecipesView(profName)
+    self._navState         = "professions"
+    self._selectedMember   = nil
+    self._selectedProfession = profName
+    self.detailWelcome:Hide()
+    self:ClearDetailRows()
+
+    local recipes = GuildCrafts.Data:GetAllRecipesForProfession(profName)
+
+    if not recipes or #recipes == 0 then
+        local msg = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        msg:SetPoint("CENTER", self.detailPanel, "CENTER", 0, 0)
+        msg:SetWidth(360)
+        msg:SetWordWrap(true)
+        msg:SetText("No recipes found for " .. profName .. ".\nMembers need to open their profession window\nwhile the addon is active.")
+        msg:SetTextColor(0.5, 0.5, 0.5)
+        msg:SetJustifyH("CENTER")
+        self.detailRows[#self.detailRows + 1] = msg
+        return
+    end
+
+    local myKey   = GuildCrafts.Data:GetPlayerKey()
+    local yOffset = -8
+
+    for _, recipe in ipairs(recipes) do
+        local row = CreateFrame("Frame", nil, self.detailContent)
+        row:SetHeight(20)
+        row:SetPoint("TOPLEFT",  self.detailContent, "TOPLEFT",  8, yOffset)
+        row:SetPoint("TOPRIGHT", self.detailContent, "TOPRIGHT", -8, yOffset)
+        row:EnableMouse(true)
+        self.detailRows[#self.detailRows + 1] = row
+
+        -- Quality-colored recipe name (left-aligned)
+        local qColor   = self:GetRecipeQualityColor(recipe.key)
+        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        nameText:SetPoint("LEFT", row, "LEFT", 0, 0)
+        nameText:SetWidth(280)
+        nameText:SetJustifyH("LEFT")
+        nameText:SetWordWrap(false)
+        nameText:SetText(qColor .. recipe.name .. "|r")
+
+        -- Sort crafters: self first, then online, then alphabetical
+        table.sort(recipe.crafters, function(a, b)
+            local aSelf = (a.key == myKey)
+            local bSelf = (b.key == myKey)
+            if aSelf ~= bSelf then return aSelf end
+            local aOn = GuildCrafts.Data:IsMemberOnline(a.key)
+            local bOn = GuildCrafts.Data:IsMemberOnline(b.key)
+            if aOn ~= bOn then return aOn end
+            return a.key < b.key
+        end)
+
+        -- Build crafter preview (max 2 names shown inline)
+        local total = #recipe.crafters
+        local parts = {}
+        for i = 1, math.min(total, 2) do
+            local c    = recipe.crafters[i]
+            local name = c.key:match("^(.+)-") or c.key
+            if c.key == myKey then
+                name = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" .. name
+            end
+            parts[#parts + 1] = name
+        end
+        local crafterStr = table.concat(parts, ", ")
+        if total > 2 then
+            crafterStr = crafterStr .. " |cff1eff00(+" .. (total - 2) .. ")|r"
+        end
+
+        local crafterText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        crafterText:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        crafterText:SetWidth(180)
+        crafterText:SetJustifyH("RIGHT")
+        crafterText:SetWordWrap(false)
+        crafterText:SetText(crafterStr)
+        crafterText:SetTextColor(0.8, 0.8, 0.8)
+
+        -- Hover tooltip: full crafter list with online status
+        local capturedRecipe = recipe
+        local capturedMyKey  = myKey
+        row:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:ClearLines()
+            GameTooltip:AddLine(capturedRecipe.name, 1, 0.82, 0)
+            GameTooltip:AddLine(" ")
+            for _, c in ipairs(capturedRecipe.crafters) do
+                local name   = c.key:match("^(.+)-") or c.key
+                local isSelf = (c.key == capturedMyKey)
+                local isOn   = GuildCrafts.Data:IsMemberOnline(c.key)
+                local line   = (isSelf and "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" or "  ") .. name
+                if isOn then line = line .. " |cff00ff00(online)|r" end
+                GameTooltip:AddLine(line, 0.9, 0.9, 0.9)
+            end
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        yOffset = yOffset - 22
+    end
+
+    self.detailContent:SetHeight(math.max(math.abs(yOffset) + 8, 1))
 end
 
 ----------------------------------------------------------------------

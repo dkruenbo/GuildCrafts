@@ -1532,6 +1532,34 @@ function Data:GetTrackedProfessions()
     return PROF_NAMES
 end
 
+--- Return all guild recipes for a given profession, aggregated across all members.
+--- Returns: { { key, name, crafters = { {key}, ... } }, ... } sorted alphabetically by name.
+function Data:GetAllRecipesForProfession(profName)
+    local gdb = self:GetGuildDB()
+    if not gdb then return {} end
+    local recipeMap = {}
+    for memberKey, entry in pairs(gdb) do
+        if type(entry) == "table" and entry.professions and entry.professions[profName] then
+            local profData = entry.professions[profName]
+            if profData.recipes then
+                for recipeKey, recipeData in pairs(profData.recipes) do
+                    local name = recipeData.name or "Unknown"
+                    if not recipeMap[recipeKey] then
+                        recipeMap[recipeKey] = { key = recipeKey, name = name, crafters = {} }
+                    end
+                    recipeMap[recipeKey].crafters[#recipeMap[recipeKey].crafters + 1] = { key = memberKey }
+                end
+            end
+        end
+    end
+    local results = {}
+    for _, recipe in pairs(recipeMap) do
+        results[#results + 1] = recipe
+    end
+    table.sort(results, function(a, b) return (a.name or "") < (b.name or "") end)
+    return results
+end
+
 --- Search recipes across all members by name substring.
 --- Returns { { recipeName, recipeKey, profName, crafters = { { key, online }, ... } }, ... }
 function Data:SearchRecipes(query)

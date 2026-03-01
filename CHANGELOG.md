@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.1.5 — UI Overhaul
+
+### Features
+
+- **Dark sidebar style** (#37): Profession and member list rows now use a dark background (0.07 alpha) that deepens on selection (0.12), a gold accent bar on the left edge of the active row, and a blue hover highlight. Consistent with GuildCraft Classic Era UI conventions.
+
+- **Quality colors** (#38): Recipe names are now tinted by item quality — grey (Poor), white (Common), green (Uncommon), blue (Rare), purple (Epic), orange (Legendary) — using `GetItemInfo` for item-linked recipes. Enchanting spells (negative recipe keys) default to white. Applies to the recipe detail view, collapsible reagent rows, and search results. Favorite star widgets use a WoW raid-target texture instead of an ASCII asterisk for crisp rendering at any size.
+
+- **Collapsible reagent rows** (#39): Recipe rows in the member recipe view now show a ► expand arrow when reagents are available. Clicking the row toggles reagent visibility (▼ when expanded). All rows default to collapsed. Expansion state is preserved within the session and cleared when navigating away from a member.
+
+- **Recipe-centric profession view** (#44): Selecting a profession while in Recipes mode shows an aggregated list of all guild recipes for that profession in the detail panel. Each row displays the quality-colored recipe name on the left and up to two crafter names on the right, with a "+N more" indicator in green when there are additional crafters. Hovering shows a tooltip with the full crafter list and online status. Your own character is indicated with a star icon prefix.
+
+- **Members / Recipes view toggle** (#45): A profession header bar appears at the top of the detail panel whenever a profession is selected, showing its icon and name. Below it, a "Members" / "Recipes" toggle switches the detail panel between the existing per-member recipe list and the new aggregated recipe view. The toggle is hidden on the search, favorites, and top-level profession list screens.
+
 ## 1.1.0 — 2026-02-27
 
 ### Features
