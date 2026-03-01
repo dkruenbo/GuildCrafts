@@ -806,7 +806,6 @@ function UI:ShowMemberRecipes(memberKey, profName)
             recipeRow:SetScript("OnEnter", function()
                 GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
                 GameTooltip:AddLine("Reagents not synced", 0.85, 0.85, 0.55)
-                GameTooltip:AddLine("Open your profession window to sync.", 0.55, 0.55, 0.55)
                 GameTooltip:Show()
             end)
             recipeRow:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -960,7 +959,6 @@ function UI:ShowSearchResults(results)
                 end
             else
                 GameTooltip:AddLine("Reagents not synced", 0.85, 0.85, 0.55)
-                GameTooltip:AddLine("Open your profession window to sync.", 0.55, 0.55, 0.55)
             end
             GameTooltip:Show()
         end)
@@ -2313,7 +2311,6 @@ function UI:ShowRecipesView(profName)
                 end
             else
                 GameTooltip:AddLine("Reagents not synced", 0.85, 0.85, 0.55)
-                GameTooltip:AddLine("Open your profession window to sync.", 0.55, 0.55, 0.55)
             end
             GameTooltip:Show()
         end)
