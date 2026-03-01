@@ -11,11 +11,11 @@ GuildCrafts.UI = GuildCrafts.UI or {}
 local UI = GuildCrafts.UI
 
 -- Frame dimensions
-local DEFAULT_WIDTH  = 700
-local DEFAULT_HEIGHT = 500
-local MIN_WIDTH      = 500
-local MIN_HEIGHT     = 350
-local LEFT_PANEL_WIDTH = 200
+local DEFAULT_WIDTH  = 820
+local DEFAULT_HEIGHT = 540
+local MIN_WIDTH      = 560
+local MIN_HEIGHT     = 380
+local LEFT_PANEL_WIDTH = 240
 
 -- Frame pool for left-panel row recycling
 UI._leftRowPool = {}
@@ -616,7 +616,7 @@ function UI:NavigateToMembers(profName)
                 staleTag = staleTag .. "  |cff999999(left guild)|r"
             end
         end
-        local label = dot .. memberInfo.key:match("^(.+)-") .. skillTag .. "  |cff888888" .. memberInfo.recipeCount .. " recipes|r" .. specTag .. staleTag
+        local label = dot .. memberInfo.key:match("^(.+)-") .. skillTag .. specTag .. staleTag
         local row = self:CreateLeftRow(self.leftContent, yOffset, label)
         row.memberKey = memberInfo.key
         row:SetScript("OnClick", function()
@@ -793,7 +793,7 @@ function UI:ShowMemberRecipes(memberKey, profName)
             expandIcon = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             expandIcon:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
             expandIcon:SetWidth(14)
-            expandIcon:SetText(isExpanded and "▼" or "►")
+            expandIcon:SetText(isExpanded and "-" or "+")
             expandIcon:SetTextColor(0.6, 0.6, 0.6)
         end
 
@@ -881,45 +881,84 @@ end
 
 function UI:ShowSearchResults(results)
     self._searchActive = true
+    self._lastSearchResults = results  -- cached for reagent expand/collapse re-render
     self.detailWelcome:Hide()
+    self:HideProfessionToggle()
     self:ClearDetailRows()
 
     if #results == 0 then
         local noResult = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        noResult:SetPoint("CENTER", self.detailPanel, "CENTER", 0, 0)
+        noResult:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 0, -80)
+        noResult:SetWidth(360)
+        noResult:SetJustifyH("CENTER")
         noResult:SetText("No results found.")
         noResult:SetTextColor(0.5, 0.5, 0.5)
+        self.detailContent:SetHeight(160)
         self.detailRows[#self.detailRows + 1] = noResult
         return
     end
 
+    self.expandedRecipes = self.expandedRecipes or {}
+
     local yOffset = -8
     for _, result in ipairs(results) do
-        -- Recipe name row with star
+        local hasReagents = result.reagents and #result.reagents > 0
+        local isExpanded  = self.expandedRecipes[result.recipeKey] or false
+
+        -- Recipe name row
         local recipeRow = CreateFrame("Frame", nil, self.detailContent)
-        recipeRow:SetSize(400, 16)
-        recipeRow:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, yOffset)
+        recipeRow:SetHeight(18)
+        recipeRow:SetPoint("TOPLEFT",  self.detailContent, "TOPLEFT",  8, yOffset)
+        recipeRow:SetPoint("TOPRIGHT", self.detailContent, "TOPRIGHT", -8, yOffset)
         self.detailRows[#self.detailRows + 1] = recipeRow
 
+        -- Expand/collapse indicator (only when has reagents)
+        local expandIcon
+        if hasReagents then
+            recipeRow:EnableMouse(true)
+            expandIcon = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            expandIcon:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
+            expandIcon:SetWidth(14)
+            expandIcon:SetText(isExpanded and "-" or "+")
+            expandIcon:SetTextColor(0.6, 0.6, 0.6)
+            local capturedKey = result.recipeKey
+            recipeRow:SetScript("OnMouseDown", function(_, button)
+                if button == "LeftButton" then
+                    UI.expandedRecipes[capturedKey] = not UI.expandedRecipes[capturedKey]
+                    UI:ShowSearchResults(UI._lastSearchResults)
+                end
+            end)
+            recipeRow:SetScript("OnEnter", function()
+                if expandIcon then expandIcon:SetTextColor(1, 1, 1) end
+            end)
+            recipeRow:SetScript("OnLeave", function()
+                if expandIcon then expandIcon:SetTextColor(0.6, 0.6, 0.6) end
+            end)
+        end
+
+        -- Star button (shifted right when expand icon present)
+        local iconOffset = hasReagents and 16 or 0
         local capturedKey = result.recipeKey
         local star = self:CreateStarButton(recipeRow, 16, function(btn)
             local nowFav = GuildCrafts.Favorites:ToggleRecipe(capturedKey)
             UI:UpdateStarAppearance(btn, nowFav)
         end)
-        star:SetPoint("LEFT", recipeRow, "LEFT", 0, 0)
+        star:SetPoint("LEFT", recipeRow, "LEFT", iconOffset, 0)
         self:UpdateStarAppearance(star, GuildCrafts.Favorites:IsRecipeFavorite(result.recipeKey))
         self.detailRows[#self.detailRows + 1] = star
 
+        -- Quality-colored recipe name + profession label
         local nameText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("LEFT", star, "RIGHT", 2, 0)
+        nameText:SetPoint("LEFT",  star,     "RIGHT", 2, 0)
+        nameText:SetPoint("RIGHT", recipeRow, "RIGHT", 0, 0)
         local qColor = self:GetRecipeQualityColor(result.recipeKey)
         nameText:SetText(qColor .. result.recipeName .. "|r  |cff888888(" .. result.profName .. ")|r")
-        yOffset = yOffset - 18
+        yOffset = yOffset - 20
 
         -- Source
         if result.source and result.source ~= "" then
             local sourceText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            sourceText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 12, yOffset)
+            sourceText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 12 + iconOffset, yOffset)
             sourceText:SetText(result.source)
             sourceText:SetTextColor(0.5, 0.5, 0.5)
             self.detailRows[#self.detailRows + 1] = sourceText
@@ -932,10 +971,9 @@ function UI:ShowSearchResults(results)
             local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
             local crafterName = crafter.key:match("^(.+)-") or crafter.key
 
-            -- Crafter row with optional Request Craft button
             local crafterRow = CreateFrame("Frame", nil, self.detailContent)
             crafterRow:SetSize(380, 18)
-            crafterRow:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 16, yOffset)
+            crafterRow:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 16 + iconOffset, yOffset)
 
             local crafterLabel = crafterRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             crafterLabel:SetPoint("LEFT", crafterRow, "LEFT", 0, 0)
@@ -956,20 +994,15 @@ function UI:ShowSearchResults(results)
                 btnText:SetPoint("CENTER")
                 btnText:SetText("Request Craft")
                 btnText:SetTextColor(0.8, 1, 0.8)
-
                 local capturedCrafterKey = crafter.key
-                local capturedItemName = result.recipeName
+                local capturedItemName   = result.recipeName
                 reqBtn:SetScript("OnClick", function()
                     if GuildCrafts.Comms then
                         GuildCrafts.Comms:SendCraftRequest(capturedCrafterKey, capturedItemName)
                     end
                 end)
-                reqBtn:SetScript("OnEnter", function(self)
-                    self:SetBackdropColor(0.2, 0.5, 0.2, 0.9)
-                end)
-                reqBtn:SetScript("OnLeave", function(self)
-                    self:SetBackdropColor(0.15, 0.4, 0.15, 0.8)
-                end)
+                reqBtn:SetScript("OnEnter", function(self) self:SetBackdropColor(0.2, 0.5, 0.2, 0.9) end)
+                reqBtn:SetScript("OnLeave", function(self) self:SetBackdropColor(0.15, 0.4, 0.15, 0.8) end)
                 self.detailRows[#self.detailRows + 1] = reqBtn
             end
 
@@ -977,15 +1010,15 @@ function UI:ShowSearchResults(results)
             yOffset = yOffset - 18
         end
 
-        -- Reagents
-        if result.reagents and #result.reagents > 0 then
+        -- Reagents (collapsible)
+        if hasReagents and isExpanded then
             local parts = {}
             for _, r in ipairs(result.reagents) do
                 parts[#parts + 1] = r.count .. "x " .. r.name
             end
             local reagentStr = table.concat(parts, ", ")
             local reagentText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            reagentText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 16, yOffset)
+            reagentText:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 16 + iconOffset, yOffset)
             reagentText:SetText("Reagents: " .. reagentStr)
             reagentText:SetTextColor(0.6, 0.8, 1.0)
             reagentText:SetWordWrap(true)
@@ -1245,10 +1278,15 @@ function UI:OnSearch(text)
     if not text or text == "" then
         -- Restore default view
         self._searchActive = false
+        self._lastSearchResults = nil
+        self.expandedRecipes = {}
         self:PopulateProfessionList()
         self:UpdateDetailWelcome()
         return
     end
+
+    -- Clear expand state when starting a fresh search
+    self.expandedRecipes = {}
 
     local scope = self._searchScope or "All"
 
@@ -1314,8 +1352,8 @@ function UI:FilterMemberList(query)
     for _, memberInfo in ipairs(members) do
         local isOnline = GuildCrafts.Data:IsMemberOnline(memberInfo.key)
         local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
-        local label = dot .. memberInfo.key:match("^(.+)-") .. "  |cff888888" .. memberInfo.recipeCount .. " recipes|r"
-        local row = self:CreateLeftRow(self.leftContent, yOffset, label)
+        local label = dot .. memberInfo.key:match("^(.+)-")
+        local row = self:CreateLeftRow(self.leftContent, yOffset, label, memberInfo.recipeCount .. " rec")
         self.leftRows[#self.leftRows + 1] = row
         yOffset = yOffset + 24
     end
@@ -1430,7 +1468,7 @@ function UI:PopulateFavMembers(yOffset)
 
     for _, info in ipairs(members) do
         local dot = info.online and "|cff00ff00O|r " or "|cff666666O|r "
-        local label = dot .. info.key:match("^(.+)-") .. "  |cff888888" .. info.recipeCount .. " recipes|r"
+        local label = dot .. info.key:match("^(.+)-")
         local row = self:CreateLeftRow(self.leftContent, yOffset, label)
         row.memberKey = info.key
 
@@ -1636,13 +1674,16 @@ function UI:UpdateDetailWelcome()
     -- with the correct state to avoid flashing the welcome text.
     if self._refreshing then return end
 
-    -- Hide welcome if: a member is selected, search is active, favorites tab is open,
-    -- OR the recipes view is showing content for a profession.
-    if self._selectedMember or self._searchActive or self._navState == "favorites"
-       or (self._viewMode == "recipes" and self._selectedProfession) then
-        self.detailWelcome:Hide()
-    else
+    -- Only show the welcome message at the true root idle state:
+    -- profession list visible, nothing drilled into, no search active.
+    local atRoot = (self._navState == "professions" or self._navState == nil)
+                   and not self._selectedProfession
+                   and not self._selectedMember
+                   and not self._searchActive
+    if atRoot then
         self.detailWelcome:Show()
+    else
+        self.detailWelcome:Hide()
     end
 end
 
@@ -1651,10 +1692,13 @@ function UI:ShowDetailEmpty(_memberKey, _profName)
     self.detailWelcome:Hide()
 
     local msg = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    msg:SetPoint("CENTER", self.detailPanel, "CENTER", 0, 0)
+    msg:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 0, -80)
+    msg:SetWidth(360)
+    msg:SetWordWrap(true)
     msg:SetText("No recipes synced yet.\nThis member's data will appear after they open\ntheir profession window with the addon installed.")
     msg:SetTextColor(0.5, 0.5, 0.5)
     msg:SetJustifyH("CENTER")
+    self.detailContent:SetHeight(160)
     self.detailRows[#self.detailRows + 1] = msg
 end
 
@@ -1719,10 +1763,12 @@ function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
             row._icon:SetPoint("LEFT", row, "LEFT", 4, 0)
             row._icon:SetTexture(iconPath)
             row._icon:Show()
-            row._label:SetPoint("LEFT", row, "LEFT", 26, 0)
+            row._label:SetPoint("LEFT",  row, "LEFT",  26, 0)
+            row._label:SetPoint("RIGHT", row, "RIGHT", -22, 0)
         else
             if row._icon then row._icon:Hide() end
-            row._label:SetPoint("LEFT", row, "LEFT", 6, 0)
+            row._label:SetPoint("LEFT",  row, "LEFT",  6, 0)
+            row._label:SetPoint("RIGHT", row, "RIGHT", -22, 0)
         end
         -- Update badge
         if badge then
@@ -1782,9 +1828,10 @@ function UI:CreateLeftRow(parent, yOffset, text, badge, iconPath)
         labelAnchorX = 26
     end
 
-    -- Text
+    -- Text (right-anchored to leave room for the star button)
     local label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    label:SetPoint("LEFT", row, "LEFT", labelAnchorX, 0)
+    label:SetPoint("LEFT",  row, "LEFT",  labelAnchorX, 0)
+    label:SetPoint("RIGHT", row, "RIGHT", -22, 0)
     label:SetTextColor(0.9, 0.9, 0.9)
     label:SetText(text)
     row._label = label
@@ -1899,7 +1946,14 @@ function UI:Refresh()
     self._selectedProfession = savedProfession
 
     -- Restore recipe view if in recipe mode
-    if self._viewMode == "recipes" and savedProfession then
+    if savedSearch and self.searchBox then
+        -- Re-run search with current search box text so results reflect any
+        -- guild-sync updates while preserving the search panel state.
+        local text = self.searchBox:GetText()
+        if text and text ~= "" then
+            self:OnSearch(text)
+        end
+    elseif self._viewMode == "recipes" and savedProfession then
         self:ShowRecipesView(savedProfession)
         self:ShowProfessionToggle(savedProfession)
         -- Re-highlight the active profession row in the left panel
@@ -1931,11 +1985,16 @@ function UI:GetRecipeQualityColor(recipeKey)
     if _qualityCache[key] ~= nil then
         return QUALITY_COLORS[_qualityCache[key]] or QUALITY_COLORS[1]
     end
-    -- Query WoW client item cache (may return nil if not loaded yet)
+    -- Query WoW client item cache.
+    -- GetItemInfo returns nil when the item is not yet loaded into the client cache.
+    -- Do NOT store a nil result — leave the cache empty so the next render attempt
+    -- retries the lookup (the client loads items progressively in the background).
     local _, _, q = GetItemInfo(key)
-    local quality = q or 1
-    _qualityCache[key] = quality
-    return QUALITY_COLORS[quality] or QUALITY_COLORS[1]
+    if q then
+        _qualityCache[key] = q
+        return QUALITY_COLORS[q] or QUALITY_COLORS[1]
+    end
+    return QUALITY_COLORS[1]  -- not loaded yet, show white until next render
 end
 
 ----------------------------------------------------------------------
@@ -2096,12 +2155,13 @@ function UI:ShowRecipesView(profName)
 
     if not recipes or #recipes == 0 then
         local msg = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        msg:SetPoint("CENTER", self.detailPanel, "CENTER", 0, 0)
-        msg:SetWidth(360)
+        msg:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 0, -80)
+        msg:SetWidth(self.detailScrollFrame:GetWidth() - 20)
         msg:SetWordWrap(true)
         msg:SetText("No recipes found for " .. profName .. ".\nMembers need to open their profession window\nwhile the addon is active.")
         msg:SetTextColor(0.5, 0.5, 0.5)
         msg:SetJustifyH("CENTER")
+        self.detailContent:SetHeight(160)
         self.detailRows[#self.detailRows + 1] = msg
         return
     end

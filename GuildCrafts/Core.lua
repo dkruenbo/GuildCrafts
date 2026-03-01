@@ -50,10 +50,29 @@ function GuildCrafts:OnEnable()
     self:RegisterEvent("GUILD_ROSTER_UPDATE", "OnGuildRosterUpdate")
     -- Enchanting in Classic TBC uses CRAFT_SHOW, not TRADE_SKILL_SHOW
     self:RegisterEvent("CRAFT_SHOW", "OnCraftShow")
+    -- Fired when the client loads an item into memory (e.g. after GetItemInfo)
+    -- Used to retry quality-color lookups that returned nil on first render
+    self:RegisterEvent("GET_ITEM_INFO_RECEIVED", "OnItemInfoReceived")
 end
 
 function GuildCrafts:OnDisable()
     -- Called if the addon is disabled (rarely used).
+end
+
+--- Fired when the WoW client loads an item into its local cache.
+--- Quality colors use GetItemInfo and may return nil on first render if the item
+--- is not yet cached — this event is our signal to re-render with real colors.
+function GuildCrafts:OnItemInfoReceived()
+    -- Debounce: cancel any pending refresh and reschedule 0.5s later.
+    -- This collapses a burst of item loads into a single refresh.
+    if self._itemInfoRefreshTimer then
+        self:CancelTimer(self._itemInfoRefreshTimer)
+        self._itemInfoRefreshTimer = nil
+    end
+    self._itemInfoRefreshTimer = self:ScheduleTimer(function()
+        self._itemInfoRefreshTimer = nil
+        GuildCrafts.UI:Refresh()
+    end, 0.5)
 end
 
 ----------------------------------------------------------------------
