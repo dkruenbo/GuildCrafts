@@ -34,6 +34,8 @@
 
 - **Expand icons on non-TBC fonts**: Unicode arrow characters (`►`/`▼`) are not present in all TBC client fonts and were rendering as rectangles. Replaced with ASCII `+`/`-`.
 
+- **Hunter pet abilities tracked as Enchanting recipes**: In Classic TBC, `CRAFT_SHOW` fires for both the Enchanting window and the Beast Training (hunter pet) window. `ScanCraft` was unconditionally assigning all scanned entries to "Enchanting", causing pet abilities (Claw, Dash, Dive, etc.) to appear as Enchanting recipes for hunter characters. Fixed by (1) checking that the player has the Enchanting skill line before scanning and aborting early if not, and (2) skipping any entry whose `craftType == "ability"` as a secondary guard for the Enchanter+Hunter edge case. The same `craftType` guard was applied to `ScanCraftCooldowns`.
+
 ## 1.1.0 — 2026-02-27
 
 ### Features
