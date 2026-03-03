@@ -570,7 +570,7 @@ function Data:ScanCraftCooldowns(profName, numCrafts)
 
     for i = 1, numCrafts do
         local craftName, _, craftType = GetCraftInfo(i)
-        if craftType ~= "header" and craftName then
+        if craftType ~= "header" and craftType ~= "ability" and craftName then
             local cdRemaining = GetCraftCooldown(i)
             if cdRemaining and cdRemaining > 0 then
                 cooldowns[craftName] = {
@@ -819,6 +819,21 @@ function Data:ScanCraft()
         return
     end
 
+    -- Guard: CRAFT_SHOW fires for both Enchanting and Beast Training (hunter pet)
+    -- windows in Classic TBC. Only scan when the player actually has Enchanting.
+    local hasEnchanting = false
+    for i = 1, GetNumSkillLines() do
+        local skillName, isHeader = GetSkillLineInfo(i)
+        if not isHeader and skillName == "Enchanting" then
+            hasEnchanting = true
+            break
+        end
+    end
+    if not hasEnchanting then
+        GuildCrafts:Debug("CRAFT_SHOW fired but player has no Enchanting skill — skipping scan (likely Beast Training).")
+        return
+    end
+
     local profName = "Enchanting"
     local playerKey = self:GetPlayerKey()
     local entry = self:GetMemberEntry(playerKey, true)
@@ -862,7 +877,9 @@ function Data:ScanCraft()
         local craftName, _, craftType = GetCraftInfo(i)
         if craftType == "header" then
             currentCategory = craftName
-        elseif craftName then
+        elseif craftName and craftType ~= "ability" then
+            -- Skip "ability" type entries (hunter pet abilities) as a secondary
+            -- guard in case an Enchanter+Hunter opens the Beast Training window.
             local recipeKey = self:GetCraftRecipeKey(i)
             if recipeKey then
                 -- Store/update reagents + category in shared RecipeDB
