@@ -67,7 +67,9 @@ SYNC DOT (top-right corner)
   Green  = fully synced
   Yellow = sync in progress
   Red    = no connection / alone
-  Hover for details (last sync time, DR identity, user count).
+  Hover for details (DR identity, online addon user count).
+  The count shows only guild members currently online who have
+  the addon — logged-off users are not included.
 
 CRAFT QUEUE BAR (bottom)
   Shows pending craft requests you have accepted.
@@ -144,7 +146,10 @@ You don't need to do anything — this all happens automatically.
 
   1. LOGIN
      Your addon says "hello" to the guild and requests any
-     recipe data you're missing.
+     recipe data you're missing. About 15 seconds after login,
+     a second discovery sweep is broadcast so any addon users
+     whose reply was delayed (e.g. by WoW's message throttle)
+     are found and added to the peer list.
 
   2. COORDINATOR (DR)
      One addon user is automatically elected as the Designated
@@ -170,6 +175,8 @@ You don't need to do anything — this all happens automatically.
      Sync data is split into small batches (10 members per
      message) so it never overwhelms WoW's message system,
      even with hundreds of guild members.
+     Discovery replies also use a small random delay to prevent
+     many clients replying at the exact same moment.
 
 The more guildies who install it, the more complete the
 guild-wide recipe book becomes.
