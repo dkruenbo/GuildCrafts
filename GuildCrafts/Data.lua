@@ -270,7 +270,89 @@ function Data:GetGuildDB()
     if not self.db.global[guildKey] then
         self.db.global[guildKey] = {}
     end
+
+    -- One-time cleanup: merge/rename keys stored without realm suffix.
+    -- Requires realm name, which is only guaranteed available after login.
+    if not self._realmlessMerged then
+        self:MergeRealmlessKeys(self.db.global[guildKey])
+        self._realmlessMerged = true
+    end
+
     return self.db.global[guildKey]
+end
+
+--- One-time cleanup: find member keys stored without a realm suffix
+--- (e.g. "Betadrul") and merge them into the canonical "Name-Realm" entry.
+--- If the canonical entry is newer, the realmless entry is simply deleted.
+--- If the canonical entry is absent, the realmless entry is renamed.
+function Data:MergeRealmlessKeys(gdb)
+    if not gdb then return end
+    local realm = GetRealmName()
+    if not realm or realm == "" then return end
+
+    local renamed  = 0
+    local merged   = 0
+
+    -- Collect realmless keys first to avoid mutating the table mid-iteration.
+    local realmless = {}
+    for key, entry in pairs(gdb) do
+        if type(entry) == "table" and entry.lastUpdate and not key:find("-") then
+            realmless[#realmless + 1] = key
+        end
+    end
+
+    for _, key in ipairs(realmless) do
+        local entry      = gdb[key]
+        local canonical  = key .. "-" .. realm
+        local existing   = gdb[canonical]
+
+        if not existing then
+            -- No canonical entry — rename in-place
+            gdb[canonical] = entry
+            gdb[key]       = nil
+            renamed = renamed + 1
+            GuildCrafts:Debug("Renamed realmless key", key, "→", canonical)
+        else
+            -- Both exist — keep the one with the more recent lastUpdate,
+            -- merging any professions the winner is missing from the loser.
+            local keepExisting = (existing.lastUpdate or 0) >= (entry.lastUpdate or 0)
+            local winner = keepExisting and existing or entry
+            local loser  = keepExisting and entry    or existing
+
+            -- Back-fill professions/recipes present in loser but absent in winner.
+            -- If the profession exists in winner but is empty (e.g. DetectProfessions
+            -- created it with a newer timestamp but no recipes scanned yet), merge
+            -- individual recipes from the loser so no data is lost.
+            for profName, loserProf in pairs(loser.professions or {}) do
+                if not winner.professions then winner.professions = {} end
+                if not winner.professions[profName] then
+                    -- Profession entirely missing from winner — copy whole block
+                    winner.professions[profName] = loserProf
+                else
+                    -- Profession exists in winner — merge individual recipes
+                    local winnerProf = winner.professions[profName]
+                    if not winnerProf.recipes then winnerProf.recipes = {} end
+                    for recipeKey, recipeData in pairs(loserProf.recipes or {}) do
+                        if not winnerProf.recipes[recipeKey] then
+                            winnerProf.recipes[recipeKey] = recipeData
+                        end
+                    end
+                end
+            end
+
+            gdb[canonical] = winner
+            gdb[key]       = nil
+            merged = merged + 1
+            GuildCrafts:Debug("Merged realmless key", key, "into", canonical)
+        end
+    end
+
+    if renamed > 0 then
+        GuildCrafts:Printf("Cleaned up %d member key(s): added missing realm suffix.", renamed)
+    end
+    if merged > 0 then
+        GuildCrafts:Printf("Cleaned up %d duplicate member key(s): merged realmless into realm entry.", merged)
+    end
 end
 
 --- One-time migration: move flat member entries from db.global into
@@ -1528,17 +1610,50 @@ function Data:GetMembersByProfession()
         end
     end
 
+    -- Deduplicate by character name (the part before the "-" realm suffix).
+    -- Legacy entries may have been stored without a realm suffix (e.g. "Betadrul")
+    -- while current entries are always stored with one ("Betadrul-Firemaw").
+    -- Keep the entry with the most-recent lastUpdate; fall back to recipeCount.
+    for pName, list in pairs(result) do
+        local seen    = {}   -- displayName -> index in deduped
+        local deduped = {}
+        for _, info in ipairs(list) do
+            local displayName = info.key:match("^(.+)-") or info.key
+            local idx = seen[displayName]
+            if not idx then
+                deduped[#deduped + 1] = info
+                seen[displayName] = #deduped
+            else
+                local existing = deduped[idx]
+                local existTs  = existing.entry and existing.entry.lastUpdate or 0
+                local newTs    = info.entry    and info.entry.lastUpdate    or 0
+                if newTs > existTs
+                        or (newTs == existTs and info.recipeCount > existing.recipeCount) then
+                    deduped[idx] = info
+                end
+            end
+        end
+        result[pName] = deduped
+    end
+
     return result
 end
 
 --- Get the count of members who have a given profession.
+--- Deduplicates by character name so legacy no-realm-suffix entries
+--- do not inflate the count.
 function Data:GetProfessionMemberCount(profName)
     local gdb = self:GetGuildDB()
     if not gdb then return 0 end
+    local seen = {}
     local count = 0
-    for _, entry in pairs(gdb) do
+    for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.professions and entry.professions[profName] then
-            count = count + 1
+            local displayName = memberKey:match("^(.+)-") or memberKey
+            if not seen[displayName] then
+                seen[displayName] = true
+                count = count + 1
+            end
         end
     end
     return count
@@ -1573,6 +1688,21 @@ function Data:GetAllRecipesForProfession(profName)
                 end
             end
         end
+    end
+    -- Deduplicate crafters per recipe by display name so a member who appears
+    -- under two different DB keys (e.g. legacy no-realm-suffix entry + current entry)
+    -- is only listed once per recipe.
+    for _, recipe in pairs(recipeMap) do
+        local seenCrafters   = {}
+        local uniqueCrafters = {}
+        for _, c in ipairs(recipe.crafters) do
+            local displayName = c.key:match("^(.+)-") or c.key
+            if not seenCrafters[displayName] then
+                seenCrafters[displayName] = true
+                uniqueCrafters[#uniqueCrafters + 1] = c
+            end
+        end
+        recipe.crafters = uniqueCrafters
     end
     local results = {}
     for _, recipe in pairs(recipeMap) do
@@ -1620,6 +1750,21 @@ function Data:SearchRecipes(query)
                 end
             end
         end
+    end
+
+    -- Deduplicate crafters by display name (same fix as GetAllRecipesForProfession;
+    -- prevents double-listing when a legacy no-realm key and a current key coexist)
+    for _, v in pairs(resultMap) do
+        local seenCrafters   = {}
+        local uniqueCrafters = {}
+        for _, c in ipairs(v.crafters) do
+            local displayName = c.key:match("^(.+)-") or c.key
+            if not seenCrafters[displayName] then
+                seenCrafters[displayName] = true
+                uniqueCrafters[#uniqueCrafters + 1] = c
+            end
+        end
+        v.crafters = uniqueCrafters
     end
 
     -- Convert map to sorted list

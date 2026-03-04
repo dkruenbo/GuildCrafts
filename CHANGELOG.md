@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.1.5b — 2026-03-03
+
+### Bug Fixes
+
+- **Duplicate members in profession list with empty recipes**: The same character could appear twice in the member list — once under a legacy key without realm suffix (e.g. `"RandomChar"`) and once under the current canonical form (`"RandomChar-Realmname"`). Clicking the legacy row showed an empty recipe panel. Fixed with a one-time `MergeRealmlessKeys` migration that runs on login: if only the realmless key exists it is renamed in-place; if both exist the newer entry (by `lastUpdate`) wins, any professions unique to the older entry are back-filled, and the duplicate is deleted. As a secondary guard, `GetMembersByProfession`, `GetProfessionMemberCount`, `GetAllRecipesForProfession`, and `SearchRecipes` now deduplicate by character name so stale DB copies never surface in the UI.
+
+- **`MergeRealmlessKeys` back-fill data loss**: If the canonical (`Name-Realm`) entry already contained a profession record (e.g. created by `DetectProfessions` with a newer timestamp but no recipes yet scanned), the back-fill skipped that profession entirely because it already existed in the winner. Any recipes stored in the legacy realmless entry for that profession were silently discarded. Fixed by merging at the individual recipe level: if a profession already exists in the winner, missing recipes from the loser are copied in one by one rather than skipping the whole block.
+
+- **HELLO reply thundering herd**: When a `discover=true` HELLO was broadcast to a large guild, all clients would reply simultaneously, potentially flooding the guild channel. Replies are now sent after a random jitter delay of 0.5–4.0 seconds, spreading the load evenly across the window.
+
+- **Addon user count inaccurate (sync dot tooltip)**: Multiple compounding issues caused the displayed count to be wrong in both directions.
+  - *Too low on login (stuck at 2)*: (a) A race between HELLO broadcast (T+8 s) and the first `SYNC_REQUEST` (T+10 s) meant HELLO replies from other nodes often hadn't arrived yet, causing a false DR self-election and a skipped sync. `RecomputeElection` now schedules a fresh sync whenever a demotion from DR → non-DR is detected. (b) After the correct DR was found, nodes whose HELLO reply was throttled or arrived late stayed invisible. A post-sync `discover` HELLO is now broadcast 5 s after sync completes; all online addon users reply unconditionally, populating the list within ~15 s of login. (c) `SYNC_REQUEST`, `SYNC_RESPONSE`, and `DELTA_UPDATE` messages opportunistically add the sender to `addonUsers` even if their HELLO was never received. (d) `OnGuildRosterUpdate` was evicting users whose `isOnline` flag was momentarily false during the unreliable login window — roster-based eviction removed entirely.
+  - *Too high over time (zombie users)*: Non-DR users are never expired by the DR heartbeat watchdog (only the DR node itself is watched), so logged-off users accumulated in `addonUsers` indefinitely. The table intentionally retains all discovered keys for fast reconnect, but the displayed count and `GetSyncStatus` now use `GetActiveAddonUserCount()`, which cross-checks `addonUsers` against the guild roster `_onlineCache`. Only the local player and roster-confirmed online users are counted.
+
+## 1.1.5a - hunter-pet-abilities-enchanting - 2026-03-03
+
+### Bug Fixes
+
+- **Hunter pet abilities tracked as Enchanting recipes**: In Classic TBC, `CRAFT_SHOW` fires for both the Enchanting window and the Beast Training (hunter pet) window. `ScanCraft` was unconditionally assigning all scanned entries to "Enchanting", causing pet abilities (Claw, Dash, Dive, etc.) to appear as Enchanting recipes for hunter characters. Fixed by (1) checking that the player has the Enchanting skill line before scanning and aborting early if not, and (2) skipping any entry whose `craftType == "ability"` as a secondary guard for the Enchanter+Hunter edge case. The same `craftType` guard was applied to `ScanCraftCooldowns`.
+
 ## 1.1.5 — UI Overhaul — 2026-03-01
 
 ### Features
@@ -33,8 +53,6 @@
 - **Quality color cache poisoning**: `GetItemInfo` results are no longer cached when the item cache returns nil (i.e. before the client has loaded the item). A `GET_ITEM_INFO_RECEIVED` listener triggers a one-time panel refresh when outstanding items load in, resolving recipes that appeared white on first open.
 
 - **Expand icons on non-TBC fonts**: Unicode arrow characters (`►`/`▼`) are not present in all TBC client fonts and were rendering as rectangles. Replaced with ASCII `+`/`-`.
-
-- **Hunter pet abilities tracked as Enchanting recipes**: In Classic TBC, `CRAFT_SHOW` fires for both the Enchanting window and the Beast Training (hunter pet) window. `ScanCraft` was unconditionally assigning all scanned entries to "Enchanting", causing pet abilities (Claw, Dash, Dive, etc.) to appear as Enchanting recipes for hunter characters. Fixed by (1) checking that the player has the Enchanting skill line before scanning and aborting early if not, and (2) skipping any entry whose `craftType == "ability"` as a secondary guard for the Enchanter+Hunter edge case. The same `craftType` guard was applied to `ScanCraftCooldowns`.
 
 ## 1.1.0 — 2026-02-27
 

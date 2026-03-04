@@ -78,6 +78,7 @@ function Comms:OnInitialize()
     self.syncPending       = false
     self.syncRetryCount    = 0
     self.syncTimer         = nil
+    self._postSyncHelloDone = false
 
     -- DR request queue (when we are DR)
     self.syncQueue         = {}
@@ -149,16 +150,25 @@ function Comms:HandleHello(payload, sender)
     self:RecomputeElection()
 
     -- Reply with our own HELLO so the sender discovers us too.
-    -- Only reply to genuinely new users (not replies) to prevent infinite loops.
-    if isNew and not payload.isReply then
+    -- Reply if:
+    --   (a) sender is new to us and didn't send a plain reply (normal discovery), OR
+    --   (b) sender explicitly asked for replies via discover=true (post-sync sweep)
+    -- Always use isReply=true in the response to prevent further cascading.
+    -- Add random jitter (0.5–4.0 s) to avoid a thundering-herd broadcast storm
+    -- when many clients reply to the same HELLO simultaneously.
+    local wantReply = (isNew and not payload.isReply) or (payload.discover and not payload.isReply)
+    if wantReply then
         local playerKey = GuildCrafts.Data:GetPlayerKey()
         if memberKey ~= playerKey then
-            self:SendMessage(MSG_HELLO, {
-                sender  = playerKey,
-                version = GuildCrafts.VERSION,
-                isReply = true,
-            }, "GUILD")
-            GuildCrafts:Debug("Sent HELLO reply to", memberKey)
+            local jitter = 0.5 + math.random() * 3.5  -- 0.5 – 4.0 s
+            self:ScheduleTimer(function()
+                self:SendMessage(MSG_HELLO, {
+                    sender  = playerKey,
+                    version = GuildCrafts.VERSION,
+                    isReply = true,
+                }, "GUILD")
+                GuildCrafts:Debug("Sent HELLO reply to", memberKey)
+            end, jitter)
         end
     end
 
@@ -169,6 +179,34 @@ function Comms:HandleHello(payload, sender)
         self.syncRetryCount = 0
         self:ScheduleTimer("SendSyncRequest", 2)
         GuildCrafts:Debug("Scheduling re-sync after discovering", memberKey)
+    end
+end
+
+----------------------------------------------------------------------
+-- Ensure a node is in addonUsers (called on any inbound message)
+----------------------------------------------------------------------
+
+--- Add or refresh the given key in addonUsers.
+--- Re-elects only when the key is brand new (avoids spurious churn).
+function Comms:TouchAddonUser(key, version)
+    if not key then return end
+    local isNew = not self.addonUsers[key]
+    if isNew then
+        self.addonUsers[key] = {
+            version  = version or 1,
+            lastSeen = time(),
+        }
+        GuildCrafts:Debug("TouchAddonUser: discovered", key)
+        self:RecomputeElection()
+        -- If this demoted us from a false-DR election, RecomputeElection
+        -- already scheduled a sync. If we're still non-DR and haven't synced,
+        -- schedule one now (covers SYNC_REQUEST / SYNC_RESPONSE discovery paths).
+        if self.myRole ~= "DR" and not self.syncPending then
+            self.syncRetryCount = 0
+            self:ScheduleTimer("SendSyncRequest", 2)
+        end
+    else
+        self.addonUsers[key].lastSeen = time()
     end
 end
 
@@ -214,6 +252,15 @@ function Comms:RecomputeElection()
         GuildCrafts:Debug("Role changed:", oldRole, "→", self.myRole,
             "| DR:", self.currentDR or "none",
             "| BDR:", self.currentBDR or "none")
+
+        -- If we were falsely elected DR (only self was known when SendSyncRequest
+        -- fired) and have now been demoted by discovering the real DR, schedule
+        -- a fresh sync so we get the guild data we skipped earlier.
+        if oldRole == "DR" and self.myRole ~= "DR" and not self.syncPending then
+            self.syncRetryCount = 0
+            self:ScheduleTimer("SendSyncRequest", 2)
+            GuildCrafts:Debug("Was false-DR, now demoted — scheduling sync with real DR")
+        end
     end
 
     -- Always ensure DR watchdog is running if we're not DR
@@ -307,42 +354,11 @@ end
 ----------------------------------------------------------------------
 
 function Comms:OnGuildRosterUpdate()
-    if not IsInGuild() then return end
-
-    -- Build set of online guild members
-    local onlineMembers = {}
-    local numMembers = GetNumGuildMembers()
-
-    -- Safety: if roster hasn't fully loaded yet, skip the offline check.
-    -- On login the first GUILD_ROSTER_UPDATE can fire with 0 members.
-    if numMembers < 2 then
-        GuildCrafts:Debug("OnGuildRosterUpdate skipped — roster not ready yet (", numMembers, "members)")
-        return
-    end
-
-    for i = 1, numMembers do
-        local name, _, _, _, _, _, _, _, isOnline = GetGuildRosterInfo(i)
-        if name and isOnline then
-            if not name:find("-") then
-                name = name .. "-" .. GetRealmName()
-            end
-            onlineMembers[name] = true
-        end
-    end
-
-    -- Remove addon users who went offline
-    local changed = false
-    for key, _ in pairs(self.addonUsers) do
-        if not onlineMembers[key] then
-            GuildCrafts:Debug("Addon user offline:", key)
-            self.addonUsers[key] = nil
-            changed = true
-        end
-    end
-
-    if changed then
-        self:RecomputeElection()
-    end
+    -- Online-status cache is already rebuilt by Core.lua before this is called.
+    -- Addon user expiry is handled solely by the DR heartbeat watchdog (180 s),
+    -- which is reliable. Roster-based eviction was removed because
+    -- GetGuildRosterInfo isOnline flags are unreliable at login and cause
+    -- valid addon users to be prematurely evicted.
 end
 
 ----------------------------------------------------------------------
@@ -419,6 +435,9 @@ function Comms:HandleSyncRequest(payload, sender)
 
     -- Don't respond to our own requests
     if requester == playerKey then return end
+
+    -- Any SYNC_REQUEST proves the sender is online with the addon.
+    self:TouchAddonUser(requester)
 
     -- Decide whether we should respond based on role and retry count
     local shouldRespond = false
@@ -540,6 +559,9 @@ end
 function Comms:HandleSyncResponse(payload, sender)
     if not payload.data then return end
 
+    -- The node that responded is definitely online with the addon.
+    self:TouchAddonUser(sender)
+
     local merged = GuildCrafts.Data:MergeIncoming(payload.data)
     GuildCrafts:Debug("Received SYNC_RESPONSE chunk", (payload.chunkIndex or 1),
         "/", (payload.chunkTotal or 1), "from", sender, "— merged:", tostring(merged))
@@ -566,6 +588,26 @@ function Comms:HandleSyncResponse(payload, sender)
     if GuildCrafts.UI and GuildCrafts.UI.Refresh then
         GuildCrafts.UI:Refresh()
     end
+
+    -- Broadcast a second HELLO so nodes whose reply was throttled or
+    -- arrived too late (before we knew the real DR) get a chance to
+    -- add themselves to our addonUsers table and vice-versa.
+    -- Use isReply=true so this doesn't trigger yet another round of replies.
+    if not self._postSyncHelloDone then
+        self._postSyncHelloDone = true
+        self:ScheduleTimer("BroadcastPostSyncHello", 5)
+    end
+end
+
+function Comms:BroadcastPostSyncHello()
+    if not IsInGuild() then return end
+    local playerKey = GuildCrafts.Data:GetPlayerKey()
+    self:SendMessage(MSG_HELLO, {
+        sender   = playerKey,
+        version  = GuildCrafts.VERSION,
+        discover = true,  -- tells all nodes to reply even if they know us already
+    }, "GUILD")
+    GuildCrafts:Debug("Sent post-sync HELLO to gather missed addon users")
 end
 
 ----------------------------------------------------------------------
@@ -657,6 +699,9 @@ function Comms:HandleDeltaUpdate(payload, sender)
     local playerKey = GuildCrafts.Data:GetPlayerKey()
     -- Don't process our own deltas
     if payload.member == playerKey then return end
+
+    -- Seeing a DELTA_UPDATE proves sender is online with the addon.
+    self:TouchAddonUser(sender)
 
     if payload.type == "add" and payload.profession and payload.recipes then
         -- Merge each recipe
@@ -985,15 +1030,30 @@ function Comms:GetAddonUsers()
     return self.addonUsers
 end
 
+--- Get count of addon users who are currently online according to the guild
+--- roster cache. This filters out zombie entries (users who logged off but
+--- haven't yet timed out of addonUsers via the heartbeat watchdog).
+function Comms:GetActiveAddonUserCount()
+    local count = 0
+    local onlineCache = GuildCrafts.Data and GuildCrafts.Data._onlineCache
+    for key, _ in pairs(self.addonUsers) do
+        -- Always count ourselves (we're online by definition)
+        -- and count anyone the roster cache confirms as online.
+        if key == GuildCrafts.Data:GetPlayerKey()
+           or (onlineCache and onlineCache[key]) then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 --- Get sync status for UI indicator.
 --- Returns "synced", "syncing", or "disconnected"
 function Comms:GetSyncStatus()
     if self.syncPending then
         return "syncing"
     end
-    local count = 0
-    for _ in pairs(self.addonUsers) do count = count + 1 end
-    if count <= 1 then
+    if self:GetActiveAddonUserCount() <= 1 then
         return "disconnected"
     end
     return "synced"

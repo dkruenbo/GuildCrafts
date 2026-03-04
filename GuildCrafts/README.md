@@ -58,10 +58,11 @@ Alchemy · Blacksmithing · Enchanting · Engineering · Jewelcrafting · Leathe
 ## How It Works
 
 1. **Open any profession window** — the addon scans all recipes and stores them locally
-2. **On login** — the addon broadcasts a `HELLO` to discover other addon users, then performs a sync
+2. **On login** — the addon broadcasts a `HELLO` to discover other addon users, then performs a sync. A second `discover` HELLO is sent ~15 s after sync completes so nodes whose first reply was throttled are still found
 3. **Designated Router (DR)** — the addon user with the lexicographically lowest character name handles sync requests, preventing channel flooding in large guilds
 4. **Delta updates** — learning a new recipe immediately broadcasts it to all online addon users
 5. **Browse & search** — use the two-panel UI to browse by profession → member → recipes, or search globally
+6. **Sync dot** — the top-right indicator shows green (synced), yellow (syncing), or red (alone). Hover to see the DR name and count of online addon users confirmed by the guild roster
 
 ## Requirements
 

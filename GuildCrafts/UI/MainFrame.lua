@@ -152,10 +152,7 @@ function UI:CreateTitleBar(parent)
         GameTooltip:AddLine("Sync Status", 1, 1, 1)
         local status = GuildCrafts.Comms and GuildCrafts.Comms:GetSyncStatus() or "unknown"
         local dr = GuildCrafts.Comms and GuildCrafts.Comms.currentDR or "none"
-        local users = 0
-        if GuildCrafts.Comms and GuildCrafts.Comms.addonUsers then
-            for _ in pairs(GuildCrafts.Comms.addonUsers) do users = users + 1 end
-        end
+        local users = GuildCrafts.Comms and GuildCrafts.Comms:GetActiveAddonUserCount() or 0
         GameTooltip:AddDoubleLine("Status:", status, 0.7, 0.7, 0.7, 1, 1, 1)
         GameTooltip:AddDoubleLine("DR:", dr, 0.7, 0.7, 0.7, 1, 1, 1)
         GameTooltip:AddDoubleLine("Addon users:", tostring(users), 0.7, 0.7, 0.7, 1, 1, 1)
