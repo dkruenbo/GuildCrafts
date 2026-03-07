@@ -51,8 +51,19 @@ function Tooltip:RebuildIndex()
                             indexByID[recipeKey][#indexByID[recipeKey] + 1] = crafterEntry
                         end
 
-                        -- Index by recipe name (fallback for enchants / name matching)
-                        if recipeData.name then
+                        -- Index by recipe name in the *viewer's* locale so that
+                        -- GetItemInfo(hoveredItem) matches even when the recipe
+                        -- was scanned by a different-language client.
+                        local localName = GuildCrafts.Data:GetLocalizedRecipeName(recipeKey, recipeData.name)
+                        if localName then
+                            if not indexByName[localName] then
+                                indexByName[localName] = {}
+                            end
+                            indexByName[localName][#indexByName[localName] + 1] = crafterEntry
+                        end
+                        -- Also index the stored (possibly foreign-locale) name as
+                        -- a fallback for uncached items.
+                        if recipeData.name and recipeData.name ~= localName then
                             if not indexByName[recipeData.name] then
                                 indexByName[recipeData.name] = {}
                             end

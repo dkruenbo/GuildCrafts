@@ -99,7 +99,7 @@ function Favorites:GetFavoriteRecipesGrouped()
                             if not recipeMap[recipeKey] then
                                 recipeMap[recipeKey] = {
                                     recipeKey = recipeKey,
-                                    recipeName = recipeData.name or "Unknown",
+                                    recipeName = GuildCrafts.Data:GetLocalizedRecipeName(recipeKey, recipeData.name),
                                     profName = profName,
                                     category = recipeData.category or GuildCrafts.Data:GetRecipeCategory(recipeKey) or "",
                                     reagents = recipeData.reagents or GuildCrafts.Data:GetRecipeReagents(recipeKey),

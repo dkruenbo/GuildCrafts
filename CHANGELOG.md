@@ -9,6 +9,8 @@
   - **Display names localised to the viewer**: Two new helpers — `GetLocalizedRecipeName(recipeKey)` and `GetLocalizedReagentName(reagent)` — resolve item and spell names via `GetItemInfo`/`GetSpellInfo` for the *viewing* client's locale. A recipe scanned in French now displays in English (or any other locale) for every guild member who views it.
   - **Locale-independent search deduplication**: `SearchRecipes` now keys its result map by `recipeKey|profName` (numeric, locale-independent) rather than the stored recipe name string, so the same recipe scanned in two different languages produces a single combined result entry. Search also matches against both the locally-resolved name and the raw stored name for cross-locale discoverability.
   - All five reagent display sites in the UI updated to use `GetLocalizedReagentName`.
+  - **Tooltip crafter overlay**: The reverse-lookup name index now resolves recipe names in the viewer's locale via `GetLocalizedRecipeName`, so hovering an item correctly shows guild crafters even when the recipe was scanned by a different-language client.
+  - **Favorites tab**: Recipe names on the favorites screen are now localised instead of showing the raw stored (possibly foreign-language) name.
 
 ## 1.1.5b — 2026-03-03
 
