@@ -735,7 +735,7 @@ function UI:ShowMemberRecipes(memberKey, profName)
     for key, data in pairs(recipes) do
         sorted[#sorted + 1] = {
             key = key,
-            name = data.name or "Unknown",
+            name = GuildCrafts.Data:GetLocalizedRecipeName(key, data.name),
             source = data.source or "",
             reagents = data.reagents or GuildCrafts.Data:GetRecipeReagents(key),
             category = data.category or GuildCrafts.Data:GetRecipeCategory(key) or "",
@@ -860,7 +860,7 @@ function UI:ShowMemberRecipes(memberKey, profName)
             for _, r in ipairs(recipe.reagents) do
                 local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                 reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 32, yOffset - 14)
-                reagentLine:SetText(r.count .. "x " .. r.name)
+                reagentLine:SetText(r.count .. "x " .. GuildCrafts.Data:GetLocalizedReagentName(r))
                 reagentLine:SetTextColor(0.6, 0.8, 1.0)
                 self.detailRows[#self.detailRows + 1] = reagentLine
                 yOffset = yOffset - 14
@@ -1021,7 +1021,7 @@ function UI:ShowSearchResults(results)
                 for _, r in ipairs(result.reagents) do
                     local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                     reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 36, yOffset)
-                    reagentLine:SetText(r.count .. "x " .. r.name)
+                    reagentLine:SetText(r.count .. "x " .. GuildCrafts.Data:GetLocalizedReagentName(r))
                     reagentLine:SetTextColor(0.6, 0.8, 1.0)
                     self.detailRows[#self.detailRows + 1] = reagentLine
                     yOffset = yOffset - 14
@@ -1648,7 +1648,7 @@ function UI:ShowFavRecipesDetail(grouped, filterProf)
             if recipe.reagents and #recipe.reagents > 0 then
                 local parts = {}
                 for _, r in ipairs(recipe.reagents) do
-                    parts[#parts + 1] = r.count .. "x " .. r.name
+                    parts[#parts + 1] = r.count .. "x " .. GuildCrafts.Data:GetLocalizedReagentName(r)
                 end
                 local reagentStr = table.concat(parts, ", ")
                 local reagentText = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -2295,7 +2295,7 @@ function UI:ShowRecipesView(profName)
             for _, r in ipairs(recipe.reagents) do
                 local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                 reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 28, yOffset)
-                reagentLine:SetText(r.count .. "x " .. r.name)
+                reagentLine:SetText(r.count .. "x " .. GuildCrafts.Data:GetLocalizedReagentName(r))
                 reagentLine:SetTextColor(0.6, 0.8, 1.0)
                 self.detailRows[#self.detailRows + 1] = reagentLine
                 yOffset = yOffset - 14

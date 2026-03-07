@@ -42,7 +42,7 @@ local tonumber = tonumber
 -- Data staleness threshold (seconds) — 30 days
 local STALE_THRESHOLD = 30 * 24 * 3600
 
--- TBC crafting professions we track
+-- TBC crafting professions we track (canonical English keys)
 local TRACKED_PROFESSIONS = {
     ["Alchemy"] = true,
     ["Blacksmithing"] = true,
@@ -52,6 +52,68 @@ local TRACKED_PROFESSIONS = {
     ["Leatherworking"] = true,
     ["Tailoring"] = true,
 }
+
+----------------------------------------------------------------------
+-- Locale-to-canonical profession name mapping
+-- GetSpellInfo(id) returns the *localised* profession name, which must
+-- match what GetSkillLineInfo / GetTradeSkillLine returns on that client.
+-- Using rank-1 profession spell IDs lets us normalise any locale to the
+-- stable English key used in the DB, TRACKED_PROFESSIONS, etc.
+----------------------------------------------------------------------
+local PROFESSION_SPELL_IDS = {
+    ["Alchemy"]        = 2259,
+    ["Blacksmithing"]  = 2018,
+    ["Enchanting"]     = 7411,
+    ["Engineering"]    = 4036,
+    ["Jewelcrafting"]  = 25229,
+    ["Leatherworking"] = 2108,
+    ["Tailoring"]      = 3908,
+}
+
+-- Populated lazily on first use (GetSpellInfo is not reliable at file-load time)
+local _localeToCanonical = nil
+local function BuildLocaleMap()
+    _localeToCanonical = {}
+    for canonical, spellID in pairs(PROFESSION_SPELL_IDS) do
+        local localizedName = GetSpellInfo(spellID)
+        if localizedName then
+            _localeToCanonical[localizedName] = canonical
+        end
+    end
+end
+
+--- Return the canonical (English) profession name for a possibly-localised input.
+--- Falls back to the input unchanged if the name is already canonical or unknown.
+function Data:GetCanonicalProfName(name)
+    if not _localeToCanonical then BuildLocaleMap() end
+    return _localeToCanonical[name] or name
+end
+
+--- Return the localized recipe name for the viewing client's language.
+--- recipeKey > 0: itemID  → GetItemInfo for the crafted item's name
+--- recipeKey < 0: spellID → GetSpellInfo for the enchant/spell name
+--- Falls back to `fallback` (or "Unknown") when not yet cached.
+function Data:GetLocalizedRecipeName(recipeKey, fallback)
+    if recipeKey and recipeKey > 0 then
+        local name = GetItemInfo(recipeKey)
+        if name then return name end
+    elseif recipeKey and recipeKey < 0 then
+        local name = GetSpellInfo(-recipeKey)
+        if name then return name end
+    end
+    return fallback or "Unknown"
+end
+
+--- Return the localized name for a reagent entry {name, count, itemID}.
+--- Uses GetItemInfo when itemID is available so non-English clients see
+--- their own locale's item names even for recipes scanned in another language.
+function Data:GetLocalizedReagentName(reagent)
+    if reagent.itemID then
+        local name = GetItemInfo(reagent.itemID)
+        if name then return name end
+    end
+    return reagent.name or ""
+end
 
 -- TBC profession specialisations keyed by spellID
 -- Each entry maps to { profession, specName }
@@ -413,13 +475,18 @@ function Data:DetectProfessions()
     if not entry then return end
     local currentProfs = {}
 
-    -- GetSkillLineInfo enumerates all skills including professions
+    -- GetSkillLineInfo enumerates all skills including professions.
+    -- Canonicalize the localized name so non-English clients store the same
+    -- stable English key that TRACKED_PROFESSIONS and the rest of the addon use.
     local skillLevels = {}  -- profName -> { rank, max }
     for i = 1, GetNumSkillLines() do
         local skillName, isHeader, _, skillRank, _, _, skillMaxRank, _, _, _, _, _, _ = GetSkillLineInfo(i)
-        if not isHeader and TRACKED_PROFESSIONS[skillName] then
-            currentProfs[skillName] = true
-            skillLevels[skillName] = { rank = skillRank, max = skillMaxRank }
+        if not isHeader then
+            local canonical = self:GetCanonicalProfName(skillName)
+            if TRACKED_PROFESSIONS[canonical] then
+                currentProfs[canonical] = true
+                skillLevels[canonical] = { rank = skillRank, max = skillMaxRank }
+            end
         end
     end
 
@@ -869,17 +936,18 @@ end
 --- Get the name of the currently open profession window.
 function Data:GetOpenProfessionName()
     -- The first entry in the trade skill list is typically a header with the profession name,
-    -- or we can use GetTradeSkillLine() if available (TBC)
+    -- or we can use GetTradeSkillLine() if available (TBC).
+    -- Always canonicalize so non-English clients return the same stable English key.
     if GetTradeSkillLine then
         local lineName = GetTradeSkillLine()
-        return lineName
+        return lineName and self:GetCanonicalProfName(lineName) or nil
     end
 
     -- Fallback: check first header
     for i = 1, GetNumTradeSkills() do
         local skillName, skillType = GetTradeSkillInfo(i)
         if skillType == "header" then
-            return skillName
+            return self:GetCanonicalProfName(skillName)
         end
     end
 
@@ -903,10 +971,11 @@ function Data:ScanCraft()
 
     -- Guard: CRAFT_SHOW fires for both Enchanting and Beast Training (hunter pet)
     -- windows in Classic TBC. Only scan when the player actually has Enchanting.
+    -- Compare against the canonical name so non-English clients are handled.
     local hasEnchanting = false
     for i = 1, GetNumSkillLines() do
         local skillName, isHeader = GetSkillLineInfo(i)
-        if not isHeader and skillName == "Enchanting" then
+        if not isHeader and self:GetCanonicalProfName(skillName) == "Enchanting" then
             hasEnchanting = true
             break
         end
@@ -927,7 +996,7 @@ function Data:ScanCraft()
     -- Refresh Enchanting skill level while the window is open
     for i = 1, GetNumSkillLines() do
         local skillName, isHeader, _, skillRank, _, _, skillMaxRank = GetSkillLineInfo(i)
-        if not isHeader and skillName == profName then
+        if not isHeader and self:GetCanonicalProfName(skillName) == profName then
             local profDataLocal = entry.professions[profName]
             if profDataLocal.skillLevel ~= skillRank or profDataLocal.maxSkillLevel ~= skillMaxRank then
                 profDataLocal.skillLevel = skillRank
@@ -1675,7 +1744,10 @@ function Data:GetAllRecipesForProfession(profName)
             local profData = entry.professions[profName]
             if profData.recipes then
                 for recipeKey, recipeData in pairs(profData.recipes) do
-                    local name = recipeData.name or "Unknown"
+                    -- Resolve the recipe name in the *viewing* client's locale via
+                    -- GetItemInfo/GetSpellInfo so a recipe scanned in French still
+                    -- shows in English (or German, etc.) for other guild members.
+                    local name = self:GetLocalizedRecipeName(recipeKey, recipeData.name)
                     if not recipeMap[recipeKey] then
                         recipeMap[recipeKey] = {
                             key      = recipeKey,
@@ -1683,6 +1755,11 @@ function Data:GetAllRecipesForProfession(profName)
                             crafters = {},
                             reagents = recipeData.reagents or self:GetRecipeReagents(recipeKey),
                         }
+                    else
+                        -- Update name if we now have a better (locally resolved) one
+                        if name ~= "Unknown" then
+                            recipeMap[recipeKey].name = name
+                        end
                     end
                     recipeMap[recipeKey].crafters[#recipeMap[recipeKey].crafters + 1] = { key = memberKey }
                 end
@@ -1729,17 +1806,35 @@ function Data:SearchRecipes(query)
             for profName, profData in pairs(entry.professions) do
                 if profData.recipes then
                     for recipeKey, recipeData in pairs(profData.recipes) do
-                        if recipeData.name and recipeData.name:lower():find(query, 1, true) then
-                            local mapKey = recipeData.name .. "|" .. profName
+                        -- Always try to resolve the name in the viewing client's locale.
+                        -- Fall back to the stored (possibly foreign-locale) name so that
+                        -- uncached items still appear in results.
+                        local localName = self:GetLocalizedRecipeName(recipeKey, recipeData.name)
+                        local storedName = recipeData.name or ""
+                        -- Match against both the locally-resolved name and the stored name
+                        -- so a French player's "Transmutation: Mercure brut" is still
+                        -- findable by an English player typing "Mercury".
+                        local matchName  = localName ~= "Unknown" and localName or storedName
+                        if matchName:lower():find(query, 1, true)
+                                or (storedName ~= matchName and storedName:lower():find(query, 1, true)) then
+                            -- Use recipeKey+profName as the map key (locale-independent)
+                            -- so the same recipe scanned in two different languages is
+                            -- deduplicated into a single result entry.
+                            local mapKey = tostring(recipeKey) .. "|" .. profName
                             if not resultMap[mapKey] then
                                 resultMap[mapKey] = {
-                                    recipeName = recipeData.name,
+                                    recipeName = localName,
                                     recipeKey = recipeKey,
                                     profName = profName,
                                     source = recipeData.source,
                                     reagents = recipeData.reagents or self:GetRecipeReagents(recipeKey),
                                     crafters = {},
                                 }
+                            else
+                                -- Keep the better (locally resolved) name if available
+                                if localName ~= "Unknown" then
+                                    resultMap[mapKey].recipeName = localName
+                                end
                             end
                             resultMap[mapKey].crafters[#resultMap[mapKey].crafters + 1] = {
                                 key = memberKey,

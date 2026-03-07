@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.6 — Multi-Locale Support — 2026-03-07
+
+### Features
+
+- **Multi-locale guild support** (fixes #8): The addon now works correctly when guild members run different game client languages (English, French, German, etc.).
+  - **Profession scanning**: `GetSkillLineInfo` and `GetTradeSkillLine` return localised profession names ("Alchimie" on a French client). These are now canonicalised to stable English DB keys at scan time using `GetSpellInfo` with each profession's rank-1 spell ID, so a French player's data is stored and shared identically to an English player's.
+  - **Display names localised to the viewer**: Two new helpers — `GetLocalizedRecipeName(recipeKey)` and `GetLocalizedReagentName(reagent)` — resolve item and spell names via `GetItemInfo`/`GetSpellInfo` for the *viewing* client's locale. A recipe scanned in French now displays in English (or any other locale) for every guild member who views it.
+  - **Locale-independent search deduplication**: `SearchRecipes` now keys its result map by `recipeKey|profName` (numeric, locale-independent) rather than the stored recipe name string, so the same recipe scanned in two different languages produces a single combined result entry. Search also matches against both the locally-resolved name and the raw stored name for cross-locale discoverability.
+  - All five reagent display sites in the UI updated to use `GetLocalizedReagentName`.
+
 ## 1.1.5b — 2026-03-03
 
 ### Bug Fixes
