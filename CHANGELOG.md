@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.7 — Guild Chat Integration — 2026-03-08
+
+### Features
+
+- **"Post crafters" button** (`[>]`): Every recipe row in the Recipe-centric view and the Search Results panel now has a small `[>]` button on the right edge. Clicking it posts the crafter list for that recipe to guild chat in the format `[GuildCrafts] Recipe Name: Crafter1 (online), Crafter2 — /gc to browse`. A 30-second per-recipe cooldown prevents accidental spam; the button shows a tooltip on hover.
+
+- **`!gc <query>` guild chat command**: Any guild member can type `!gc <recipe name>` in guild chat and the addon will automatically reply with matching crafters — no addon installation required for the person asking. The Designated Router (DR) responds immediately; if it doesn't, the Backup Designated Router (BDR) posts after 5 seconds, and any other addon user after 12 seconds. The guild chat echo acts as the cross-client deduplication signal, so only one response ever appears. Replies are capped at 3 recipe results to avoid flooding chat. A 30-second per-query cooldown prevents repeat spam. If no crafter is found, the responder replies with a "no crafter found" message.
+
 ## 1.1.6 — Multi-Locale Support — 2026-03-07
 
 ### Features
