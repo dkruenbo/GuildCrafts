@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.7a — Guild Chat Fixes — 2026-03-08
+
+### Bug Fixes
+
+- **`!gc` dedup precision**: Replaced `time()` (integer seconds) with `GetTime()` (sub-second float) for the guild chat echo timestamp and the scheduled-response timestamp. Prevents the BDR from double-posting when the DR responds within the same wall-clock second.
+- **Guild chat message truncation**: `FormatCraftersLine` now builds the crafter list incrementally against a 255-byte budget (accounting for the prefix) instead of fitting as many names as possible without a hard limit.
+- **`!gc` response throttle**: Multi-line `!gc` responses are now staggered 0.5 s apart via `ScheduleTimer` to avoid WoW's "sending messages too quickly" throttle.
+- **Fuzzy search over-matching**: Vowel-stripping fuzzy search now requires a minimum query length of 4 characters before activating, preventing false positives on short consonant patterns.
+- **OTHER-tier storm**: All OTHER-role nodes were scheduled at exactly 12 s, causing all 50+ of them to fire simultaneously if DR and BDR didn't respond. OTHER nodes now add a `math.random(0, 8)` second jitter to their delay so only the first to fire posts, and the rest cancel when they see the guild chat echo.
+- **`!gc` crafter list verbosity**: Crafter lists in `!gc` responses are now capped at 2 names followed by `+X more` to keep messages concise.
+
 ## 1.1.7 — Guild Chat Integration — 2026-03-08
 
 ### Features
