@@ -27,6 +27,8 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Data staleness indicator** — member data older than 30 days is flagged with a red age tag (e.g. "30d ago", "2mo ago")
 - **Profession change detection** — dropping a profession automatically purges stale data
 - **Guild roster pruning** — ex-guild members are cleaned up automatically
+- **Post crafters to guild chat** — every recipe row in the Recipe-centric and Search Results views has a `[>]` button that posts the crafter list for that recipe to guild chat, so members without the addon can see who to ask; a 30-second per-recipe cooldown prevents accidental spam
+- **`!gc <query>` chat command** — any guild member can type `!gc <recipe name>` (or shift-click an item) in guild chat to get a crafter list reply without opening the addon; partial and fuzzy (vowel-tolerant) matching supported; DR responds immediately, BDR after 5 s, any other addon user after 12 s if no response appeared yet
 
 ## Tracked Professions
 

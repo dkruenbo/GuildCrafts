@@ -1005,9 +1005,16 @@ function UI:ShowSearchResults(results)
         end
         local crafterStr = table.concat(cParts, ", ")
         if total > 2 then crafterStr = crafterStr .. " |cff1eff00(+" .. (total - 2) .. ")|r" end
+        -- Post-to-guild-chat button (always right-most)
+        local capturedSearchResult = result
+        local postBtn = self:CreatePostButton(recipeRow, function()
+            GuildCrafts:PostCraftersToGuildChat(capturedSearchResult.recipeName, capturedSearchResult.recipeKey, capturedSearchResult.crafters)
+        end)
+        postBtn:SetPoint("RIGHT", recipeRow, "RIGHT", 0, 0)
+        self.detailRows[#self.detailRows + 1] = postBtn
         local crafterText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        crafterText:SetPoint("RIGHT", recipeRow, "RIGHT", 0, 0)
-        crafterText:SetWidth(170)
+        crafterText:SetPoint("RIGHT", postBtn, "LEFT", -2, 0)
+        crafterText:SetWidth(140)
         crafterText:SetJustifyH("RIGHT")
         crafterText:SetWordWrap(false)
         crafterText:SetText(crafterStr)
@@ -1713,6 +1720,40 @@ end
 -- Star Button Factory
 ----------------------------------------------------------------------
 
+--- Create a small "post to guild chat" button used on recipe rows.
+function UI:CreatePostButton(parent, onClick)
+    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    btn:SetSize(26, 16)
+    btn:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    btn:SetBackdropColor(0.1, 0.1, 0.1, 0)
+    btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 0)
+    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    label:SetPoint("CENTER")
+    label:SetText("|cff666666[>]|r")
+    btn:SetScript("OnEnter", function()
+        btn:SetBackdropColor(0.15, 0.15, 0.15, 0.9)
+        btn:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
+        label:SetText("|cffdddddd[>]|r")
+        GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Post crafters to guild chat", 1, 0.82, 0)
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function()
+        btn:SetBackdropColor(0.1, 0.1, 0.1, 0)
+        btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 0)
+        label:SetText("|cff666666[>]|r")
+        GameTooltip:Hide()
+    end)
+    btn:SetScript("OnClick", function()
+        if onClick then onClick() end
+    end)
+    return btn
+end
+
 function UI:CreateStarButton(parent, size, onClick)
     local btn = CreateFrame("Frame", nil, parent)
     btn:SetSize(size, size)
@@ -2250,9 +2291,17 @@ function UI:ShowRecipesView(profName)
         local crafterStr = table.concat(parts, ", ")
         if total > 2 then crafterStr = crafterStr .. " |cff1eff00(+" .. (total - 2) .. ")|r" end
 
+        -- Post-to-guild-chat button (always right-most)
+        local capturedPostRecipe = recipe
+        local postBtn = self:CreatePostButton(row, function()
+            GuildCrafts:PostCraftersToGuildChat(capturedPostRecipe.name, capturedPostRecipe.key, capturedPostRecipe.crafters)
+        end)
+        postBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        self.detailRows[#self.detailRows + 1] = postBtn
+
         local crafterText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        crafterText:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-        crafterText:SetWidth(175)
+        crafterText:SetPoint("RIGHT", postBtn, "LEFT", -2, 0)
+        crafterText:SetWidth(145)
         crafterText:SetJustifyH("RIGHT")
         crafterText:SetWordWrap(false)
         crafterText:SetText(crafterStr)

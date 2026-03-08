@@ -1791,9 +1791,18 @@ end
 
 --- Search recipes across all members by name substring.
 --- Returns { { recipeName, recipeKey, profName, crafters = { { key, online }, ... } }, ... }
-function Data:SearchRecipes(query)
+--- Strip vowels for fuzzy matching — handles the most common typo class.
+--- "agylity" → "glty", "agility" → "glty"
+local function StripVowels(s)
+    return s:lower():gsub("[aeiouAEIOU]", "")
+end
+
+function Data:SearchRecipes(query, fuzzy)
     if not query or query == "" then return {} end
     query = query:lower()
+    -- Require at least 4 characters for fuzzy (vowel-stripped) matching to avoid
+    -- false positives on very short consonant patterns like "st" matching dozens.
+    local fuzzyQuery = (fuzzy and #query >= 4) and StripVowels(query) or nil
 
     -- Build a map: recipeName → { recipeKey, profName, crafters }
     local resultMap = {}
@@ -1815,8 +1824,10 @@ function Data:SearchRecipes(query)
                         -- so a French player's "Transmutation: Mercure brut" is still
                         -- findable by an English player typing "Mercury".
                         local matchName  = localName ~= "Unknown" and localName or storedName
-                        if matchName:lower():find(query, 1, true)
-                                or (storedName ~= matchName and storedName:lower():find(query, 1, true)) then
+                        local matched = matchName:lower():find(query, 1, true)
+                            or (storedName ~= matchName and storedName:lower():find(query, 1, true))
+                            or (fuzzyQuery and StripVowels(matchName):find(fuzzyQuery, 1, true))
+                        if matched then
                             -- Use recipeKey+profName as the map key (locale-independent)
                             -- so the same recipe scanned in two different languages is
                             -- deduplicated into a single result entry.
