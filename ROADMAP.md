@@ -35,6 +35,12 @@ This document describes planned releases with implementation notes for each item
 | [#44](https://github.com/dkruenbo/GuildCrafts/issues/44) | Recipe-centric view with inline crafter preview | Done in 1.1.5 |
 | [#45](https://github.com/dkruenbo/GuildCrafts/issues/45) | Members/Recipes view toggle for professions | Done in 1.1.5 |
 
+### 1.1.6 — Multi-Locale Support
+
+| Issue | Title | Status |
+|-------|-------|--------|
+| [#8](https://github.com/dkruenbo/GuildCrafts/issues/8) | Locale Support — multi-language guild sync and display | Done in 1.1.6 |
+
 ### 1.1.7a — Guild Chat Integration
 
 | Issue | Title | Status |
@@ -245,20 +251,6 @@ Items in this section are not a committed release. They are candidates — each 
 - Consider coroutine-based generation if the dataset causes frame drops (unlikely for typical guild sizes, but guard it).
 
 **Files:** `Core.lua` (new `/gc export` slash handler), `UI/MainFrame.lua` (export frame), `Data.lua` (new `ExportCSV()` method).
-
----
-
-### [#8] Locale Support
-
-> **What it is:** Make all user-visible strings in the UI and chat messages locale-aware so the addon works correctly for non-English clients.
-
-**Implementation notes:**
-- The profession name normalisation layer (`Data:GetCanonicalProfName()` via `PROFESSION_SPELL_IDS`) already handles localized profession names from `GetSpellInfo`. This is the hardest part of locale support and it's already done.
-- Remaining work: extract all hardcoded English strings in `UI/MainFrame.lua` and `Core.lua` into a `Locale.lua` file using AceLocale-3.0 or a simple `L = {}` table pattern. AceLocale-3.0 is the conventional WoW addon approach.
-- Recipe names are already localized via `Data:GetLocalizedRecipeName()` using `GetItemInfo` / `GetSpellInfo`.
-- The main effort is the UI label strings (~80–100 strings in `MainFrame.lua`).
-
-**Files:** New `GuildCrafts/Locale.lua` (and per-locale files e.g. `Locale-deDE.lua`), `UI/MainFrame.lua` (replace string literals with `L["key"]`), `Core.lua` (same), `GuildCrafts.toc` (new file entries).
 
 ---
 
