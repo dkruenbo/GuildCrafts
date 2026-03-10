@@ -802,15 +802,8 @@ function UI:ShowMemberRecipes(memberKey, profName)
             noReagIcon:SetTextColor(0.35, 0.35, 0.35)
             recipeRow:EnableMouse(true)
             local capturedRowKey = recipe.key
-            recipeRow:SetScript("OnEnter", function()
-                local k = tonumber(capturedRowKey)
-                if k and k > 0 then
-                    GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
-                    GameTooltip:SetHyperlink("item:" .. k)
-                elseif k and k < 0 then
-                    GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
-                    GameTooltip:SetSpellByID(-k)
-                end
+            recipeRow:SetScript("OnEnter", function(self)
+                UI:ShowRecipeTooltip(self, capturedRowKey)
             end)
             recipeRow:SetScript("OnLeave", function() GameTooltip:Hide() end)
         end
@@ -843,16 +836,9 @@ function UI:ShowMemberRecipes(memberKey, profName)
                     UI:ShowMemberRecipes(capturedMemberKey, capturedProfName)
                 end
             end)
-            recipeRow:SetScript("OnEnter", function()
+            recipeRow:SetScript("OnEnter", function(self)
                 if expandIcon then expandIcon:SetTextColor(1, 1, 1) end
-                local k = tonumber(capturedKey)
-                if k and k > 0 then
-                    GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
-                    GameTooltip:SetHyperlink("item:" .. k)
-                elseif k and k < 0 then
-                    GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
-                    GameTooltip:SetSpellByID(-k)
-                end
+                UI:ShowRecipeTooltip(self, capturedKey)
             end)
             recipeRow:SetScript("OnLeave", function()
                 if expandIcon then expandIcon:SetTextColor(0.6, 0.6, 0.6) end
@@ -956,14 +942,7 @@ function UI:ShowSearchResults(results)
         local capturedRecipeKey  = result.recipeKey
         recipeRow:SetScript("OnEnter", function(self)
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(1, 1, 1) end
-            local k = tonumber(capturedRecipeKey)
-            if k and k > 0 then
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetHyperlink("item:" .. k)
-            elseif k and k < 0 then
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetSpellByID(-k)
-            end
+            UI:ShowRecipeTooltip(self, capturedRecipeKey)
         end)
         recipeRow:SetScript("OnLeave", function()
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(0.6, 0.6, 0.6) end
@@ -1644,14 +1623,7 @@ function UI:ShowFavRecipesDetail(grouped, filterProf)
             nameText:SetText(qColor .. recipe.recipeName .. "|r")
             recipeRow:EnableMouse(true)
             recipeRow:SetScript("OnEnter", function(self)
-                local k = tonumber(capturedKey)
-                if k and k > 0 then
-                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetHyperlink("item:" .. k)
-                elseif k and k < 0 then
-                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetSpellByID(-k)
-                end
+                UI:ShowRecipeTooltip(self, capturedKey)
             end)
             recipeRow:SetScript("OnLeave", function() GameTooltip:Hide() end)
             yOffset = yOffset - 18
@@ -2038,6 +2010,42 @@ function UI:Refresh()
 end
 
 ----------------------------------------------------------------------
+-- Recipe Tooltip Helper
+----------------------------------------------------------------------
+
+--- Show the native WoW item or spell tooltip for a recipe key.
+--- Positive key = itemID, negative key = spellID (Enchanting / spell-based).
+function UI:ShowRecipeTooltip(owner, recipeKey)
+    local k = tonumber(recipeKey)
+    if not k then return end
+
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+
+    if k > 0 then
+        GameTooltip:SetHyperlink("item:" .. k)
+        GameTooltip:Show()
+        return
+    end
+
+    if k < 0 then
+        if GameTooltip.SetSpellByID then
+            GameTooltip:SetSpellByID(-k)
+            GameTooltip:Show()
+            return
+        end
+        -- Fallback for clients where SetSpellByID is unavailable
+        local link = GetSpellLink(-k)
+        if link then
+            GameTooltip:SetHyperlink(link)
+            GameTooltip:Show()
+            return
+        end
+    end
+
+    GameTooltip:Hide()
+end
+
+----------------------------------------------------------------------
 -- Quality Color Helper (#38)
 ----------------------------------------------------------------------
 
@@ -2329,14 +2337,7 @@ function UI:ShowRecipesView(profName)
         local capturedRecipeKey  = recipe.key
         row:SetScript("OnEnter", function(self)
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(1, 1, 1) end
-            local k = tonumber(capturedRecipeKey)
-            if k and k > 0 then
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetHyperlink("item:" .. k)
-            elseif k and k < 0 then
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetSpellByID(-k)
-            end
+            UI:ShowRecipeTooltip(self, capturedRecipeKey)
         end)
         row:SetScript("OnLeave", function()
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(0.6, 0.6, 0.6) end
