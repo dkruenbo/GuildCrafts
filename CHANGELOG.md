@@ -2,6 +2,11 @@
 
 ## 1.1.8a — 2026-03-10
 
+### New Features
+
+- **Hover crafter names to see the full list** — hovering the crafter text (right side of a recipe row) in Search results and Recipes view shows a tooltip with all crafters and their online status
+- **Hover a reagent to see its tooltip** — expanding a recipe and hovering any reagent line shows the native WoW item tooltip
+
 ### Fixes
 
 - Tooltip hit zone is now scoped to the recipe name only — hovering the crafter list, expand icon, or post button no longer triggers the item tooltip
