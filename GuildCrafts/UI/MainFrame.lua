@@ -800,12 +800,6 @@ function UI:ShowMemberRecipes(memberKey, profName)
             noReagIcon:SetWidth(14)
             noReagIcon:SetText("~")
             noReagIcon:SetTextColor(0.35, 0.35, 0.35)
-            recipeRow:EnableMouse(true)
-            local capturedRowKey = recipe.key
-            recipeRow:SetScript("OnEnter", function(self)
-                UI:ShowRecipeTooltip(self, capturedRowKey)
-            end)
-            recipeRow:SetScript("OnLeave", function() GameTooltip:Hide() end)
         end
 
         -- Star toggle (always offset 16 to align with the icon column)
@@ -824,6 +818,16 @@ function UI:ShowMemberRecipes(memberKey, profName)
         local qColor = self:GetRecipeQualityColor(recipe.key)
         nameText:SetText(qColor .. recipe.name .. "|r")
 
+        -- Name overlay: item/spell tooltip on hover (name area only)
+        local nameHit = CreateFrame("Frame", nil, recipeRow)
+        nameHit:SetPoint("TOPLEFT",     star,      "TOPRIGHT",    2, 0)
+        nameHit:SetPoint("BOTTOMRIGHT", recipeRow, "BOTTOMRIGHT", 0, 0)
+        nameHit:EnableMouse(true)
+        nameHit:SetScript("OnEnter", function(self)
+            UI:ShowRecipeTooltip(self, capturedKey)
+        end)
+        nameHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
         -- Click recipe row to toggle reagents (only when has reagents)
         if hasReagents then
             local capturedMemberKey = memberKey
@@ -836,13 +840,11 @@ function UI:ShowMemberRecipes(memberKey, profName)
                     UI:ShowMemberRecipes(capturedMemberKey, capturedProfName)
                 end
             end)
-            recipeRow:SetScript("OnEnter", function(self)
+            recipeRow:SetScript("OnEnter", function()
                 if expandIcon then expandIcon:SetTextColor(1, 1, 1) end
-                UI:ShowRecipeTooltip(self, capturedKey)
             end)
             recipeRow:SetScript("OnLeave", function()
                 if expandIcon then expandIcon:SetTextColor(0.6, 0.6, 0.6) end
-                GameTooltip:Hide()
             end)
         end
 
@@ -937,16 +939,14 @@ function UI:ShowSearchResults(results)
             noReagIcon:SetTextColor(0.35, 0.35, 0.35)
         end
 
-        -- Shared hover: icon highlight + native item/spell tooltip
+        -- Hover: highlight expand/collapse icon
         local capturedExpandIcon = expandIcon
         local capturedRecipeKey  = result.recipeKey
-        recipeRow:SetScript("OnEnter", function(self)
+        recipeRow:SetScript("OnEnter", function()
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(1, 1, 1) end
-            UI:ShowRecipeTooltip(self, capturedRecipeKey)
         end)
         recipeRow:SetScript("OnLeave", function()
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(0.6, 0.6, 0.6) end
-            GameTooltip:Hide()
         end)
 
         -- Star button (always at 16px offset)
@@ -967,6 +967,16 @@ function UI:ShowSearchResults(results)
         nameText:SetJustifyH("LEFT")
         nameText:SetWordWrap(false)
         nameText:SetText(qColor .. result.recipeName .. "|r  |cff666666(" .. result.profName .. ")|r")
+
+        -- Name overlay: item/spell tooltip on hover (name area only)
+        local nameHit = CreateFrame("Frame", nil, recipeRow)
+        nameHit:SetPoint("TOPLEFT",     star,      "TOPRIGHT",    2,    0)
+        nameHit:SetPoint("BOTTOMRIGHT", recipeRow, "BOTTOMRIGHT", -175, 0)
+        nameHit:EnableMouse(true)
+        nameHit:SetScript("OnEnter", function(self)
+            UI:ShowRecipeTooltip(self, capturedRecipeKey)
+        end)
+        nameHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
         -- Inline crafter preview (right section, max 2 + overflow count)
         table.sort(result.crafters, function(a, b)
@@ -1621,11 +1631,16 @@ function UI:ShowFavRecipesDetail(grouped, filterProf)
             nameText:SetPoint("LEFT", star, "RIGHT", 2, 0)
             local qColor = self:GetRecipeQualityColor(recipe.recipeKey)
             nameText:SetText(qColor .. recipe.recipeName .. "|r")
-            recipeRow:EnableMouse(true)
-            recipeRow:SetScript("OnEnter", function(self)
+
+            -- Name overlay: item/spell tooltip on hover (name area only)
+            local nameHit = CreateFrame("Frame", nil, recipeRow)
+            nameHit:SetPoint("TOPLEFT",     star,      "TOPRIGHT",    2, 0)
+            nameHit:SetPoint("BOTTOMRIGHT", recipeRow, "BOTTOMRIGHT", 0, 0)
+            nameHit:EnableMouse(true)
+            nameHit:SetScript("OnEnter", function(self)
                 UI:ShowRecipeTooltip(self, capturedKey)
             end)
-            recipeRow:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            nameHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
             yOffset = yOffset - 18
 
             -- Crafters list
@@ -2291,6 +2306,17 @@ function UI:ShowRecipesView(profName)
         nameText:SetWordWrap(false)
         nameText:SetText(qColor .. recipe.name .. "|r")
 
+        -- Name overlay: item/spell tooltip on hover (name area only)
+        local capturedNameKey = recipe.key
+        local nameHit = CreateFrame("Frame", nil, row)
+        nameHit:SetPoint("TOPLEFT",     row, "TOPLEFT",     16,   0)
+        nameHit:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -180, 0)
+        nameHit:EnableMouse(true)
+        nameHit:SetScript("OnEnter", function(self)
+            UI:ShowRecipeTooltip(self, capturedNameKey)
+        end)
+        nameHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
         -- Sort crafters: self first, then online, then alphabetical
         table.sort(recipe.crafters, function(a, b)
             local aSelf = (a.key == myKey)
@@ -2332,16 +2358,13 @@ function UI:ShowRecipesView(profName)
         crafterText:SetText(crafterStr)
         crafterText:SetTextColor(0.8, 0.8, 0.8)
 
-        -- Hover: highlight icon + native item/spell tooltip
+        -- Hover: highlight expand/collapse icon
         local capturedExpandIcon = expandIcon
-        local capturedRecipeKey  = recipe.key
-        row:SetScript("OnEnter", function(self)
+        row:SetScript("OnEnter", function()
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(1, 1, 1) end
-            UI:ShowRecipeTooltip(self, capturedRecipeKey)
         end)
         row:SetScript("OnLeave", function()
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(0.6, 0.6, 0.6) end
-            GameTooltip:Hide()
         end)
 
         yOffset = yOffset - 22
