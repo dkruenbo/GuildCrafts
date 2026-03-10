@@ -4,7 +4,12 @@
 
 ### New Features
 
-- **Hover a recipe row to see its tooltip** — hovering any recipe in the Search results, Recipes view, member detail, or Favorites now shows the native WoW item or spell tooltip. Enchanting recipes (spell-based) show the spell tooltip; all other professions show the item tooltip
+- **Hover a recipe name to see its tooltip** — hovering the recipe name in Search results, Recipes view, member detail, or Favorites shows the native WoW item or spell tooltip. Enchanting recipes (spell-based) show the spell tooltip; all other professions show the item tooltip
+
+### Fixes
+
+- Tooltip hit zone is scoped to the recipe name only — hovering the crafter list, expand icon, or post button no longer triggers the item tooltip
+- Fixed potential tooltip flicker when moving the cursor between the recipe name and the rest of the row
 
 ---
 
