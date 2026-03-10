@@ -861,11 +861,25 @@ function UI:ShowMemberRecipes(memberKey, profName)
         -- Reagents (vertical list, only rendered when expanded)
         if hasReagents and isExpanded then
             for _, r in ipairs(recipe.reagents) do
-                local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 32, yOffset - 14)
+                local reagentFrame = CreateFrame("Frame", nil, self.detailContent)
+                reagentFrame:SetSize(300, 14)
+                reagentFrame:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 32, yOffset - 14)
+                reagentFrame:EnableMouse(true)
+                local reagentLine = reagentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                reagentLine:SetAllPoints()
+                reagentLine:SetJustifyH("LEFT")
                 reagentLine:SetText(r.count .. "x " .. GuildCrafts.Data:GetLocalizedReagentName(r))
                 reagentLine:SetTextColor(0.6, 0.8, 1.0)
-                self.detailRows[#self.detailRows + 1] = reagentLine
+                if r.itemID then
+                    local capturedItemID = r.itemID
+                    reagentFrame:SetScript("OnEnter", function(self)
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                        GameTooltip:SetHyperlink("item:" .. capturedItemID)
+                        GameTooltip:Show()
+                    end)
+                    reagentFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                end
+                self.detailRows[#self.detailRows + 1] = reagentFrame
                 yOffset = yOffset - 14
             end
             yOffset = yOffset - 4
@@ -1047,11 +1061,25 @@ function UI:ShowSearchResults(results)
         if isExpanded then
             if hasReagents then
                 for _, r in ipairs(result.reagents) do
-                    local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                    reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 36, yOffset)
+                    local reagentFrame = CreateFrame("Frame", nil, self.detailContent)
+                    reagentFrame:SetSize(300, 14)
+                    reagentFrame:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 36, yOffset)
+                    reagentFrame:EnableMouse(true)
+                    local reagentLine = reagentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                    reagentLine:SetAllPoints()
+                    reagentLine:SetJustifyH("LEFT")
                     reagentLine:SetText(r.count .. "x " .. GuildCrafts.Data:GetLocalizedReagentName(r))
                     reagentLine:SetTextColor(0.6, 0.8, 1.0)
-                    self.detailRows[#self.detailRows + 1] = reagentLine
+                    if r.itemID then
+                        local capturedItemID = r.itemID
+                        reagentFrame:SetScript("OnEnter", function(self)
+                            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                            GameTooltip:SetHyperlink("item:" .. capturedItemID)
+                            GameTooltip:Show()
+                        end)
+                        reagentFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                    end
+                    self.detailRows[#self.detailRows + 1] = reagentFrame
                     yOffset = yOffset - 14
                 end
                 yOffset = yOffset - 2
@@ -2426,11 +2454,25 @@ function UI:ShowRecipesView(profName)
         -- Vertical reagent list (collapsed by default, shown when expanded)
         if hasReagents and isExpanded then
             for _, r in ipairs(recipe.reagents) do
-                local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 28, yOffset)
+                local reagentFrame = CreateFrame("Frame", nil, self.detailContent)
+                reagentFrame:SetSize(300, 14)
+                reagentFrame:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 28, yOffset)
+                reagentFrame:EnableMouse(true)
+                local reagentLine = reagentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                reagentLine:SetAllPoints()
+                reagentLine:SetJustifyH("LEFT")
                 reagentLine:SetText(r.count .. "x " .. GuildCrafts.Data:GetLocalizedReagentName(r))
                 reagentLine:SetTextColor(0.6, 0.8, 1.0)
-                self.detailRows[#self.detailRows + 1] = reagentLine
+                if r.itemID then
+                    local capturedItemID = r.itemID
+                    reagentFrame:SetScript("OnEnter", function(self)
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                        GameTooltip:SetHyperlink("item:" .. capturedItemID)
+                        GameTooltip:Show()
+                    end)
+                    reagentFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                end
+                self.detailRows[#self.detailRows + 1] = reagentFrame
                 yOffset = yOffset - 14
             end
             yOffset = yOffset - 4
