@@ -861,11 +861,25 @@ function UI:ShowMemberRecipes(memberKey, profName)
         -- Reagents (vertical list, only rendered when expanded)
         if hasReagents and isExpanded then
             for _, r in ipairs(recipe.reagents) do
-                local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 32, yOffset - 14)
+                local reagentFrame = CreateFrame("Frame", nil, self.detailContent)
+                reagentFrame:SetSize(300, 14)
+                reagentFrame:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 32, yOffset - 14)
+                reagentFrame:EnableMouse(true)
+                local reagentLine = reagentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                reagentLine:SetAllPoints()
+                reagentLine:SetJustifyH("LEFT")
                 reagentLine:SetText(r.count .. "x " .. GuildCrafts.Data:GetLocalizedReagentName(r))
                 reagentLine:SetTextColor(0.6, 0.8, 1.0)
-                self.detailRows[#self.detailRows + 1] = reagentLine
+                if r.itemID then
+                    local capturedItemID = r.itemID
+                    reagentFrame:SetScript("OnEnter", function(self)
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                        GameTooltip:SetHyperlink("item:" .. capturedItemID)
+                        GameTooltip:Show()
+                    end)
+                    reagentFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                end
+                self.detailRows[#self.detailRows + 1] = reagentFrame
                 yOffset = yOffset - 14
             end
             yOffset = yOffset - 4
@@ -1014,17 +1028,58 @@ function UI:ShowSearchResults(results)
         crafterText:SetText(crafterStr)
         crafterText:SetTextColor(0.8, 0.8, 0.8)
 
+        -- Crafter list tooltip on hover (right side, over crafter text)
+        if total > 0 then
+            local capturedCrafters = result.crafters
+            local capturedMyKey    = myKey
+            local capturedName     = result.recipeName
+            local crafterHit = CreateFrame("Frame", nil, recipeRow)
+            crafterHit:SetPoint("RIGHT", postBtn, "LEFT", -2, 0)
+            crafterHit:SetSize(140, 20)
+            crafterHit:EnableMouse(true)
+            crafterHit:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+                GameTooltip:ClearLines()
+                GameTooltip:AddLine(capturedName, 1, 0.82, 0)
+                GameTooltip:AddLine(" ")
+                for _, c in ipairs(capturedCrafters) do
+                    local cname  = c.key:match("^(.+)-") or c.key
+                    local isSelf = (c.key == capturedMyKey)
+                    local isOn   = GuildCrafts.Data:IsMemberOnline(c.key)
+                    local line   = (isSelf and "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" or "  ") .. cname
+                    if isOn then line = line .. " |cff00ff00(online)|r" end
+                    GameTooltip:AddLine(line, 0.9, 0.9, 0.9)
+                end
+                GameTooltip:Show()
+            end)
+            crafterHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
+
         yOffset = yOffset - 22
 
         -- Expanded section: vertical reagents only (crafters already shown inline on the right)
         if isExpanded then
             if hasReagents then
                 for _, r in ipairs(result.reagents) do
-                    local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                    reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 36, yOffset)
+                    local reagentFrame = CreateFrame("Frame", nil, self.detailContent)
+                    reagentFrame:SetSize(300, 14)
+                    reagentFrame:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 36, yOffset)
+                    reagentFrame:EnableMouse(true)
+                    local reagentLine = reagentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                    reagentLine:SetAllPoints()
+                    reagentLine:SetJustifyH("LEFT")
                     reagentLine:SetText(r.count .. "x " .. GuildCrafts.Data:GetLocalizedReagentName(r))
                     reagentLine:SetTextColor(0.6, 0.8, 1.0)
-                    self.detailRows[#self.detailRows + 1] = reagentLine
+                    if r.itemID then
+                        local capturedItemID = r.itemID
+                        reagentFrame:SetScript("OnEnter", function(self)
+                            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                            GameTooltip:SetHyperlink("item:" .. capturedItemID)
+                            GameTooltip:Show()
+                        end)
+                        reagentFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                    end
+                    self.detailRows[#self.detailRows + 1] = reagentFrame
                     yOffset = yOffset - 14
                 end
                 yOffset = yOffset - 2
@@ -2358,6 +2413,33 @@ function UI:ShowRecipesView(profName)
         crafterText:SetText(crafterStr)
         crafterText:SetTextColor(0.8, 0.8, 0.8)
 
+        -- Crafter list tooltip on hover (right side, over crafter text)
+        if total > 0 then
+            local capturedCrafters = recipe.crafters
+            local capturedMyKey    = myKey
+            local capturedName     = recipe.name
+            local crafterHit = CreateFrame("Frame", nil, row)
+            crafterHit:SetPoint("RIGHT", postBtn, "LEFT", -2, 0)
+            crafterHit:SetSize(145, 20)
+            crafterHit:EnableMouse(true)
+            crafterHit:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+                GameTooltip:ClearLines()
+                GameTooltip:AddLine(capturedName, 1, 0.82, 0)
+                GameTooltip:AddLine(" ")
+                for _, c in ipairs(capturedCrafters) do
+                    local cname  = c.key:match("^(.+)-") or c.key
+                    local isSelf = (c.key == capturedMyKey)
+                    local isOn   = GuildCrafts.Data:IsMemberOnline(c.key)
+                    local line   = (isSelf and "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" or "  ") .. cname
+                    if isOn then line = line .. " |cff00ff00(online)|r" end
+                    GameTooltip:AddLine(line, 0.9, 0.9, 0.9)
+                end
+                GameTooltip:Show()
+            end)
+            crafterHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
+
         -- Hover: highlight expand/collapse icon
         local capturedExpandIcon = expandIcon
         row:SetScript("OnEnter", function()
@@ -2372,11 +2454,25 @@ function UI:ShowRecipesView(profName)
         -- Vertical reagent list (collapsed by default, shown when expanded)
         if hasReagents and isExpanded then
             for _, r in ipairs(recipe.reagents) do
-                local reagentLine = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                reagentLine:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 28, yOffset)
+                local reagentFrame = CreateFrame("Frame", nil, self.detailContent)
+                reagentFrame:SetSize(300, 14)
+                reagentFrame:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 28, yOffset)
+                reagentFrame:EnableMouse(true)
+                local reagentLine = reagentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                reagentLine:SetAllPoints()
+                reagentLine:SetJustifyH("LEFT")
                 reagentLine:SetText(r.count .. "x " .. GuildCrafts.Data:GetLocalizedReagentName(r))
                 reagentLine:SetTextColor(0.6, 0.8, 1.0)
-                self.detailRows[#self.detailRows + 1] = reagentLine
+                if r.itemID then
+                    local capturedItemID = r.itemID
+                    reagentFrame:SetScript("OnEnter", function(self)
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                        GameTooltip:SetHyperlink("item:" .. capturedItemID)
+                        GameTooltip:Show()
+                    end)
+                    reagentFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                end
+                self.detailRows[#self.detailRows + 1] = reagentFrame
                 yOffset = yOffset - 14
             end
             yOffset = yOffset - 4
