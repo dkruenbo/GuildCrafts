@@ -801,10 +801,16 @@ function UI:ShowMemberRecipes(memberKey, profName)
             noReagIcon:SetText("~")
             noReagIcon:SetTextColor(0.35, 0.35, 0.35)
             recipeRow:EnableMouse(true)
+            local capturedRowKey = recipe.key
             recipeRow:SetScript("OnEnter", function()
-                GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
-                GameTooltip:AddLine("Reagents not synced", 0.85, 0.85, 0.55)
-                GameTooltip:Show()
+                local k = tonumber(capturedRowKey)
+                if k and k > 0 then
+                    GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
+                    GameTooltip:SetHyperlink("item:" .. k)
+                elseif k and k < 0 then
+                    GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
+                    GameTooltip:SetSpellByID(-k)
+                end
             end)
             recipeRow:SetScript("OnLeave", function() GameTooltip:Hide() end)
         end
@@ -839,9 +845,18 @@ function UI:ShowMemberRecipes(memberKey, profName)
             end)
             recipeRow:SetScript("OnEnter", function()
                 if expandIcon then expandIcon:SetTextColor(1, 1, 1) end
+                local k = tonumber(capturedKey)
+                if k and k > 0 then
+                    GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
+                    GameTooltip:SetHyperlink("item:" .. k)
+                elseif k and k < 0 then
+                    GameTooltip:SetOwner(recipeRow, "ANCHOR_RIGHT")
+                    GameTooltip:SetSpellByID(-k)
+                end
             end)
             recipeRow:SetScript("OnLeave", function()
                 if expandIcon then expandIcon:SetTextColor(0.6, 0.6, 0.6) end
+                GameTooltip:Hide()
             end)
         end
 
@@ -936,29 +951,19 @@ function UI:ShowSearchResults(results)
             noReagIcon:SetTextColor(0.35, 0.35, 0.35)
         end
 
-        -- Shared hover: icon highlight + tooltip
+        -- Shared hover: icon highlight + native item/spell tooltip
         local capturedExpandIcon = expandIcon
-        local capturedHasReagents = hasReagents
-        local capturedResult = result
+        local capturedRecipeKey  = result.recipeKey
         recipeRow:SetScript("OnEnter", function(self)
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(1, 1, 1) end
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:ClearLines()
-            if capturedHasReagents then
-                GameTooltip:AddLine(capturedResult.recipeName, 1, 0.82, 0)
-                GameTooltip:AddLine(" ")
-                for _, c in ipairs(capturedResult.crafters) do
-                    local cname  = c.key:match("^(.+)-") or c.key
-                    local isSelf = (c.key == myKey)
-                    local isOn   = GuildCrafts.Data:IsMemberOnline(c.key)
-                    local line   = (isSelf and "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" or "  ") .. cname
-                    if isOn then line = line .. " |cff00ff00(online)|r" end
-                    GameTooltip:AddLine(line, 0.9, 0.9, 0.9)
-                end
-            else
-                GameTooltip:AddLine("Reagents not synced", 0.85, 0.85, 0.55)
+            local k = tonumber(capturedRecipeKey)
+            if k and k > 0 then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetHyperlink("item:" .. k)
+            elseif k and k < 0 then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetSpellByID(-k)
             end
-            GameTooltip:Show()
         end)
         recipeRow:SetScript("OnLeave", function()
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(0.6, 0.6, 0.6) end
@@ -1637,6 +1642,18 @@ function UI:ShowFavRecipesDetail(grouped, filterProf)
             nameText:SetPoint("LEFT", star, "RIGHT", 2, 0)
             local qColor = self:GetRecipeQualityColor(recipe.recipeKey)
             nameText:SetText(qColor .. recipe.recipeName .. "|r")
+            recipeRow:EnableMouse(true)
+            recipeRow:SetScript("OnEnter", function(self)
+                local k = tonumber(capturedKey)
+                if k and k > 0 then
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:SetHyperlink("item:" .. k)
+                elseif k and k < 0 then
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:SetSpellByID(-k)
+                end
+            end)
+            recipeRow:SetScript("OnLeave", function() GameTooltip:Hide() end)
             yOffset = yOffset - 18
 
             -- Crafters list
@@ -2307,30 +2324,19 @@ function UI:ShowRecipesView(profName)
         crafterText:SetText(crafterStr)
         crafterText:SetTextColor(0.8, 0.8, 0.8)
 
-        -- Hover: highlight icon + crafter tooltip (or reagents-not-synced message)
+        -- Hover: highlight icon + native item/spell tooltip
         local capturedExpandIcon = expandIcon
-        local capturedRecipe     = recipe
-        local capturedMyKey      = myKey
-        local capturedHasReag    = hasReagents
+        local capturedRecipeKey  = recipe.key
         row:SetScript("OnEnter", function(self)
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(1, 1, 1) end
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:ClearLines()
-            if capturedHasReag then
-                GameTooltip:AddLine(capturedRecipe.name, 1, 0.82, 0)
-                GameTooltip:AddLine(" ")
-                for _, c in ipairs(capturedRecipe.crafters) do
-                    local cname  = c.key:match("^(.+)-") or c.key
-                    local isSelf = (c.key == capturedMyKey)
-                    local isOn   = GuildCrafts.Data:IsMemberOnline(c.key)
-                    local line   = (isSelf and "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" or "  ") .. cname
-                    if isOn then line = line .. " |cff00ff00(online)|r" end
-                    GameTooltip:AddLine(line, 0.9, 0.9, 0.9)
-                end
-            else
-                GameTooltip:AddLine("Reagents not synced", 0.85, 0.85, 0.55)
+            local k = tonumber(capturedRecipeKey)
+            if k and k > 0 then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetHyperlink("item:" .. k)
+            elseif k and k < 0 then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetSpellByID(-k)
             end
-            GameTooltip:Show()
         end)
         row:SetScript("OnLeave", function()
             if capturedExpandIcon then capturedExpandIcon:SetTextColor(0.6, 0.6, 0.6) end
