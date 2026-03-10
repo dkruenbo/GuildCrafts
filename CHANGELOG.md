@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.8 — Recipe Hover Tooltips — 2026-03-10
+
+### New Features
+
+- **Hover a recipe row to see its tooltip** — hovering any recipe in the Search results, Recipes view, member detail, or Favorites now shows the native WoW item or spell tooltip. Enchanting recipes (spell-based) show the spell tooltip; all other professions show the item tooltip
+
+---
+
 ## 1.1.7a — Guild Chat Fixes — 2026-03-08
 
 ### Fixes
