@@ -32,7 +32,7 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 
 ## Tracked Professions
 
-Alchemy · Blacksmithing · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
+Alchemy · Blacksmithing · Cooking · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
 
 ## Installation
 

@@ -159,7 +159,7 @@
     Built for **WoW TBC Anniversary Edition**  
     Interface version **20505**
 
-    Supports all **7 TBC crafting professions**.
+    Supports all **8 TBC crafting professions**.
 
     ---
 

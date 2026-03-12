@@ -2,6 +2,10 @@
 
 ## 1.2.0 — Protocol Correctness — 2026-03-12
 
+### New Features
+
+- **Cooking now tracked** — raid food, utility food, and all Cooking recipes are now included in the guild database, search, and tooltip injection (closes #60)
+
 ### Improvements
 
 - **Term-based DR authority** — the Designated Router now carries a monotone term counter in every message. If a DR is replaced by a new election, any late-arriving messages from the old DR are silently discarded, preventing stale data from overwriting newer guild recipes
