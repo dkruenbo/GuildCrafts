@@ -80,6 +80,10 @@ function Comms:OnInitialize()
     self.syncTimer         = nil
     self._postSyncHelloDone = false
 
+    -- Term: incremented each time this client is promoted to DR.
+    -- Carried in every outgoing message so stale authority can be detected.
+    self.currentTerm = 0
+
     -- DR request queue (when we are DR)
     self.syncQueue         = {}
     self.syncProcessing    = false
@@ -241,6 +245,8 @@ function Comms:RecomputeElection()
     if self.myRole ~= oldRole then
         if self.myRole == "DR" then
             GuildCrafts:Debug("You are now the Designated Router (DR).")
+            self.currentTerm = self.currentTerm + 1
+            GuildCrafts:Debug("DR term advanced to", self.currentTerm)
             self:StartHeartbeat()
         elseif self.myRole == "BDR" then
             GuildCrafts:Debug("You are now the Backup Designated Router (BDR).")
@@ -303,6 +309,26 @@ function Comms:SendHeartbeat()
 end
 
 function Comms:HandleHeartbeat(payload)
+    -- Term enforcement: drop beats from stale DRs; adopt higher authority.
+    if payload.term then
+        if payload.term < self.currentTerm then
+            GuildCrafts:Debug("Dropping stale HEARTBEAT (term", payload.term, "< current", self.currentTerm, ")")
+            return
+        end
+        if payload.term > self.currentTerm then
+            self.currentTerm = payload.term
+            GuildCrafts:Debug("Adopted higher term", self.currentTerm, "from HEARTBEAT")
+            if self.myRole == "DR" then
+                GuildCrafts:Debug("Stepping down as DR — higher-term authority arrived")
+                self:StopHeartbeat()
+                -- Update myRole immediately so we stop acting as DR.
+                -- RecomputeElection() runs again below if the DR is a new node,
+                -- but if the DR was already known that branch is skipped — calling
+                -- it here ensures myRole is always consistent.
+                self:RecomputeElection()
+            end
+        end
+    end
     if payload.dr then
         self.lastDRHeartbeat = time()
         -- Ensure DR is in our user list
@@ -558,6 +584,19 @@ end
 
 function Comms:HandleSyncResponse(payload, sender)
     if not payload.data then return end
+
+    -- Term enforcement: discard sync data from a superseded DR.
+    if payload.term and payload.term < self.currentTerm then
+        GuildCrafts:Debug("Dropping stale SYNC_RESPONSE from", sender,
+            "(term", payload.term, "< current", self.currentTerm, ")")
+        return
+    end
+    -- Adopt a higher term seen in a sync response (DR may have replied
+    -- before we received its first heartbeat).
+    if payload.term and payload.term > self.currentTerm then
+        self.currentTerm = payload.term
+        GuildCrafts:Debug("Adopted higher term", self.currentTerm, "from SYNC_RESPONSE")
+    end
 
     -- The node that responded is definitely online with the addon.
     self:TouchAddonUser(sender)
@@ -850,9 +889,10 @@ end
 --- Serialize, optionally compress, and send a message.
 function Comms:SendMessage(msgType, payload, distribution, target, priority)
     local envelope = {
-        t = msgType,      -- type
-        v = GuildCrafts.VERSION,
-        p = payload,
+        t    = msgType,           -- type
+        v    = GuildCrafts.VERSION,
+        term = self.currentTerm,  -- DR authority term
+        p    = payload,
     }
 
     local serialized = self:Serialize(envelope)
@@ -955,6 +995,9 @@ function Comms:ProcessIncoming(message, _distribution, sender)
     local msgType = envelope.t
     local payload = envelope.p or {}
     local msgVersion = envelope.v or 1
+    -- Inject envelope-level term so handlers can enforce authority without
+    -- each sender needing to embed it redundantly in the payload.
+    payload.term = envelope.term
 
     -- Version compatibility check
     if msgVersion > GuildCrafts.VERSION then

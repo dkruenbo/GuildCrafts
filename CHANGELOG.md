@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.0 — Protocol Correctness — 2026-03-12
+
+### New Features
+
+- **Cooking now tracked** — raid food, utility food, and all Cooking recipes are now included in the guild database, search, and tooltip injection (closes #60)
+
+### Improvements
+
+- **Term-based DR authority** — the Designated Router now carries a monotone term counter in every message. If a DR is replaced by a new election, any late-arriving messages from the old DR are silently discarded, preventing stale data from overwriting newer guild recipes
+- **Immediate step-down** — if a node is currently acting as DR and receives a heartbeat from a higher-term authority, it steps down instantly and triggers a fresh election rather than waiting for the next heartbeat cycle
+
+### Fixes
+
+- Fixed a race where the old DR kept responding to sync requests after being superseded, because `myRole` was not updated until the next heartbeat timeout
+
+---
+
 ## 1.1.8a — 2026-03-10
 
 ### New Features

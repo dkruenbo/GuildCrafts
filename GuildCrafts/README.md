@@ -32,7 +32,7 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 
 ## Tracked Professions
 
-Alchemy · Blacksmithing · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
+Alchemy · Blacksmithing · Cooking · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
 
 ## Installation
 
@@ -65,6 +65,19 @@ Alchemy · Blacksmithing · Enchanting · Engineering · Jewelcrafting · Leathe
 4. **Delta updates** — learning a new recipe immediately broadcasts it to all online addon users
 5. **Browse & search** — use the two-panel UI to browse by profession → member → recipes, or search globally
 6. **Sync dot** — the top-right indicator shows green (synced), yellow (syncing), or red (alone). Hover to see the DR name and count of online addon users confirmed by the guild roster
+
+## Sync Safety Guarantees (since 1.2.0)
+
+GuildCrafts uses a **term-numbered authority model** to keep guild data consistent when the network is unreliable or multiple addon users are online at once.
+
+| Guarantee | Mechanism |
+|---|---|
+| **No split-brain** | A DR election increments a monotone *term counter*. Every outgoing message carries the sender's term. |
+| **Stale DR silenced** | If a HEARTBEAT or SYNC_RESPONSE arrives with a term lower than the receiver's current term, it is silently dropped — stale data can never overwrite fresher data. |
+| **Immediate step-down** | If a non-stale HEARTBEAT arrives with a *higher* term, the local DR immediately stops its heartbeat and yields to the new authority. |
+| **No data loss on partition** | Delta-timestamps ensure that whichever node first wins the DR role after a partition always pulls the most recent recipe from the richer peer before pushing its own view. |
+
+These properties hold even across version-mixed guilds: `term = 0` is treated as "unknown authority" by older clients, which continue to behave as before.
 
 ## Requirements
 
