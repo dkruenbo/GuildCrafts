@@ -50,82 +50,17 @@ This document describes planned releases with implementation notes for each item
 | — | Dedup via `GetTime()` float echo check (sub-second precision) | Done in 1.1.7a |
 | — | OTHER-tier jitter (`math.random(0,8)`) to prevent response storms | Done in 1.1.7a |
 
+### 1.2.0 — Protocol Correctness + Cooking
+
+| Issue | Title | Status |
+|-------|-------|--------|
+| [#47](https://github.com/dkruenbo/GuildCrafts/issues/47) | Term-based authority enforcement (split-brain protection) | Done in 1.2.0 |
+| [#48](https://github.com/dkruenbo/GuildCrafts/issues/48) | Document safety guarantees and convergence properties | Done in 1.2.0 |
+| [#60](https://github.com/dkruenbo/GuildCrafts/issues/60) | Add Cooking profession support | Done in 1.2.0 |
+
 ---
 
 ## Upcoming
-
----
-
-## 1.2.0 — Protocol Correctness
-
-**Theme:** Close formal safety gaps in the sync protocol. Two tightly scoped items — one code change, one documentation pass. No wire-format changes, no merge-logic changes, clean to validate.
-
-**Note:** UX improvements are intentionally held out of this release. See 1.2.1 below.
-
----
-
-### [#47] Term-based authority enforcement (split-brain protection)
-
-> **What it is:** Add a monotonically incrementing `term` counter to the DR election so stale-leader commands are rejected after a DR handover. Without this, a delayed HEARTBEAT from an old DR could be accepted by nodes that have already elected a new one.
-
-**Why now:** The current LWW (last-write-wins) version vector protects *data* integrity but not *authority* integrity. The protocol is empirically stable in a small guild on a reliable network, but the design is formally unsound. This is a clean ~50 line change with high correctness value.
-
-**Implementation:**
-
-1. **State** — Add `self.currentTerm = 0` to `Comms:OnInitialize()`. Keep it **runtime-only** (do not persist to `SavedVariables`). The term resets to `0` on every login and the first DR promotion bumps it to `1`. This is sufficient to reject a delayed stale-leader message within the same session. Persistence would only add value for reload/rehydration edge cases that have no reported user impact — don't solve a problem you don't have.
-
-2. **DR promotion** — In `RecomputeElection()`, when role changes to `"DR"`, increment `self.currentTerm` before starting the heartbeat:
-   ```lua
-   if self.myRole == "DR" then
-       self.currentTerm = self.currentTerm + 1
-       self:StartHeartbeat()
-   end
-   ```
-
-3. **HEARTBEAT payload** — Add `term = self.currentTerm` to `SendHeartbeat()`.
-
-4. **SYNC_RESPONSE payload** — Add `term = self.currentTerm` to the envelope in `ProcessSyncRequest()`.
-
-5. **Inbound checks** — In `HandleHeartbeat()` and `HandleSyncResponse()`, gate on term:
-   ```lua
-   if msg.term < self.currentTerm then return end  -- reject stale
-   if msg.term > self.currentTerm then
-       self.currentTerm = msg.term
-       -- step down if we thought we were DR
-       if self.myRole == "DR" then
-           self.myRole = "OTHER"
-           self:StopHeartbeat()
-       end
-   end
-   ```
-
-6. **Migration** — Existing installs with no stored term default to `0`. First real DR promotion bumps it to `1`, which is higher than any stale-DR `0` message. No special migration code needed.
-
-7. **Backward compat** — Old clients (v1.1.x) send no `term` field. Treat missing term as `0`, which will always be ≤ `currentTerm` after first election. Harmless.
-
-**Files:** `Comms.lua` (~50 lines), `Core.lua` (version bump).
-
----
-
-### [#48] Document safety guarantees and convergence properties
-
-> **What it is:** Add a `## Safety Guarantees` section to README.md formally stating what can and cannot happen in the sync protocol — what is prevented, what is eventually consistent, and what the known limitations are.
-
-**Why now:** Pure documentation, no code changes. Write it immediately after #47 lands while the design decisions are fresh.
-
-**Implementation:**
-
-Write a section covering three categories:
-
-- **Safety (what cannot happen):** At most one valid DR per term (once #47 lands). No conflicting per-recipe data for the same `(member, profession, recipeKey)` triple — the version vector's LWW merge is idempotent. No data loss for a successfully ACK'd sync (the requester only marks `syncPending = false` on final chunk receipt).
-
-- **Liveness (what may temporarily happen):** Stale data visible during a network partition (eventual consistency model — all nodes converge when connectivity is restored). Delayed convergence after DR failure — up to `3 × HEARTBEAT_INTERVAL = 180s`. Duplicate HEARTBEAT/SYNC messages are safe — all handlers are idempotent.
-
-- **Convergence (what must eventually happen):** All connected nodes converge to a consistent state via the version vector comparison in `ProcessSyncRequest`. DR/BDR election completes within one roster update. A failed DR is detected and replaced within 180s.
-
-- **Limitations subsection:** No Byzantine fault tolerance (a malicious client can inject false data). Clock-based LWW means data from a client with a misconfigured system clock may incorrectly win or lose merge conflicts. No quorum — DR acts as single source of truth.
-
-**Files:** `README.md` only.
 
 ---
 
