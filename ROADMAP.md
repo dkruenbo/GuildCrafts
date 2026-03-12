@@ -229,7 +229,171 @@ Write a section covering three categories:
 
 ---
 
-> **Exit criterion:** After 1.2.1, GuildCrafts is considered feature-complete for its core use case. Everything below this line is optional and only justified by confirmed user demand or available contributors.
+### Specialisation description tooltip on member rows
+
+> **What it is:** When a member row displays a specialisation tag such as `[Armorsmith]` or `[Transmutation Master]`, hovering anywhere on that row shows a `GameTooltip` with a plain-English explanation of what the specialisation unlocks. Currently the tag is rendered inline and colour-coded but provides no further context — a player who doesn't know what "Dragonscale Leatherworking" entails has no way to find out in-context.
+
+**Why now:** The specialisation label is already detected at login via `DetectSpecialisations()` in `Data.lua` and stored in `profData.specialisation`. The `SPECIALISATION_SPELLS` table has the canonical label per spellID; it just lacks a `description` string. No protocol changes, no new data collection — this is a two-file change with high UX value per line written.
+
+**Implementation:**
+
+1. **Add descriptions to `SPECIALISATION_SPELLS`** — Extend each entry in the table in `Data.lua` with a `description` string:
+   ```lua
+   [28672] = { prof = "Alchemy", spec = "Transmutation Master",
+               description = "Chance to create additional items when performing transmutations." },
+   [9788]  = { prof = "Blacksmithing", spec = "Armorsmith",
+               description = "Unlocks the ability to craft high-end plate armour sets." },
+   -- etc. for all entries
+   ```
+
+2. **Add accessor** — Add `Data:GetSpecialisationDescription(spec)` that iterates `SPECIALISATION_SPELLS` values and returns the `description` for a matching `spec` label (`nil` if not found).
+
+3. **Wire tooltip onto member rows** — In the member profession view in `MainFrame.lua`, where rows with a specialisation tag are rendered, add `OnEnter` / `OnLeave` scripts. The tooltip title reuses the existing light-blue colour (`|cffaaddff` → RGB `0.67, 0.87, 1`) to match the inline tag:
+   ```lua
+   row:SetScript("OnEnter", function(self)
+       if profData and profData.specialisation then
+           local desc = GuildCrafts.Data:GetSpecialisationDescription(profData.specialisation)
+           if desc then
+               GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+               GameTooltip:AddLine(profData.specialisation, 0.67, 0.87, 1)
+               GameTooltip:AddLine(desc, 1, 1, 1, true)
+               GameTooltip:Show()
+           end
+       end
+   end)
+   row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+   ```
+
+4. **Scope** — Only add the tooltip on rows that actually have a `specialisation` set. Rows for members without a spec, or rows in the Favorites or Search views where spec context is absent, get no `OnEnter` script and remain unchanged.
+
+**Files:** `Data.lua` (~25 lines — description strings + accessor), `UI/MainFrame.lua` (~15 lines — `OnEnter`/`OnLeave` on member rows).
+
+---
+
+> **Exit criterion:** After 1.2.1, GuildCrafts is considered feature-complete for its core browsing and coordination use case. 1.2.2 below adds one further user-facing feature before the project is considered stable.
+
+---
+
+## 1.2.2 — Expansion Filter
+
+**Theme:** Let players narrow the recipe browser to Original Classic or The Burning Crusade recipes. Guilds actively progressing through TBC content frequently want to see only TBC-era profession recipes; players focused on original-content crafting (Arcanite transmutes, Classic raid gear sets, etc.) want the reverse. The filter is purely a display layer — it requires one new data file and a small UI control, with zero changes to the sync protocol, merge logic, or database schema.
+
+---
+
+### [#49] Recipe expansion filter (Classic / TBC)
+
+> **What it is:** A pair of toggle buttons in the main window header — `[Classic]` and `[TBC]` — that limit the displayed recipe list to Original Classic recipes, TBC recipes, or both. The expansion tag for each recipe is resolved from a new static lookup table at render time and is never stored in synced data or `SavedVariables`.
+
+**Why now:** As guilds move deeper into TBC, profession windows fill with a mix of original and expansion recipes. Finding a specific TBC crafted item becomes slower as the lists grow. The feature is additive and non-breaking — old clients without the lookup file show all recipes exactly as today, and the new client defaults both toggles to on, so first-run behaviour is identical to the current state.
+
+**Implementation:**
+
+1. **Static expansion lookup table (`RecipeExpansion.lua`)** — Create `GuildCrafts/RecipeExpansion.lua` exposing a single table:
+   ```lua
+   GuildCrafts.RecipeExpansion = {
+       -- Positive keys = itemID (crafted recipes)
+       -- Negative keys = –spellID (enchantments, stored as negative in recipe DB)
+       [2553]  = "ORIG",  -- Elixir of Minor Agility
+       [25804] = "TBC",   -- Fel Strength Elixir
+       -- ... full list populated from guild scan data + WoWHead cross-reference
+   }
+   ```
+   Recipes not present in the table are treated as unknown and always pass the filter — safe default for any recipe added by future patches without a corresponding table update.
+
+2. **Persist filter state** — Add to the `AceDB` `global` defaults in `Data.lua`:
+   ```lua
+   expansionFilter = { ORIG = true, TBC = true },
+   ```
+   Both on by default (show all). Stored in `global` scope, not per-character — expansion preference is a guild-browsing setting, not alt-specific.
+
+3. **UI control** — In `MainFrame.lua`, add two small toggle buttons in the header bar alongside the existing search box and view toggle:
+   - `[Classic]` — toggles `expansionFilter.ORIG`
+   - `[TBC]` — toggles `expansionFilter.TBC`
+
+   Style them with the existing active/inactive visual pattern (highlighted border or background when active). If the user toggles both off, re-enable both automatically — an empty filter set would hide all recipes and is not a useful state.
+
+4. **Filter at render time** — In every recipe-list rendering loop (`ShowRecipesView`, `ShowSearchResults`, `ShowMemberRecipes`), insert a single lookup before adding each recipe row:
+   ```lua
+   local tag = GuildCrafts.RecipeExpansion and GuildCrafts.RecipeExpansion[recipeKey]
+   if tag then
+       local f = GuildCrafts.db.global.expansionFilter
+       if not f[tag] then goto continue end
+   end
+   -- unknown tag: always show
+   ```
+   This is the entirety of the runtime cost — one table lookup per recipe row render. No sorting, no caching, no additional passes.
+
+5. **Optional tooltip label** — Show a dim secondary line in the recipe detail tooltip: `|cff888888Classic|r` or `|cff888888TBC|r`. Skip this if it adds visual noise; the filter buttons already communicate the active state clearly.
+
+6. **`.toc` registration** — Add `RecipeExpansion.lua` to `GuildCrafts.toc` before `UI/MainFrame.lua` so the table is populated before the UI reads it.
+
+**Backward compat:** No wire-format changes. The filter is entirely client-side. Old clients (v1.2.1 and below) without `RecipeExpansion.lua` show all recipes unfiltered, which is identical to their current behaviour. New clients default both toggles on, so the out-of-box experience is also unchanged.
+
+**Files:** `GuildCrafts/RecipeExpansion.lua` (new — lookup table), `UI/MainFrame.lua` (~30 lines — toggle buttons + filter checks in three render loops), `Data.lua` (~5 lines — AceDB default), `GuildCrafts.toc` (1 line).
+
+---
+
+> **Exit criterion:** After 1.2.2, GuildCrafts is considered stable. Future work requires either confirmed user demand or an available contributor willing to own it end-to-end.
+
+---
+
+## 1.2.3 — Craft Request Rework
+
+**Theme:** Replace the disruptive popup-based craft request system with a whisper button that delegates conversation to WoW's own chat. The popup system was opt-out, had no rate limiting, and was used for trolling. This release removes the entire addon-protocol request flow and replaces it with a single `[W]` button per recipe row that pre-fills a whisper — keeping the "ask a crafter" workflow intact while eliminating every abuse vector.
+
+---
+
+### [#50] Replace craft request popup with whisper button
+
+> **What it is:** Remove the `CRAFT_REQUEST / CRAFT_ACCEPT / CRAFT_DECLINE / CRAFT_COMPLETE` addon message protocol, the incoming popup, and the craft queue panel. Add a `[W]` button to every recipe row in the Recipes view and Search Results view. Clicking `[W]` pre-fills the WoW chat input with a whisper to the chosen crafter — including a live item link — without sending it, so the player can review and edit before pressing Enter.
+
+**Why now:** The popup fires on the recipient's screen regardless of what they are doing, is stackable by anyone in the guild, and cannot be rate-limited without significant protocol complexity. Delegating to WoW's native whisper means the recipient can use `/ignore`, Blizzard handles spam, and the addon protocol shrinks rather than grows.
+
+**Implementation:**
+
+1. **Remove addon request protocol** — Delete `MSG_CRAFT_REQUEST`, `MSG_CRAFT_ACCEPT`, `MSG_CRAFT_DECLINE`, `MSG_CRAFT_COMPLETE` from `Comms.lua` along with their send and handle functions (`SendCraftRequest`, `SendCraftAccept`, `SendCraftDecline`, `SendCraftComplete`, `HandleCraftRequest`, `HandleCraftAccept`, `HandleCraftDecline`, `HandleCraftComplete`). The `PREFIX` registration and all other message types are unaffected.
+
+2. **Remove `CraftRequest.lua`** — The entire module (`pendingPopups`, `craftQueue`, persistence, popup display, accept/decline/complete logic) is deleted. Remove it from `GuildCrafts.toc` and remove the `GuildCrafts:NewModule("CraftRequest")` call from `Core.lua`.
+
+3. **Remove popup UI and queue panel** — Delete `UI:ShowCraftRequestPopup()`, `UI:RemovePopup()`, `UI:RefreshCraftQueue()`, and the craft queue section from `MainFrame.lua`. Remove `_activePopups` state.
+
+4. **Add `[W]` button factory** — Add `UI:CreateWhisperButton(parent, crafters, recipeName, recipeKey)` in `MainFrame.lua`, styled identically to the existing `CreatePostButton` (same size, same backdrop, same hover highlight). The label is `|cff666666[W]|r`, brightening to `|cffdddddd[W]|r` on hover. Tooltip on hover reads: *"Whisper a crafter"*.
+
+5. **Single crafter path** — If `#crafters == 1` and `crafters[1].key ~= myKey`, clicking `[W]` calls `OpenWhisper(crafters[1], recipeName, recipeKey)` directly, no picker shown.
+
+6. **Self-only path** — If the only crafter is the player themselves, `[W]` does not render.
+
+7. **Multi-crafter picker** — If `#crafters > 1` (excluding self), clicking `[W]` opens a small dropdown frame anchored `BOTTOMRIGHT` of the button. One row per crafter (self excluded), sorted online-first then alphabetical. Each row is a clickable button showing:
+   ```
+   ● Thrall        (green dot = online, |cff00ff00 ; grey |cff888888 = offline)
+   ```
+   Clicking a row calls `OpenWhisper(crafter, recipeName, recipeKey)` and closes the picker. Clicking anywhere outside the picker (detected via `OnUpdate` world-click check or a full-screen invisible intercept frame) closes it without action.
+
+8. **`OpenWhisper(crafter, recipeName, recipeKey)` helper** — Constructs the pre-filled message and opens chat:
+   ```lua
+   local function OpenWhisper(crafter, recipeName, recipeKey)
+       local name = crafter.key:match("^(.+)-") or crafter.key
+       local link
+       if recipeKey > 0 then
+           link = select(2, GetItemInfo(recipeKey))  -- item link or nil if uncached
+       else
+           link = GetSpellLink(-recipeKey)           -- spell link for enchants
+       end
+       local display = link or recipeName            -- fallback to plain name
+       ChatFrame_OpenChat("/w " .. name .. " Can you craft " .. display .. " for me?")
+   end
+   ```
+   `ChatFrame_OpenChat` pre-populates the chat editbox and focuses it without sending. The player edits freely and presses Enter (or Escape to cancel).
+
+9. **Placement** — `[W]` sits immediately to the left of `[>]` on every recipe row in `ShowSearchResults` and the Recipes-centric view (`ShowRecipesView`). The crafter text label anchors its right edge to `[W]`'s left edge, the same way it currently anchors to `[>]`. No layout changes elsewhere.
+
+**Backward compat:** Old clients (v1.2.2 and below) that send `CRAFT_REQUEST` messages to a v1.2.3 client will have them silently ignored — the prefix is still registered, but the handler is gone. No error, no response. Old clients receive no `CRAFT_ACCEPT` or `CRAFT_DECLINE` back, so their pending popup simply times out. Not ideal but acceptable for a transition period; the changelog should advise guilds to update together.
+
+**Files:** `Comms.lua` (~−80 lines), `CraftRequest.lua` (deleted), `Core.lua` (~5 lines — remove module load), `UI/MainFrame.lua` (~+80 lines for `[W]` button + picker, ~−120 lines removing popup/queue panel), `GuildCrafts.toc` (remove `CraftRequest.lua`).
+
+---
+
+> **Exit criterion:** After 1.2.3, GuildCrafts is considered stable. Future work requires either confirmed user demand or an available contributor willing to own it end-to-end.
 
 ---
 
@@ -306,4 +470,4 @@ Items in this section are not a committed release. They are candidates — each 
 | [#19](https://github.com/dkruenbo/GuildCrafts/issues/19) | Incremental sync: send only changed professions | Premature optimisation. `DELTA_UPDATE` already handles the real-time case; the full-member SYNC_RESPONSE only fires for members who were offline, and LibDeflate already compresses those payloads well. The implementation touches version vector format, merge semantics, `StripSyncFields`, and requires capability negotiation in `HELLO` — meaningful surface area for a problem with no reported user pain. Revisit only if a 50+ member guild reports slow post-login sync or chat throttle hits. Benchmark first. |
 | — | Search result ranking by skill level / online status | Useful QoL but requires ranking model design. |
 | — | Quick-action buttons in search results (Request / Post) | Convenience shortcut. Low complexity, good candidate for a 1.2.x patch after 1.2.0 ships. |
-| — | Cooldown panel: show who has what on cooldown and when it expires | Requires active DR participation to broadcast cooldown state. Design needed before implementation. |
+| — | Cooldown panel: dedicated UI panel showing who has what on cooldown and when it expires | Basic cooldown tracking (Mooncloth, Shadowcloth, Spellcloth, Transmutes) is already implemented and visible in the existing UI. This item is a separate, focused panel — a dedicated view listing all guild cooldowns with expiry countdowns. Requires DR to broadcast cooldown state in real time; design needed before implementation. |
