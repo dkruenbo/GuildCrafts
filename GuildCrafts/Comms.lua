@@ -321,6 +321,11 @@ function Comms:HandleHeartbeat(payload)
             if self.myRole == "DR" then
                 GuildCrafts:Debug("Stepping down as DR — higher-term authority arrived")
                 self:StopHeartbeat()
+                -- Update myRole immediately so we stop acting as DR.
+                -- RecomputeElection() runs again below if the DR is a new node,
+                -- but if the DR was already known that branch is skipped — calling
+                -- it here ensures myRole is always consistent.
+                self:RecomputeElection()
             end
         end
     end
