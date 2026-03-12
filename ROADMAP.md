@@ -217,54 +217,65 @@ This document describes planned releases with implementation notes for each item
 
 ### [#49] Recipe expansion filter (Classic / TBC)
 
-> **What it is:** A pair of toggle buttons in the main window header — `[Classic]` and `[TBC]` — that limit the displayed recipe list to Original Classic recipes, TBC recipes, or both. The expansion tag for each recipe is resolved from a new static lookup table at render time and is never stored in synced data or `SavedVariables`.
+> **What it is:** A pair of toggle buttons in the main window header — `[Classic]` and `[TBC]` — that limit the displayed recipe list to Original Classic recipes, TBC recipes, or both. Each recipe's expansion is resolved at render time using a per-profession spell-ID threshold: any recipe whose spell ID is greater than or equal to the profession's threshold is TBC; lower is Classic. No new file is needed.
 
-**Why now:** As guilds move deeper into TBC, profession windows fill with a mix of original and expansion recipes. Finding a specific TBC crafted item becomes slower as the lists grow. The feature is additive and non-breaking — old clients without the lookup file show all recipes exactly as today, and the new client defaults both toggles to on, so first-run behaviour is identical to the current state.
+**Why now:** As guilds move deeper into TBC, profession windows fill with a mix of original and expansion recipes. Finding a specific TBC crafted item becomes slower as the lists grow. The feature is additive and non-breaking — old clients show all recipes exactly as today, and the new client defaults both toggles to on, so first-run behaviour is identical to the current state.
 
 **Implementation:**
 
-1. **Static expansion lookup table (`RecipeExpansion.lua`)** — Create `GuildCrafts/RecipeExpansion.lua` exposing a single table:
+1. **Inline threshold table in `Data.lua`** — Add a single 7-entry table alongside the existing profession constants:
    ```lua
-   GuildCrafts.RecipeExpansion = {
-       -- Positive keys = itemID (crafted recipes)
-       -- Negative keys = –spellID (enchantments, stored as negative in recipe DB)
-       [2553]  = "ORIG",  -- Elixir of Minor Agility
-       [25804] = "TBC",   -- Fel Strength Elixir
-       -- ... full list populated from guild scan data + WoWHead cross-reference
+   GuildCrafts.TBC_THRESHOLD = {
+       ["Alchemy"]        = 28543,  -- Elixir of Camouflage
+       ["Blacksmithing"]  = 29545,  -- Fel Iron Plate Gloves
+       ["Cooking"]        = 28267,  -- Crunchy Spider Surprise
+       ["Enchanting"]     = 27899,  -- Enchant Bracer - Brawn
+       ["Engineering"]    = 30303,  -- Elemental Blasting Powder
+       ["Leatherworking"] = 32454,  -- Knothide Leather
+       ["Tailoring"]      = 26745,  -- Bolt of Netherweave
+       -- Jewelcrafting: TBC-only profession, no threshold (all recipes are TBC)
    }
    ```
-   Recipes not present in the table are treated as unknown and always pass the filter — safe default for any recipe added by future patches without a corresponding table update.
+   Each value is the spell ID of the first TBC recipe learned by the profession. Thresholds were verified against WoWHead's Classic TBC spell database. No new file, no `.toc` change.
 
-2. **Persist filter state** — Add to the `AceDB` `global` defaults in `Data.lua`:
+2. **Tag resolution helper** — Add a small helper (also in `Data.lua`):
+   ```lua
+   function GuildCrafts:GetExpansionTag(profName, spellID)
+       if profName == "Jewelcrafting" then return "TBC" end
+       local threshold = GuildCrafts.TBC_THRESHOLD[profName]
+       if not threshold then return nil end  -- unknown prof: always show
+       return spellID >= threshold and "TBC" or "ORIG"
+   end
+   ```
+
+3. **Persist filter state** — Add to the `AceDB` `global` defaults in `Data.lua`:
    ```lua
    expansionFilter = { ORIG = true, TBC = true },
    ```
    Both on by default (show all). Stored in `global` scope, not per-character — expansion preference is a guild-browsing setting, not alt-specific.
 
-3. **UI control** — In `MainFrame.lua`, add two small toggle buttons in the header bar alongside the existing search box and view toggle:
+4. **UI control** — In `MainFrame.lua`, add two small toggle buttons in the header bar alongside the existing search box and view toggle:
    - `[Classic]` — toggles `expansionFilter.ORIG`
    - `[TBC]` — toggles `expansionFilter.TBC`
 
    Style them with the existing active/inactive visual pattern (highlighted border or background when active). If the user toggles both off, re-enable both automatically — an empty filter set would hide all recipes and is not a useful state.
 
-4. **Filter at render time** — In every recipe-list rendering loop (`ShowRecipesView`, `ShowSearchResults`, `ShowMemberRecipes`), insert a single lookup before adding each recipe row:
+5. **Filter at render time** — In every recipe-list rendering loop (`ShowRecipesView`, `ShowSearchResults`, `ShowMemberRecipes`), insert a single check before adding each recipe row:
    ```lua
-   local tag = GuildCrafts.RecipeExpansion and GuildCrafts.RecipeExpansion[recipeKey]
+   local tag = GuildCrafts:GetExpansionTag(profName, math.abs(recipeKey))
    if tag then
        local f = GuildCrafts.db.global.expansionFilter
        if not f[tag] then goto continue end
    end
-   -- unknown tag: always show
+   -- nil tag (unknown prof): always show
    ```
-   This is the entirety of the runtime cost — one table lookup per recipe row render. No sorting, no caching, no additional passes.
+   `math.abs` normalises negative enchantment spell IDs. This is the entirety of the runtime cost — one table lookup per recipe row render.
 
-5. **Optional tooltip label** — Show a dim secondary line in the recipe detail tooltip: `|cff888888Classic|r` or `|cff888888TBC|r`. Skip this if it adds visual noise; the filter buttons already communicate the active state clearly.
+6. **Optional tooltip label** — Show a dim secondary line in the recipe detail tooltip: `|cff888888Classic|r` or `|cff888888TBC|r`. Skip this if it adds visual noise; the filter buttons already communicate the active state clearly.
 
-6. **`.toc` registration** — Add `RecipeExpansion.lua` to `GuildCrafts.toc` before `UI/MainFrame.lua` so the table is populated before the UI reads it.
+**Backward compat:** No wire-format changes. The filter is entirely client-side. Old clients show all recipes unfiltered, which is identical to their current behaviour. New clients default both toggles on, so the out-of-box experience is also unchanged. No new file is added; the threshold table is negligible in size.
 
-**Backward compat:** No wire-format changes. The filter is entirely client-side. Old clients (v1.2.1 and below) without `RecipeExpansion.lua` show all recipes unfiltered, which is identical to their current behaviour. New clients default both toggles on, so the out-of-box experience is also unchanged.
-
-**Files:** `GuildCrafts/RecipeExpansion.lua` (new — lookup table), `UI/MainFrame.lua` (~30 lines — toggle buttons + filter checks in three render loops), `Data.lua` (~5 lines — AceDB default), `GuildCrafts.toc` (1 line).
+**Files:** `Data.lua` (~20 lines — threshold table + tag helper + AceDB default), `UI/MainFrame.lua` (~30 lines — toggle buttons + filter checks in three render loops).
 
 ---
 
