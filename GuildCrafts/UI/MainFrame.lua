@@ -1097,7 +1097,7 @@ function UI:ShowSearchResults(results)
 
         -- Crafter list tooltip on hover (right side, over crafter text)
         if total > 0 then
-            local capturedCrafters = result.crafters
+            local capturedCrafters = displayCrafters
             local capturedMyKey    = myKey
             local capturedName     = result.recipeName
             local crafterHit = CreateFrame("Frame", nil, recipeRow)
@@ -2519,7 +2519,7 @@ function UI:ShowRecipesView(profName)
 
         -- Crafter list tooltip on hover (right side, over crafter text)
         if total > 0 then
-            local capturedCrafters = recipe.crafters
+            local capturedCrafters = displayCrafters
             local capturedMyKey    = myKey
             local capturedName     = recipe.name
             local crafterHit = CreateFrame("Frame", nil, row)

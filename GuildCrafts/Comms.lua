@@ -735,6 +735,7 @@ function Comms:BroadcastProfessionRemoval(memberKey, profName)
 end
 
 function Comms:HandleDeltaUpdate(payload, sender)
+    if not payload.member then return end
     local playerKey = GuildCrafts.Data:GetPlayerKey()
     -- Don't process our own deltas
     if payload.member == playerKey then return end
@@ -830,6 +831,7 @@ function Comms:SendCraftComplete(requesterKey, itemName)
 end
 
 function Comms:HandleCraftRequest(payload, _sender)
+    if not payload.requester or not payload.item then return end
     GuildCrafts:Debug("CRAFT_REQUEST from", payload.requester, "for", payload.item)
     if GuildCrafts.CraftRequest and GuildCrafts.CraftRequest.OnIncomingRequest then
         GuildCrafts.CraftRequest:OnIncomingRequest(payload.requester, payload.item)
