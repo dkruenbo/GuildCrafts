@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.1 — Data Clarity & Search UX — 2026-03-13
+
+### New Features
+
+- **Online-only crafter filter** — a new `[Online]` toggle button in the profession header bar filters the crafter display in Recipes view and Search Results to show only online crafters. Toggle state persists across reloads. When active, recipes with no online crafter show `—`
+- **"Scanned: N ago" timestamp in member detail** — the member recipe panel now shows a small grey label (`Scanned: 2h ago`, `Scanned: 3d ago`, etc.) below the member name so you can immediately judge how fresh the data is
+- **Specialisation description tooltip** — hovering a member row that shows a specialisation tag (e.g. `[Transmutation Master]`, `[Dragonscale Leatherworking]`) now pops a GameTooltip with a plain-English explanation of what the spec unlocks
+- **Better empty search state** — searching for a term with no results now shows `No crafters found for 'X'` with a `!gc X` guild-chat hint instead of the generic silent blank
+
+---
+
 ## 1.2.0 — Protocol Correctness — 2026-03-12
 
 ### New Features

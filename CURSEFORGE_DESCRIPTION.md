@@ -1,196 +1,196 @@
-    # GuildCrafts
+# GuildCrafts
 
-    **Find guild crafters instantly.**
+**Find guild crafters instantly.**
 
-    Stop asking in guild chat *“Can anyone craft this?”* and waiting for replies.
+Stop asking in guild chat *“Can anyone craft this?”* and waiting for replies.
 
-    GuildCrafts automatically builds a **shared crafting database for your guild**.  
-    Search any item and instantly see **who can craft it**.
+GuildCrafts automatically builds a **shared crafting database for your guild**.  
+Search any item and instantly see **who can craft it**.
 
-    You can even search directly from guild chat.
+You can even search directly from guild chat.
 
-    `!gc shadowcloth`  
-    `!gc spellstrike hood`  
-    `!gc flask`
+`!gc shadowcloth`  
+`!gc spellstrike hood`  
+`!gc flask`
 
-    GuildCrafts automatically replies with matching crafters — **no addon required for the person asking**.
+GuildCrafts automatically replies with matching crafters — **no addon required for the person asking**.
 
-    ---
+---
 
-    # Core Features
+# Core Features
 
-    ### Guild Chat Craft Lookup
+### Guild Chat Craft Lookup
 
-    Perfect for quickly finding crafters during raids, farming sessions, or when browsing the auction house.
+Perfect for quickly finding crafters during raids, farming sessions, or when browsing the auction house.
 
-    Just type:
+Just type:
 
-    `!gc <item name>`
+`!gc <item name>`
 
-    GuildCrafts will reply with **guild members who can craft it**.
+GuildCrafts will reply with **guild members who can craft it**.
 
-    Players asking the question **do not need the addon installed**.
+Players asking the question **do not need the addon installed**.
 
-    ### Shared Guild Recipe Database
+### Shared Guild Recipe Database
 
-    GuildCrafts combines the recipes of all addon users into a **single guild recipe book**.
+GuildCrafts combines the recipes of all addon users into a **single guild recipe book**.
 
-    Search by:
+Search by:
 
-    * recipe name  
-    * crafted item  
-    * profession  
+* recipe name  
+* crafted item  
+* profession  
 
-    Instantly see **which guild members can craft what**.
+Instantly see **which guild members can craft what**.
 
-    The more guild members who install the addon, the more complete the database becomes.
+The more guild members who install the addon, the more complete the database becomes.
 
-    ### Item Tooltip Integration
+### Item Tooltip Integration
 
-    GuildCrafts injects crafter info directly into native item tooltips.
+GuildCrafts injects crafter info directly into native item tooltips.
 
-    Hover any item anywhere in the game:
+Hover any item anywhere in the game:
 
-    * bags  
-    * auction house  
-    * trade chat  
-    * mail  
-    * tooltips  
+* bags  
+* auction house  
+* trade chat  
+* mail  
+* tooltips  
 
-    GuildCrafts shows **which guild members can craft that item** — no asking in chat or checking external websites.
+GuildCrafts shows **which guild members can craft that item** — no asking in chat or checking external websites.
 
-    ---
+---
 
-    # Recipe Browser
+# Recipe Browser
 
-    GuildCrafts includes a full crafting browser for your guild.
+GuildCrafts includes a full crafting browser for your guild.
 
-    Browse professions and recipes in two ways:
+Browse professions and recipes in two ways:
 
-    ### Members View
+### Members View
 
-    See **every recipe known by a specific guild member**.
+See **every recipe known by a specific guild member**.
 
-    Useful when you already know who might craft something.
+Useful when you already know who might craft something.
 
-    ### Recipes View
+### Recipes View
 
-    See **every guild member who can craft a recipe**.
+See **every guild member who can craft a recipe**.
 
-    * Hover recipes to inspect the crafted item or spell
-    * Expand recipes to view reagent materials
-    * Hover reagents to inspect them
-    * Hover the crafter preview to see the full crafter list
-    * Click `[>]` to post crafters directly to guild chat
+* Hover recipes to inspect the crafted item or spell
+* Expand recipes to view reagent materials
+* Hover reagents to inspect them
+* Hover the crafter preview to see the full crafter list
+* Click `[>]` to post crafters directly to guild chat
 
-    This makes it easy to see **who can craft something and what it costs** at a glance.
+This makes it easy to see **who can craft something and what it costs** at a glance.
 
-    ---
+---
 
-    # Quality of Life
+# Quality of Life
 
-    ### Favorites
+### Favorites
 
-    Star recipes or crafters you use often and access them instantly from the Favorites tab.
+Star recipes or crafters you use often and access them instantly from the Favorites tab.
 
-    Perfect for things like:
+Perfect for things like:
 
-    * regular raid consumables  
-    * enchant contacts  
-    * crafting partners
+* regular raid consumables  
+* enchant contacts  
+* crafting partners
 
-    ### Cooldown Tracking
+### Cooldown Tracking
 
-    GuildCrafts tracks profession cooldowns across your guild.
+GuildCrafts tracks profession cooldowns across your guild.
 
-    Examples include:
+Examples include:
 
-    * Mooncloth  
-    * Shadowcloth  
-    * Spellcloth  
-    * Transmutes  
+* Mooncloth  
+* Shadowcloth  
+* Spellcloth  
+* Transmutes  
 
-    Quickly see **which cooldowns are available**.
+Quickly see **which cooldowns are available**.
 
-    ### Specializations
+### Specializations
 
-    GuildCrafts tracks profession specializations such as:
+GuildCrafts tracks profession specializations such as:
 
-    * Transmutation Master  
-    * Mooncloth Tailoring  
-    * Spellfire Tailoring  
-    * Goblin / Gnomish Engineering  
+* Transmutation Master  
+* Mooncloth Tailoring  
+* Spellfire Tailoring  
+* Goblin / Gnomish Engineering  
 
-    So you always know **who can craft which variant**.
+So you always know **who can craft which variant**.
 
-    ---
+---
 
-    # Clean Interface
+# Clean Interface
 
-    GuildCrafts is designed to stay readable even in large guilds.
+GuildCrafts is designed to stay readable even in large guilds.
 
-    Features include:
+Features include:
 
-    * quality-colored recipe names  
-    * collapsible reagent lists  
-    * profession icons  
-    * favorites system  
-    * crafter preview on recipe rows  
-    * minimap button  
+* quality-colored recipe names  
+* collapsible reagent lists  
+* profession icons  
+* favorites system  
+* crafter preview on recipe rows  
+* minimap button  
 
-    Everything is built to stay **fast and easy to scan**.
+Everything is built to stay **fast and easy to scan**.
 
-    ---
+---
 
-    # Setup
+# Setup
 
-    Getting started takes less than a minute.
+Getting started takes less than a minute.
 
-    1. Install the addon  
-    2. Open each of your profession windows once  
-    3. Done
+1. Install the addon  
+2. Open each of your profession windows once  
+3. Done
 
-    Your recipes will now automatically sync with other guild members who use the addon.
+Your recipes will now automatically sync with other guild members who use the addon.
 
-    ---
+---
 
-    # Supported Version
+# Supported Version
 
-    Built for **WoW TBC Anniversary Edition**  
-    Interface version **20505**
+Built for **WoW TBC Anniversary Edition**  
+Interface version **20505**
 
-    Supports all **8 TBC crafting professions**.
+Supports all **8 TBC crafting professions**.
 
-    ---
+---
 
-    # Commands
+# Commands
 
-    `/gc`  
-    Open the GuildCrafts window.
+`/gc`  
+Open the GuildCrafts window.
 
-    `/gc minimap`  
-    Toggle the minimap button.
+`/gc minimap`  
+Toggle the minimap button.
 
-    `/gc reset`  
-    Clear your local database and re-scan recipes.
+`/gc reset`  
+Clear your local database and re-scan recipes.
 
-    `!gc <query>`  
-    Search for crafters directly from **guild chat**.
+`!gc <query>`  
+Search for crafters directly from **guild chat**.
 
-    Example:
+Example:
 
-    `!gc shadowcloth`
+`!gc shadowcloth`
 
-    ---
+---
 
-    # Automatic Sync
+# Automatic Sync
 
-    GuildCrafts synchronizes recipe data automatically between addon users.
+GuildCrafts synchronizes recipe data automatically between addon users.
 
-    * no setup required  
-    * low chat traffic  
-    * new recipes broadcast automatically  
+* no setup required  
+* low chat traffic  
+* new recipes broadcast automatically  
 
-    Members who leave the guild are automatically removed after 30 days.
+Members who leave the guild are automatically removed after 30 days.
 
-    Works best when multiple guild members use the addon — the more players sync, the more complete the database becomes.
+Works best when multiple guild members use the addon — the more players sync, the more complete the database becomes.
