@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.2 — Expansion Filter — 2026-03-14
+
+### New Features
+
+- **Expansion filter buttons** — two new toggle buttons `[Orig]` and `[TBC]` in the search bar let you narrow the recipe display to Original Classic recipes, TBC recipes, or both. Filter state persists across reloads. Both are active by default so first-run behaviour is unchanged
+- **Per-profession spell-ID thresholds** — expansion tag is resolved at render time using inline thresholds in `Data.lua`; Jewelcrafting is always TBC (it's a TBC-only profession). Recipes with no threshold entry always show regardless of filter state
+
+---
+
 ## 1.2.1 — Data Clarity & Search UX — 2026-03-13
 
 ### New Features

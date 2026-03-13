@@ -54,6 +54,19 @@ local TRACKED_PROFESSIONS = {
     ["Tailoring"] = true,
 }
 
+-- Expansion threshold spell IDs per profession.
+-- Recipes with |spellID| >= threshold are TBC; lower are Classic.
+-- Jewelcrafting is TBC-only — all its recipes are TBC.
+local TBC_THRESHOLD = {
+    ["Alchemy"]        = 28543,  -- Elixir of Camouflage
+    ["Blacksmithing"]  = 29545,  -- Fel Iron Plate Gloves
+    ["Cooking"]        = 28267,  -- Crunchy Spider Surprise
+    ["Enchanting"]     = 27899,  -- Enchant Bracer - Brawn
+    ["Engineering"]    = 30303,  -- Elemental Blasting Powder
+    ["Leatherworking"] = 32454,  -- Knothide Leather
+    ["Tailoring"]      = 26745,  -- Bolt of Netherweave
+}
+
 ----------------------------------------------------------------------
 -- Locale-to-canonical profession name mapping
 -- GetSpellInfo(id) returns the *localised* profession name, which must
@@ -151,6 +164,15 @@ function Data:GetSpecialisationDescription(spec)
     return nil
 end
 
+--- Returns "TBC", "ORIG", or nil (show regardless) for a recipe in a given profession.
+--- recipeKey: positive = item-based, negative = enchanting spell-based.
+function Data:GetExpansionTag(profName, recipeKey)
+    if profName == "Jewelcrafting" then return "TBC" end
+    local threshold = TBC_THRESHOLD[profName]
+    if not threshold then return nil end
+    return math.abs(recipeKey) >= threshold and "TBC" or "ORIG"
+end
+
 -- AceDB defaults
 local DB_DEFAULTS = {
     global = {
@@ -168,6 +190,7 @@ local DB_DEFAULTS = {
     },
     profile = {
         showOnlineOnly = false,
+        expansionFilter = { ORIG = true, TBC = true },
     },
 }
 
