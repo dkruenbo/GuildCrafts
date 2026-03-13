@@ -85,6 +85,12 @@ See **every guild member who can craft a recipe**.
 
 This makes it easy to see **who can craft something and what it costs** at a glance.
 
+### Online Filter
+
+Toggle the **Online** indicator next to the favourites star to instantly hide offline members.
+
+The member list, crafter lists, and profession counts all update immediately — no need to scroll past a sea of grey names.
+
 ---
 
 # Quality of Life
@@ -123,15 +129,7 @@ GuildCrafts tracks profession specializations such as:
 
 So you always know **who can craft which variant**.
 
----
-
-# Clean Interface
-
-GuildCrafts is designed to stay readable even in large guilds.
-
-Features include:
-
-* quality-colored recipe names  
+Hover the specialization label in a member's detail panel to see a plain-English description of what it unlocks.
 * collapsible reagent lists  
 * profession icons  
 * favorites system  

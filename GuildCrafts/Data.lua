@@ -1724,17 +1724,19 @@ end
 --- Get the count of members who have a given profession.
 --- Deduplicates by character name so legacy no-realm-suffix entries
 --- do not inflate the count.
-function Data:GetProfessionMemberCount(profName)
+function Data:GetProfessionMemberCount(profName, onlineOnly)
     local gdb = self:GetGuildDB()
     if not gdb then return 0 end
     local seen = {}
     local count = 0
     for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.professions and entry.professions[profName] then
-            local displayName = memberKey:match("^(.+)-") or memberKey
-            if not seen[displayName] then
-                seen[displayName] = true
-                count = count + 1
+            if not onlineOnly or self:IsMemberOnline(memberKey) then
+                local displayName = memberKey:match("^(.+)-") or memberKey
+                if not seen[displayName] then
+                    seen[displayName] = true
+                    count = count + 1
+                end
             end
         end
     end
