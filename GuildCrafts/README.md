@@ -24,6 +24,7 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Chunked sync** — large sync payloads are split into batches of 10 members, preventing chat throttle issues in large guilds
 - **Last-scanned timestamp** — member detail panels show "Scanned: 2h ago" so you can judge how fresh the data is
 - **Online-only filter** — a toggle in the left panel header hides offline members from the member list and crafter lists; profession counts update to reflect the filtered view
+- **Expansion filter** — `[Vanilla]` and `[TBC]` toggle buttons in the search bar let you narrow recipes to Original Classic, TBC, or both; filter state persists per character; both on by default so first-run behaviour is unchanged
 - **Data staleness indicator** — member data older than 30 days is flagged with a red age tag (e.g. "30d ago", "2mo ago")
 - **Profession change detection** — dropping a profession automatically purges stale data
 - **Guild roster pruning** — ex-guild members are cleaned up automatically
