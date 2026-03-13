@@ -7,16 +7,14 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Automatic recipe scanning** — hooks into the profession window to capture every recipe you know
 - **Guild-wide sync** — OSPF/EIGRP-inspired protocol with Designated Router (DR) election prevents channel flooding
 - **Bidirectional sync** — login sync detects and resolves data gaps in both directions
-- **Live search** — find any recipe, profession, or crafter instantly
-- **Craft requests** — request crafts from online guild members directly through the UI
-- **Craft queue** — crafters can manage incoming requests with accept/decline/complete workflow
+- **Live search** — find any recipe, profession, or crafter instantly; empty results show an actionable hint including the `!gc` chat command
 - **Tooltip integration** — hover over any item in bags, AH, or chat links to see which guild members can craft it
 - **Reagent tracking** — see required materials for every recipe at a glance; click any recipe row to expand or collapse its reagent list
 - **Quality colors** — recipe names are tinted by item rarity (grey/white/green/blue/purple/orange) using WoW's item quality data; Enchanting spells default to white
 - **Dark professional sidebar** — profession and member rows use a polished dark style with a gold accent bar on the selected row and a blue hover highlight
 - **Members / Recipes view toggle** — when browsing a profession, switch between the existing per-member recipe list and an aggregated view showing every recipe the guild can craft, with an inline crafter preview and hover tooltip
 - **Recipe-centric view** — aggregated view shows all guild recipes for a profession sorted alphabetically; each row shows up to two crafter names with a `+N more` indicator and full crafter list on hover
-- **Specialisation tracking** — detects and displays TBC profession specs (Transmute Master, Weaponsmith, Mooncloth Tailoring, etc.)
+- **Specialisation tracking** — detects and displays TBC profession specs (Transmute Master, Weaponsmith, Mooncloth Tailoring, etc.); hover the specialisation label in the member detail panel for a plain-English description of what it unlocks
 - **Cooldown tracking** — shows active profession cooldowns (Transmutes, Primal Mooncloth, Spellcloth, Shadowcloth) with time remaining
 - **Skill level display** — see each member's current profession skill level (e.g. "375/375") in the member list and recipe detail view
 - **Recipe categorization** — recipes are grouped by sub-type (Potions, Elixirs, Flasks, Weapons, Armor, etc.) with visual category headers
@@ -24,6 +22,8 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Minimap button** — small icon on the minimap to toggle the window; drag to reposition, hide with `/gc minimap`
 - **Profession icons** — WoW's built-in profession icons displayed next to each profession name in the browse panel
 - **Chunked sync** — large sync payloads are split into batches of 10 members, preventing chat throttle issues in large guilds
+- **Last-scanned timestamp** — member detail panels show "Scanned: 2h ago" so you can judge how fresh the data is
+- **Online-only filter** — a toggle in the left panel header hides offline members from the member list and crafter lists; profession counts update to reflect the filtered view
 - **Data staleness indicator** — member data older than 30 days is flagged with a red age tag (e.g. "30d ago", "2mo ago")
 - **Profession change detection** — dropping a profession automatically purges stale data
 - **Guild roster pruning** — ex-guild members are cleaned up automatically
@@ -53,7 +53,6 @@ Alchemy · Blacksmithing · Cooking · Enchanting · Engineering · Jewelcraftin
 | `/gc sim clear` | Remove all simulated data |
 | `/gc sim sync` | Simulate a full sync response |
 | `/gc sim delta` | Simulate an incoming recipe update |
-| `/gc sim craft` | Simulate an incoming craft request |
 | `/gc minimap` | Toggle minimap button visibility |
 | `/gc reset` | Wipe all saved data and reload |
 

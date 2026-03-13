@@ -58,154 +58,18 @@ This document describes planned releases with implementation notes for each item
 | [#48](https://github.com/dkruenbo/GuildCrafts/issues/48) | Document safety guarantees and convergence properties | Done in 1.2.0 |
 | [#60](https://github.com/dkruenbo/GuildCrafts/issues/60) | Add Cooking profession support | Done in 1.2.0 |
 
+### 1.2.1 — Data Clarity & Search UX
+
+| Issue | Title | Status |
+|-------|-------|--------|
+| — | Online-only member filter (toggle next to favourites star) | Done in 1.2.1 |
+| — | Better empty search state with actionable `!gc` hint | Done in 1.2.1 |
+| — | "Scanned: N ago" timestamp in member detail panel | Done in 1.2.1 |
+| — | Specialisation description tooltip in member detail panel | Done in 1.2.1 |
+
 ---
 
 ## Upcoming
-
----
-
-## 1.2.1 — Data Clarity & Search UX
-
-**Theme:** Surface existing data more clearly. All three items use data and infrastructure already in the codebase — this is purely a UI and messaging pass. Separating it from 1.2.0 means any regression can be cleanly attributed to either the protocol changes or the UI changes, not both.
-
----
-
-### Online-only crafter filter toggle
-
-> **What it is:** A toggle button in the Recipes view and Search Results view that hides crafters who are currently offline from the crafter list. Currently online crafters are already sorted to the top; this makes "show only online" a first-class UI action rather than requiring the user to scroll past offline names.
-
-**Why now:** The online/offline status infrastructure already exists — `Data._onlineCache` is populated from `GetGuildRosterInfo` on every `GUILD_ROSTER_UPDATE`. This is purely a UI filter layer on top of existing data. Estimated ~40 lines in `MainFrame.lua`.
-
-**Implementation:**
-
-1. **State** — Add a boolean `GuildCrafts.UI.showOnlineOnly = false` (default off, or persist to `AceDB`).
-
-2. **Toggle button** — In `MainFrame.lua`, add a small toggle button in the recipes/search header bar (next to the existing search box or view toggle). Style it like the existing sidebar buttons. On click, flip `showOnlineOnly` and call `UI:Refresh()`.
-
-3. **Filter at render time** — In the crafter-list rendering loop (both `ShowRecipesView` and `ShowSearchResults`), wrap the crafter display in:
-   ```lua
-   if self.showOnlineOnly then
-       local isOnline = GuildCrafts.Data._onlineCache
-           and GuildCrafts.Data._onlineCache[crafterKey]
-       if not isOnline then goto continue end
-   end
-   ```
-
-4. **Visual state** — When the toggle is active, give it a highlighted border or different text color so it's clear the filter is on. Use the same highlight pattern as the existing active-tab buttons.
-
-5. **Persistence** — Store `showOnlineOnly` in `AceDB` profile so it survives reloads. Key: `db.profile.showOnlineOnly`.
-
-**Files:** `UI/MainFrame.lua` (~40 lines), `Data.lua` (no changes — `_onlineCache` already exists).
-
----
-
-### Better no-result states: missing-scan CTA and search suggestions
-
-> **What it is:** Replace the current empty/sparse states (missing profession data shown as `~`, search returning nothing silently) with actionable messages that tell the user why data is missing and what to do about it.
-
-**Why now:** Two common pain points from tester feedback: (1) seeing `~` for a guild member's professions with no explanation, (2) searching for a recipe and getting no results with no guidance on whether that means nobody can craft it or the data just hasn't been collected yet.
-
-**Implementation:**
-
-1. **Missing profession data (`~` → actionable message):**
-   In `MainFrame.lua`, wherever member profession data is rendered as `~` or empty, replace with a dim italic label:
-   ```
-   "Data not yet scanned — ask them to open their profession window"
-   ```
-   The condition is: member exists in the guild DB but `entry.professions[profName]` is `nil` or `entry.lastUpdate` is `0`.
-
-2. **Empty search results:**
-   In `ShowSearchResults()`, when `results` is empty, render a hint frame instead of a blank scroll area:
-   ```
-   "No crafters found for '[query]'.
-    Try: a shorter search term, checking Browse by Profession,
-    or asking in guild chat with !gc [query]."
-   ```
-
-3. **`!gc` no-match consistency:**
-   The `!gc` handler in `Core.lua` already posts "No crafters found for X" to guild chat. Mirror the same message in the UI search panel so the two surfaces are consistent.
-
-4. **Last-scan timestamp context:**
-   Show a dim timestamp next to missing data: "Last updated: never" or "Last updated: 14 days ago". This tells the user whether the data was collected long ago or never at all. Data source: `entry.lastUpdate` in the guild DB.
-
-**Files:** `UI/MainFrame.lua` (~30 lines), `Core.lua` (no changes needed for !gc).
-
----
-
-### Show "last scanned N ago" timestamp in member detail view
-
-> **What it is:** Display a human-readable "Updated 2 hours ago" / "Updated 3 days ago" label on member detail panels so users can judge how fresh the data is.
-
-**Why now:** `entry.lastUpdate` is already stored per member. The data is there; it just isn't surfaced anywhere in the UI. This is a pure display addition.
-
-**Implementation:**
-
-1. **Helper function** — Add a local `FormatAge(timestamp)` in `MainFrame.lua`:
-   ```lua
-   local function FormatAge(ts)
-       if not ts or ts == 0 then return "never" end
-       local delta = time() - ts
-       if delta < 120 then return "just now"
-       elseif delta < 3600 then return math.floor(delta / 60) .. "m ago"
-       elseif delta < 86400 then return math.floor(delta / 3600) .. "h ago"
-       else return math.floor(delta / 86400) .. "d ago" end
-   end
-   ```
-
-2. **Render location** — In the member detail panel (the view that shows a single member's professions and recipes), add a dim label below the member name:
-   ```
-   Scanned: 2h ago
-   ```
-   Use `|cff808080` (medium grey) to make it clearly secondary information.
-
-3. **Refresh on UI update** — `FormatAge` is called at render time, so it's always current whenever the panel redraws (which happens on `UI:Refresh()` calls triggered by sync events).
-
-**Files:** `UI/MainFrame.lua` (~20 lines).
-
----
-
-### Specialisation description tooltip on member rows
-
-> **What it is:** When a member row displays a specialisation tag such as `[Armorsmith]` or `[Transmutation Master]`, hovering anywhere on that row shows a `GameTooltip` with a plain-English explanation of what the specialisation unlocks. Currently the tag is rendered inline and colour-coded but provides no further context — a player who doesn't know what "Dragonscale Leatherworking" entails has no way to find out in-context.
-
-**Why now:** The specialisation label is already detected at login via `DetectSpecialisations()` in `Data.lua` and stored in `profData.specialisation`. The `SPECIALISATION_SPELLS` table has the canonical label per spellID; it just lacks a `description` string. No protocol changes, no new data collection — this is a two-file change with high UX value per line written.
-
-**Implementation:**
-
-1. **Add descriptions to `SPECIALISATION_SPELLS`** — Extend each entry in the table in `Data.lua` with a `description` string:
-   ```lua
-   [28672] = { prof = "Alchemy", spec = "Transmutation Master",
-               description = "Chance to create additional items when performing transmutations." },
-   [9788]  = { prof = "Blacksmithing", spec = "Armorsmith",
-               description = "Unlocks the ability to craft high-end plate armour sets." },
-   -- etc. for all entries
-   ```
-
-2. **Add accessor** — Add `Data:GetSpecialisationDescription(spec)` that iterates `SPECIALISATION_SPELLS` values and returns the `description` for a matching `spec` label (`nil` if not found).
-
-3. **Wire tooltip onto member rows** — In the member profession view in `MainFrame.lua`, where rows with a specialisation tag are rendered, add `OnEnter` / `OnLeave` scripts. The tooltip title reuses the existing light-blue colour (`|cffaaddff` → RGB `0.67, 0.87, 1`) to match the inline tag:
-   ```lua
-   row:SetScript("OnEnter", function(self)
-       if profData and profData.specialisation then
-           local desc = GuildCrafts.Data:GetSpecialisationDescription(profData.specialisation)
-           if desc then
-               GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-               GameTooltip:AddLine(profData.specialisation, 0.67, 0.87, 1)
-               GameTooltip:AddLine(desc, 1, 1, 1, true)
-               GameTooltip:Show()
-           end
-       end
-   end)
-   row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-   ```
-
-4. **Scope** — Only add the tooltip on rows that actually have a `specialisation` set. Rows for members without a spec, or rows in the Favorites or Search views where spec context is absent, get no `OnEnter` script and remain unchanged.
-
-**Files:** `Data.lua` (~25 lines — description strings + accessor), `UI/MainFrame.lua` (~15 lines — `OnEnter`/`OnLeave` on member rows).
-
----
-
-> **Exit criterion:** After 1.2.1, GuildCrafts is considered feature-complete for its core browsing and coordination use case. 1.2.2 below adds one further user-facing feature before the project is considered stable.
 
 ---
 

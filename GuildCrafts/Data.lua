@@ -118,30 +118,38 @@ function Data:GetLocalizedReagentName(reagent)
 end
 
 -- TBC profession specialisations keyed by spellID
--- Each entry maps to { profession, specName }
+-- Each entry maps to { prof, spec, desc }
 local SPECIALISATION_SPELLS = {
     -- Alchemy
-    [28675] = { prof = "Alchemy",         spec = "Potion Master" },
-    [28677] = { prof = "Alchemy",         spec = "Elixir Master" },
-    [28672] = { prof = "Alchemy",         spec = "Transmutation Master" },
+    [28675] = { prof = "Alchemy",         spec = "Potion Master",              desc = "Chance to create extra potions when crafting." },
+    [28677] = { prof = "Alchemy",         spec = "Elixir Master",              desc = "Chance to create extra elixirs when crafting." },
+    [28672] = { prof = "Alchemy",         spec = "Transmutation Master",       desc = "Chance to create extra materials when transmuting." },
     -- Blacksmithing
-    [9788]  = { prof = "Blacksmithing",   spec = "Armorsmith" },
-    [9787]  = { prof = "Blacksmithing",   spec = "Weaponsmith" },
-    [17039] = { prof = "Blacksmithing",   spec = "Master Swordsmith" },
-    [17040] = { prof = "Blacksmithing",   spec = "Master Hammersmith" },
-    [17041] = { prof = "Blacksmithing",   spec = "Master Axesmith" },
+    [9788]  = { prof = "Blacksmithing",   spec = "Armorsmith",                 desc = "Unlocks high-end plate armour recipes." },
+    [9787]  = { prof = "Blacksmithing",   spec = "Weaponsmith",                desc = "Unlocks high-end weapon recipes." },
+    [17039] = { prof = "Blacksmithing",   spec = "Master Swordsmith",          desc = "Unlocks iconic TBC sword recipes." },
+    [17040] = { prof = "Blacksmithing",   spec = "Master Hammersmith",         desc = "Unlocks iconic TBC hammer recipes." },
+    [17041] = { prof = "Blacksmithing",   spec = "Master Axesmith",            desc = "Unlocks iconic TBC axe recipes." },
     -- Engineering
-    [20219] = { prof = "Engineering",     spec = "Gnomish Engineer" },
-    [20222] = { prof = "Engineering",     spec = "Goblin Engineer" },
+    [20219] = { prof = "Engineering",     spec = "Gnomish Engineer",           desc = "Unlocks Gnomish gadgets and backfiring devices." },
+    [20222] = { prof = "Engineering",     spec = "Goblin Engineer",            desc = "Unlocks explosive Goblin devices and launchers." },
     -- Leatherworking
-    [10656] = { prof = "Leatherworking",  spec = "Dragonscale Leatherworking" },
-    [10658] = { prof = "Leatherworking",  spec = "Elemental Leatherworking" },
-    [10660] = { prof = "Leatherworking",  spec = "Tribal Leatherworking" },
+    [10656] = { prof = "Leatherworking",  spec = "Dragonscale Leatherworking", desc = "Unlocks dragonscale armour sets for hunters and shamans." },
+    [10658] = { prof = "Leatherworking",  spec = "Elemental Leatherworking",   desc = "Unlocks elemental leather gear for rogues and druids." },
+    [10660] = { prof = "Leatherworking",  spec = "Tribal Leatherworking",      desc = "Unlocks tribal leather gear with nature resistance." },
     -- Tailoring
-    [26798] = { prof = "Tailoring",       spec = "Mooncloth Tailoring" },
-    [26801] = { prof = "Tailoring",       spec = "Shadoweave Tailoring" },
-    [26797] = { prof = "Tailoring",       spec = "Spellfire Tailoring" },
+    [26798] = { prof = "Tailoring",       spec = "Mooncloth Tailoring",        desc = "Unlocks Primal Mooncloth gear; craft Primal Mooncloth on cooldown." },
+    [26801] = { prof = "Tailoring",       spec = "Shadoweave Tailoring",       desc = "Unlocks Frozen Shadoweave gear; craft Shadowcloth on cooldown." },
+    [26797] = { prof = "Tailoring",       spec = "Spellfire Tailoring",        desc = "Unlocks Spellfire gear; craft Spellcloth on cooldown." },
 }
+
+--- Return the description string for the given specialisation label, or nil if not found.
+function Data:GetSpecialisationDescription(spec)
+    for _, info in pairs(SPECIALISATION_SPELLS) do
+        if info.spec == spec then return info.desc end
+    end
+    return nil
+end
 
 -- AceDB defaults
 local DB_DEFAULTS = {
@@ -157,6 +165,9 @@ local DB_DEFAULTS = {
         --     lastUpdate = timestamp,
         --     _simulated = nil,  -- only set on simulated entries
         -- }
+    },
+    profile = {
+        showOnlineOnly = false,
     },
 }
 
@@ -1713,17 +1724,19 @@ end
 --- Get the count of members who have a given profession.
 --- Deduplicates by character name so legacy no-realm-suffix entries
 --- do not inflate the count.
-function Data:GetProfessionMemberCount(profName)
+function Data:GetProfessionMemberCount(profName, onlineOnly)
     local gdb = self:GetGuildDB()
     if not gdb then return 0 end
     local seen = {}
     local count = 0
     for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.professions and entry.professions[profName] then
-            local displayName = memberKey:match("^(.+)-") or memberKey
-            if not seen[displayName] then
-                seen[displayName] = true
-                count = count + 1
+            if not onlineOnly or self:IsMemberOnline(memberKey) then
+                local displayName = memberKey:match("^(.+)-") or memberKey
+                if not seen[displayName] then
+                    seen[displayName] = true
+                    count = count + 1
+                end
             end
         end
     end

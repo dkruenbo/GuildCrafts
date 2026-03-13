@@ -45,6 +45,16 @@ local STAR_TEXTURE = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1"
 -- Item quality lookup cache (avoids repeated GetItemInfo calls per frame render)
 local _qualityCache = {}
 
+--- Format a Unix timestamp as a human-readable age string.
+local function FormatAge(ts)
+    if not ts or ts == 0 then return "never" end
+    local delta = time() - ts
+    if delta < 120   then return "just now" end
+    if delta < 3600  then return math.floor(delta / 60)   .. "m ago" end
+    if delta < 86400 then return math.floor(delta / 3600) .. "h ago" end
+    return math.floor(delta / 86400) .. "d ago"
+end
+
 ----------------------------------------------------------------------
 -- Main Frame Creation
 ----------------------------------------------------------------------
@@ -96,7 +106,6 @@ function UI:CreateMainFrame()
     self:CreateSearchBar(f)
     self:CreateDetailPanel(f)
     self:CreateLeftPanel(f)
-    self:CreateCraftQueueBar(f)
     self:CreateResizeGrip(f)
 
     self.mainFrame = f
@@ -342,6 +351,27 @@ function UI:CreateLeftPanel(parent)
     favBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     self.favButton = favBtn
 
+    -- Online-only filter dot (left of the fav star)
+    local onlineDot = CreateFrame("Frame", nil, panel)
+    onlineDot:SetSize(16, 16)
+    onlineDot:SetPoint("TOPRIGHT", favBtn, "TOPLEFT", -4, 0)
+    onlineDot:EnableMouse(true)
+    local onlineDotFS = onlineDot:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    onlineDotFS:SetPoint("CENTER")
+    onlineDotFS:SetText("O")
+    onlineDotFS:SetTextColor(0.3, 0.3, 0.3)
+    onlineDot:SetScript("OnMouseDown", function()
+        UI:ToggleOnlineFilter()
+    end)
+    onlineDot:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Online Filter", 1, 1, 1)
+        GameTooltip:AddLine("Show only online members.", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    onlineDot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    self.onlineFilterDotFS = onlineDotFS
+
     -- Scroll frame for list content
     local scrollFrame = CreateFrame("ScrollFrame", "GuildCraftsLeftScroll", panel, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", 4, -26)
@@ -480,39 +510,6 @@ function UI:CreateDetailPanel(parent)
 end
 
 ----------------------------------------------------------------------
--- Craft Queue Bar
-----------------------------------------------------------------------
-
-function UI:CreateCraftQueueBar(parent)
-    local bar = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    bar:SetHeight(24)
-    bar:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 1, 1)
-    bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -1, 1)
-    bar:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-    })
-    bar:SetBackdropColor(0.12, 0.12, 0.12, 1)
-
-    local text = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    text:SetPoint("LEFT", bar, "LEFT", 10, 0)
-    text:SetText("Craft Queue (empty)")
-    text:SetTextColor(0.7, 0.7, 0.7)
-
-    local arrow = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    arrow:SetPoint("RIGHT", bar, "RIGHT", -10, 0)
-    arrow:SetText("^")
-    arrow:SetTextColor(0.5, 0.5, 0.5)
-
-    self.craftQueueBar = bar
-    self.craftQueueBarText = text
-    self.craftQueueExpanded = false
-
-    bar:SetScript("OnClick", function()
-        UI:ToggleCraftQueue()
-    end)
-end
-
-----------------------------------------------------------------------
 -- Profession Icon Textures (TBC)
 ----------------------------------------------------------------------
 
@@ -544,7 +541,13 @@ function UI:PopulateProfessionList()
     local yOffset = 0
 
     for _, profName in ipairs(professions) do
-        local count = GuildCrafts.Data:GetProfessionMemberCount(profName)
+        local showOnlineOnly = GuildCrafts.db and GuildCrafts.db.profile.showOnlineOnly
+        local count
+        if showOnlineOnly then
+            count = GuildCrafts.Data:GetProfessionMemberCount(profName, true)
+        else
+            count = GuildCrafts.Data:GetProfessionMemberCount(profName)
+        end
         local row = self:CreateLeftRow(self.leftContent, yOffset, profName, "(" .. count .. ")", PROFESSION_ICONS[profName])
         local capturedProfName = profName
         local capturedRow = row
@@ -587,50 +590,53 @@ function UI:NavigateToMembers(profName)
     -- Sort: online first, then alphabetical
     self:SortMemberList(members)
 
+    local showOnlineOnly = GuildCrafts.db and GuildCrafts.db.profile.showOnlineOnly
     local yOffset = 0
     for _, memberInfo in ipairs(members) do
         local isOnline = GuildCrafts.Data:IsMemberOnline(memberInfo.key)
-        local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
-        local specTag = ""
-        local skillTag = ""
-        local staleTag = ""
-        if memberInfo.entry and memberInfo.entry.professions and memberInfo.entry.professions[profName] then
-            local profData = memberInfo.entry.professions[profName]
-            local spec = profData.specialisation
-            if spec then
-                specTag = "  |cffaaddff[" .. spec .. "]|r"
+        if not showOnlineOnly or isOnline then
+            local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
+            local specTag = ""
+            local skillTag = ""
+            local staleTag = ""
+            if memberInfo.entry and memberInfo.entry.professions and memberInfo.entry.professions[profName] then
+                local profData = memberInfo.entry.professions[profName]
+                local spec = profData.specialisation
+                if spec then
+                    specTag = "  |cffaaddff[" .. spec .. "]|r"
+                end
+                if profData.skillLevel and profData.maxSkillLevel then
+                    skillTag = "  |cffffff99" .. profData.skillLevel .. "/" .. profData.maxSkillLevel .. "|r"
+                end
             end
-            if profData.skillLevel and profData.maxSkillLevel then
-                skillTag = "  |cffffff99" .. profData.skillLevel .. "/" .. profData.maxSkillLevel .. "|r"
+            -- Staleness / absent indicator
+            if memberInfo.entry then
+                local stale = GuildCrafts.Data:GetStalenessTag(memberInfo.entry.lastUpdate)
+                if stale then
+                    staleTag = "  |cffff6666[" .. stale .. "]|r"
+                end
+                if memberInfo.entry._absentSince then
+                    staleTag = staleTag .. "  |cff999999(left guild)|r"
+                end
             end
+            local label = dot .. memberInfo.key:match("^(.+)-") .. skillTag .. specTag .. staleTag
+            local row = self:CreateLeftRow(self.leftContent, yOffset, label)
+            row.memberKey = memberInfo.key
+            row:SetScript("OnClick", function()
+                UI:ShowMemberRecipes(memberInfo.key, profName)
+            end)
+            -- Member star
+            local capturedMemberKey = memberInfo.key
+            local memberStar = self:CreateStarButton(row, 14, function(btn)
+                local nowFav = GuildCrafts.Favorites:ToggleMember(capturedMemberKey)
+                UI:UpdateStarAppearance(btn, nowFav)
+            end)
+            memberStar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+            self:UpdateStarAppearance(memberStar, GuildCrafts.Favorites:IsMemberFavorite(memberInfo.key))
+            row._star = memberStar
+            self.leftRows[#self.leftRows + 1] = row
+            yOffset = yOffset + 24
         end
-        -- Staleness / absent indicator
-        if memberInfo.entry then
-            local stale = GuildCrafts.Data:GetStalenessTag(memberInfo.entry.lastUpdate)
-            if stale then
-                staleTag = "  |cffff6666[" .. stale .. "]|r"
-            end
-            if memberInfo.entry._absentSince then
-                staleTag = staleTag .. "  |cff999999(left guild)|r"
-            end
-        end
-        local label = dot .. memberInfo.key:match("^(.+)-") .. skillTag .. specTag .. staleTag
-        local row = self:CreateLeftRow(self.leftContent, yOffset, label)
-        row.memberKey = memberInfo.key
-        row:SetScript("OnClick", function()
-            UI:ShowMemberRecipes(memberInfo.key, profName)
-        end)
-        -- Member star
-        local capturedMemberKey = memberInfo.key
-        local memberStar = self:CreateStarButton(row, 14, function(btn)
-            local nowFav = GuildCrafts.Favorites:ToggleMember(capturedMemberKey)
-            UI:UpdateStarAppearance(btn, nowFav)
-        end)
-        memberStar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-        self:UpdateStarAppearance(memberStar, GuildCrafts.Favorites:IsMemberFavorite(memberInfo.key))
-        row._star = memberStar
-        self.leftRows[#self.leftRows + 1] = row
-        yOffset = yOffset + 24
     end
 
     self.leftContent:SetHeight(math.max(yOffset + 8, 1))
@@ -684,9 +690,6 @@ function UI:ShowMemberRecipes(memberKey, profName)
         headerText = headerText .. "  " .. profData.skillLevel .. "/" .. profData.maxSkillLevel
     end
     local spec = profData.specialisation
-    if spec then
-        headerText = headerText .. "  |cffaaddff(" .. spec .. ")|r"
-    end
     -- Staleness warning in header
     local stale = GuildCrafts.Data:GetStalenessTag(entry.lastUpdate)
     if stale then
@@ -696,7 +699,35 @@ function UI:ShowMemberRecipes(memberKey, profName)
     header:SetTextColor(1, 0.82, 0)
     self.detailRows[#self.detailRows + 1] = header
 
-    local yOffset = -32
+    -- Last-scanned timestamp
+    local scanLabel = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    scanLabel:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, -26)
+    scanLabel:SetText("|cff808080Scanned: " .. FormatAge(entry.lastUpdate) .. "|r")
+    self.detailRows[#self.detailRows + 1] = scanLabel
+
+    -- Specialisation hover label in right panel
+    if spec then
+        local specBtn = CreateFrame("Frame", nil, self.detailContent)
+        specBtn:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, -40)
+        specBtn:SetPoint("RIGHT",   self.detailContent, "RIGHT",  -8,  0)
+        specBtn:SetHeight(14)
+        specBtn:EnableMouse(true)
+        local specFS = specBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        specFS:SetPoint("LEFT", specBtn, "LEFT", 0, 0)
+        specFS:SetText("|cffaaddff[" .. spec .. "]|r")
+        local capturedSpec = spec
+        specBtn:SetScript("OnEnter", function(self)
+            local desc = GuildCrafts.Data:GetSpecialisationDescription(capturedSpec)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(capturedSpec, 0.67, 0.87, 1)
+            if desc then GameTooltip:AddLine(desc, 1, 1, 1, true) end
+            GameTooltip:Show()
+        end)
+        specBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        self.detailRows[#self.detailRows + 1] = specBtn
+    end
+
+    local yOffset = spec and -58 or -42
 
     -- Cooldowns section (if any active)
     if profData.cooldowns then
@@ -903,11 +934,16 @@ function UI:ShowSearchResults(results)
     self:ClearDetailRows()
 
     if #results == 0 then
+        local query = self.searchBox and self.searchBox:GetText() or ""
         local noResult = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         noResult:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 0, -80)
         noResult:SetWidth(360)
         noResult:SetJustifyH("CENTER")
-        noResult:SetText("No results found.")
+        if query ~= "" then
+            noResult:SetText("Nobody in the guild knows '" .. query .. "'.")
+        else
+            noResult:SetText("No results found.")
+        end
         noResult:SetTextColor(0.5, 0.5, 0.5)
         self.detailContent:SetHeight(160)
         self.detailRows[#self.detailRows + 1] = noResult
@@ -1001,10 +1037,17 @@ function UI:ShowSearchResults(results)
             if aOn ~= bOn then return aOn end
             return a.key < b.key
         end)
-        local total = #result.crafters
+        local showOnlineOnly = GuildCrafts.db and GuildCrafts.db.profile.showOnlineOnly
+        local displayCrafters = {}
+        for _, c in ipairs(result.crafters) do
+            if not showOnlineOnly or c.key == myKey or GuildCrafts.Data:IsMemberOnline(c.key) then
+                displayCrafters[#displayCrafters + 1] = c
+            end
+        end
+        local total = #displayCrafters
         local cParts = {}
         for i = 1, math.min(total, 2) do
-            local c = result.crafters[i]
+            local c = displayCrafters[i]
             local cname = c.key:match("^(.+)-") or c.key
             if c.key == myKey then
                 cname = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" .. cname
@@ -1013,6 +1056,7 @@ function UI:ShowSearchResults(results)
         end
         local crafterStr = table.concat(cParts, ", ")
         if total > 2 then crafterStr = crafterStr .. " |cff1eff00(+" .. (total - 2) .. ")|r" end
+        if total == 0 and showOnlineOnly then crafterStr = "|cff666666—|r" end
         -- Post-to-guild-chat button (always right-most)
         local capturedSearchResult = result
         local postBtn = self:CreatePostButton(recipeRow, function()
@@ -1030,7 +1074,7 @@ function UI:ShowSearchResults(results)
 
         -- Crafter list tooltip on hover (right side, over crafter text)
         if total > 0 then
-            local capturedCrafters = result.crafters
+            local capturedCrafters = displayCrafters
             local capturedMyKey    = myKey
             local capturedName     = result.recipeName
             local crafterHit = CreateFrame("Frame", nil, recipeRow)
@@ -1206,126 +1250,6 @@ function UI:RemovePopup(popup)
             end
         end
     end
-end
-
-----------------------------------------------------------------------
--- Craft Queue Panel
-----------------------------------------------------------------------
-
-function UI:ToggleCraftQueue()
-    self.craftQueueExpanded = not self.craftQueueExpanded
-    if self.craftQueueExpanded then
-        self:ShowCraftQueuePanel()
-    else
-        self:HideCraftQueuePanel()
-    end
-end
-
-function UI:ShowCraftQueuePanel()
-    if not self._craftQueuePanel then
-        local panel = CreateFrame("Frame", nil, self.mainFrame, "BackdropTemplate")
-        panel:SetHeight(120)
-        panel:SetPoint("BOTTOMLEFT", self.craftQueueBar, "TOPLEFT", 0, 0)
-        panel:SetPoint("BOTTOMRIGHT", self.craftQueueBar, "TOPRIGHT", 0, 0)
-        panel:SetBackdrop({
-            bgFile   = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
-        panel:SetBackdropColor(0.08, 0.08, 0.08, 1)
-        panel:SetBackdropBorderColor(unpack(COLOR_DIVIDER))
-
-        self._craftQueuePanel = panel
-        self._craftQueueRows = {}
-    end
-
-    self._craftQueuePanel:Show()
-    self:RefreshCraftQueue()
-end
-
-function UI:HideCraftQueuePanel()
-    if self._craftQueuePanel then
-        self._craftQueuePanel:Hide()
-    end
-end
-
-function UI:RefreshCraftQueue()
-    -- Update bar text
-    local count = GuildCrafts.CraftRequest and GuildCrafts.CraftRequest:GetQueueCount() or 0
-    if count > 0 then
-        self.craftQueueBarText:SetText("Craft Queue (" .. count .. " pending)")
-        self.craftQueueBarText:SetTextColor(1, 0.82, 0)
-    else
-        self.craftQueueBarText:SetText("Craft Queue (empty)")
-        self.craftQueueBarText:SetTextColor(0.5, 0.5, 0.5)
-    end
-
-    -- Refresh panel content if visible
-    if not self._craftQueuePanel or not self._craftQueuePanel:IsShown() then return end
-
-    -- Clear old rows
-    if self._craftQueueRows then
-        for _, row in ipairs(self._craftQueueRows) do
-            row:Hide()
-        end
-    end
-    self._craftQueueRows = {}
-
-    local queue = GuildCrafts.CraftRequest and GuildCrafts.CraftRequest:GetQueue() or {}
-    local yOffset = -4
-    for _, req in ipairs(queue) do
-        local row = CreateFrame("Frame", nil, self._craftQueuePanel)
-        row:SetHeight(22)
-        row:SetPoint("TOPLEFT", self._craftQueuePanel, "TOPLEFT", 8, yOffset)
-        row:SetPoint("TOPRIGHT", self._craftQueuePanel, "TOPRIGHT", -8, yOffset)
-
-        local label = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        label:SetPoint("LEFT", row, "LEFT", 0, 0)
-        label:SetText("|cffffd100" .. req.item .. "|r — for " ..
-            (req.requester:match("^(.+)-") or req.requester))
-
-        -- Complete button
-        local completeBtn = CreateFrame("Button", nil, row, "BackdropTemplate")
-        completeBtn:SetSize(40, 18)
-        completeBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-        completeBtn:SetBackdrop({
-            bgFile   = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
-        completeBtn:SetBackdropColor(0.15, 0.4, 0.15, 0.8)
-        completeBtn:SetBackdropBorderColor(0.3, 0.6, 0.3, 0.5)
-        local cText = completeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        cText:SetPoint("CENTER")
-        cText:SetText("Done")
-        completeBtn:SetScript("OnClick", function()
-            GuildCrafts.CraftRequest:CompleteRequest(req)
-        end)
-
-        -- Dismiss button
-        local dismissBtn = CreateFrame("Button", nil, row, "BackdropTemplate")
-        dismissBtn:SetSize(24, 18)
-        dismissBtn:SetPoint("RIGHT", completeBtn, "LEFT", -4, 0)
-        dismissBtn:SetBackdrop({
-            bgFile   = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
-        dismissBtn:SetBackdropColor(0.4, 0.15, 0.15, 0.8)
-        dismissBtn:SetBackdropBorderColor(0.6, 0.3, 0.3, 0.5)
-        local dText = dismissBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        dText:SetPoint("CENTER")
-        dText:SetText("X")
-        dismissBtn:SetScript("OnClick", function()
-            GuildCrafts.CraftRequest:DismissRequest(req)
-        end)
-
-        self._craftQueueRows[#self._craftQueueRows + 1] = row
-        yOffset = yOffset - 24
-    end
-
-    local panelHeight = math.max(math.abs(yOffset) + 8, 40)
-    self._craftQueuePanel:SetHeight(panelHeight)
 end
 
 ----------------------------------------------------------------------
@@ -2075,8 +1999,6 @@ function UI:Refresh()
 
     -- Make sure welcome state is correct after all updates
     self:UpdateDetailWelcome()
-
-    self:RefreshCraftQueue()
 end
 
 ----------------------------------------------------------------------
@@ -2215,6 +2137,7 @@ function UI:ShowProfessionToggle(profName)
 
     -- Sync toggle button visuals with current view mode
     self:_UpdateViewToggleVisuals()
+    self:_UpdateOnlineBtnVisuals()
 
     -- Reanchor scroll frame below toggle bar
     self.detailScrollFrame:ClearAllPoints()
@@ -2256,6 +2179,34 @@ function UI:_UpdateViewToggleVisuals()
         mem:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
         mem._textFS:SetTextColor(0.7, 0.7, 0.7)
         mem:Enable()
+    end
+end
+
+--- Update the Online Only dot visual to match the current filter state.
+function UI:_UpdateOnlineBtnVisuals()
+    if not self.onlineFilterDotFS then return end
+    local on = GuildCrafts.db and GuildCrafts.db.profile.showOnlineOnly
+    if on then
+        self.onlineFilterDotFS:SetTextColor(0.2, 1, 0.4)
+    else
+        self.onlineFilterDotFS:SetTextColor(0.3, 0.3, 0.3)
+    end
+end
+
+--- Toggle the "show online crafters only" filter and refresh the active view.
+function UI:ToggleOnlineFilter()
+    if not GuildCrafts.db then return end
+    GuildCrafts.db.profile.showOnlineOnly = not GuildCrafts.db.profile.showOnlineOnly
+    self:_UpdateOnlineBtnVisuals()
+    if self._searchActive and self._lastSearchResults then
+        self:ShowSearchResults(self._lastSearchResults)
+    elseif self._viewMode == "recipes" and self._selectedProfession then
+        self:ShowRecipesView(self._selectedProfession)
+    elseif self._navState == "members" and self._selectedProfession then
+        self:NavigateToMembers(self._selectedProfession)
+    else
+        -- On the profession list: just repopulate so counts refresh
+        self:PopulateProfessionList()
     end
 end
 
@@ -2384,10 +2335,17 @@ function UI:ShowRecipesView(profName)
         end)
 
         -- Inline crafter preview (max 2 names, right-aligned)
-        local total = #recipe.crafters
+        local showOnlineOnly = GuildCrafts.db and GuildCrafts.db.profile.showOnlineOnly
+        local displayCrafters = {}
+        for _, c in ipairs(recipe.crafters) do
+            if not showOnlineOnly or c.key == myKey or GuildCrafts.Data:IsMemberOnline(c.key) then
+                displayCrafters[#displayCrafters + 1] = c
+            end
+        end
+        local total = #displayCrafters
         local parts = {}
         for i = 1, math.min(total, 2) do
-            local c    = recipe.crafters[i]
+            local c    = displayCrafters[i]
             local name = c.key:match("^(.+)-") or c.key
             if c.key == myKey then
                 name = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:10:10:0:0|t" .. name
@@ -2396,6 +2354,7 @@ function UI:ShowRecipesView(profName)
         end
         local crafterStr = table.concat(parts, ", ")
         if total > 2 then crafterStr = crafterStr .. " |cff1eff00(+" .. (total - 2) .. ")|r" end
+        if total == 0 and showOnlineOnly then crafterStr = "|cff666666—|r" end
 
         -- Post-to-guild-chat button (always right-most)
         local capturedPostRecipe = recipe
@@ -2415,7 +2374,7 @@ function UI:ShowRecipesView(profName)
 
         -- Crafter list tooltip on hover (right side, over crafter text)
         if total > 0 then
-            local capturedCrafters = recipe.crafters
+            local capturedCrafters = displayCrafters
             local capturedMyKey    = myKey
             local capturedName     = recipe.name
             local crafterHit = CreateFrame("Frame", nil, row)
