@@ -13,6 +13,7 @@ Libs\embeds.xml
 # Core modules
 Core.lua
 Data.lua
+Data_TBC.lua
 Comms.lua
 CraftRequest.lua
 Favorites.lua

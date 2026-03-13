@@ -54,18 +54,8 @@ local TRACKED_PROFESSIONS = {
     ["Tailoring"] = true,
 }
 
--- Expansion threshold spell IDs per profession.
--- Recipes with |spellID| >= threshold are TBC; lower are Classic.
--- Jewelcrafting is TBC-only — all its recipes are TBC.
-local TBC_THRESHOLD = {
-    ["Alchemy"]        = 28543,  -- Elixir of Camouflage
-    ["Blacksmithing"]  = 29545,  -- Fel Iron Plate Gloves
-    ["Cooking"]        = 28267,  -- Crunchy Spider Surprise
-    ["Enchanting"]     = 27899,  -- Enchant Bracer - Brawn
-    ["Engineering"]    = 30303,  -- Elemental Blasting Powder
-    ["Leatherworking"] = 32454,  -- Knothide Leather
-    ["Tailoring"]      = 26745,  -- Bolt of Netherweave
-}
+-- TBC_ITEM_IDS is populated by Data_TBC.lua on the GuildCrafts addon table.
+-- It maps every TBC Classic recipe spell ID to 1.
 
 ----------------------------------------------------------------------
 -- Locale-to-canonical profession name mapping
@@ -164,13 +154,13 @@ function Data:GetSpecialisationDescription(spec)
     return nil
 end
 
---- Returns "TBC", "ORIG", or nil (show regardless) for a recipe in a given profession.
---- recipeKey: positive = item-based, negative = enchanting spell-based.
-function Data:GetExpansionTag(profName, recipeKey)
-    if profName == "Jewelcrafting" then return "TBC" end
-    local threshold = TBC_THRESHOLD[profName]
-    if not threshold then return nil end
-    return math.abs(recipeKey) >= threshold and "TBC" or "ORIG"
+--- Returns "TBC", "ORIG", or nil (show regardless) for a recipe.
+--- recipeKey: positive = createdItemId, negative = -spellId (enchanting).
+--- Looks up directly in TBC_ITEM_IDS — no scan required.
+function Data:GetExpansionTag(_profName, recipeKey)
+    local ids = GuildCrafts.TBC_ITEM_IDS
+    if not ids then return nil end
+    return ids[recipeKey] and "TBC" or "ORIG"
 end
 
 -- AceDB defaults

@@ -69,7 +69,7 @@ read_globals = {
 
     -- WoW API — Misc
     "GetAddOnMemoryUsage", "UpdateAddOnMemoryUsage",
-    "GetBuildInfo", "GetItemInfo", "IsSpellKnown",
+    "GetBuildInfo", "GetItemInfo", "IsMouseButtonDown", "IsSpellKnown",
     "UnitName", "GetRealmName", "ReloadUI",
     "time",
 
