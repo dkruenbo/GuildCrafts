@@ -183,12 +183,22 @@ function UI:CreateResizeGrip(parent)
     grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    grip:SetFrameLevel(parent:GetFrameLevel() + 20)
 
     grip:SetScript("OnMouseDown", function()
         parent:StartSizing("BOTTOMRIGHT")
+        -- Safety: poll every frame in case OnMouseUp is missed
+        grip:SetScript("OnUpdate", function()
+            if not IsMouseButtonDown("LeftButton") then
+                parent:StopMovingOrSizing()
+                grip:SetScript("OnUpdate", nil)
+                UI:OnResize()
+            end
+        end)
     end)
     grip:SetScript("OnMouseUp", function()
         parent:StopMovingOrSizing()
+        grip:SetScript("OnUpdate", nil)
         UI:OnResize()
     end)
 end
@@ -216,7 +226,7 @@ function UI:CreateSearchBar(parent)
     local search = CreateFrame("EditBox", "GuildCraftsSearchBox", container, "BackdropTemplate")
     search:SetHeight(24)
     search:SetPoint("LEFT", container, "LEFT", 2, 0)
-    search:SetPoint("RIGHT", container, "RIGHT", -90, 0)
+    search:SetPoint("RIGHT", container, "RIGHT", -188, 0)
     search:SetFontObject(ChatFontNormal)
     search:SetAutoFocus(false)
     search:SetBackdrop({
@@ -285,6 +295,46 @@ function UI:CreateSearchBar(parent)
             UI:OnSearch(text)
         end
     end)
+
+    -- Expansion filter buttons: [Orig] and [TBC]
+    local function makeExpBtn(label, rightOffset, width)
+        local btn = CreateFrame("Button", nil, container, "BackdropTemplate")
+        btn:SetSize(width, 24)
+        btn:SetPoint("RIGHT", container, "RIGHT", rightOffset, 0)
+        btn:SetBackdrop({
+            bgFile   = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        btn:SetBackdropColor(0.12, 0.12, 0.12, 1)
+        btn:SetBackdropBorderColor(1, 0.82, 0, 1)
+        local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetPoint("CENTER")
+        fs:SetText(label)
+        fs:SetTextColor(1, 0.82, 0)
+        btn._textFS = fs
+        return btn
+    end
+    local tbcBtn  = makeExpBtn("TBC",     -84, 40)
+    local origBtn = makeExpBtn("Vanilla", -128, 56)
+    tbcBtn:SetScript("OnClick",  function() UI:ToggleExpansionFilter("TBC")  end)
+    origBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("ORIG") end)
+    tbcBtn:SetScript("OnEnter",  function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:AddLine("TBC Recipes", 1, 1, 1)
+        GameTooltip:AddLine("Show The Burning Crusade recipes.", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    tbcBtn:SetScript("OnLeave",  function() GameTooltip:Hide() end)
+    origBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:AddLine("Vanilla Recipes", 1, 1, 1)
+        GameTooltip:AddLine("Show Vanilla Classic recipes.", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    origBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    self._expFilterTBCBtn  = tbcBtn
+    self._expFilterOrigBtn = origBtn
 
     self.searchBox = search
     self.scopeButton = scopeBtn
@@ -782,9 +832,17 @@ function UI:ShowMemberRecipes(memberKey, profName)
         return a.name < b.name
     end)
 
+    local filteredSorted = {}
+    for _, recipe in ipairs(sorted) do
+        local expTag = GuildCrafts.Data:GetExpansionTag(profName, recipe.key)
+        if not expTag or not GuildCrafts.db or GuildCrafts.db.profile.expansionFilter[expTag] then
+            filteredSorted[#filteredSorted + 1] = recipe
+        end
+    end
+
     local lastCategory = nil
     self.expandedRecipes = self.expandedRecipes or {}
-    for _, recipe in ipairs(sorted) do
+    for _, recipe in ipairs(filteredSorted) do
         -- Category header
         local displayCategory = recipe.category ~= "" and recipe.category or nil
         if displayCategory and displayCategory ~= lastCategory then
@@ -952,9 +1010,16 @@ function UI:ShowSearchResults(results)
 
     self.expandedRecipes = self.expandedRecipes or {}
     local myKey = GuildCrafts.Data:GetPlayerKey()
+    local filteredResults = {}
+    for _, result in ipairs(results) do
+        local expTag = GuildCrafts.Data:GetExpansionTag(result.profName, result.recipeKey)
+        if not expTag or not GuildCrafts.db or GuildCrafts.db.profile.expansionFilter[expTag] then
+            filteredResults[#filteredResults + 1] = result
+        end
+    end
 
     local yOffset = -8
-    for _, result in ipairs(results) do
+    for _, result in ipairs(filteredResults) do
         local hasReagents = result.reagents and #result.reagents > 0
         local isExpanded  = self.expandedRecipes[result.recipeKey] or false
 
@@ -2138,6 +2203,7 @@ function UI:ShowProfessionToggle(profName)
     -- Sync toggle button visuals with current view mode
     self:_UpdateViewToggleVisuals()
     self:_UpdateOnlineBtnVisuals()
+    self:_UpdateExpansionFilterVisuals()
 
     -- Reanchor scroll frame below toggle bar
     self.detailScrollFrame:ClearAllPoints()
@@ -2190,6 +2256,45 @@ function UI:_UpdateOnlineBtnVisuals()
         self.onlineFilterDotFS:SetTextColor(0.2, 1, 0.4)
     else
         self.onlineFilterDotFS:SetTextColor(0.3, 0.3, 0.3)
+    end
+end
+
+--- Update visual state of the [Orig] and [TBC] expansion filter buttons.
+function UI:_UpdateExpansionFilterVisuals()
+    if not self._expFilterOrigBtn then return end
+    local f = GuildCrafts.db and GuildCrafts.db.profile.expansionFilter
+    if not f then return end
+    for _, info in ipairs({
+        { btn = self._expFilterOrigBtn, tag = "ORIG" },
+        { btn = self._expFilterTBCBtn,  tag = "TBC"  },
+    }) do
+        if f[info.tag] then
+            info.btn:SetBackdropColor(0.12, 0.12, 0.12, 1)
+            info.btn:SetBackdropBorderColor(1, 0.82, 0, 1)
+            info.btn._textFS:SetTextColor(1, 0.82, 0)
+        else
+            info.btn:SetBackdropColor(0.07, 0.07, 0.07, 0.9)
+            info.btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+            info.btn._textFS:SetTextColor(0.4, 0.4, 0.4)
+        end
+    end
+end
+
+--- Toggle an expansion filter tag ("ORIG" or "TBC") and refresh the active view.
+function UI:ToggleExpansionFilter(tag)
+    if not GuildCrafts.db then return end
+    local f = GuildCrafts.db.profile.expansionFilter
+    local other = tag == "ORIG" and "TBC" or "ORIG"
+    -- Prevent both being off
+    if f[tag] and not f[other] then return end
+    f[tag] = not f[tag]
+    self:_UpdateExpansionFilterVisuals()
+    if self._searchActive and self._lastSearchResults then
+        self:ShowSearchResults(self._lastSearchResults)
+    elseif self._viewMode == "recipes" and self._selectedProfession then
+        self:ShowRecipesView(self._selectedProfession)
+    elseif self._selectedMember and self._selectedProfession then
+        self:ShowMemberRecipes(self._selectedMember, self._selectedProfession)
     end
 end
 
@@ -2266,9 +2371,16 @@ function UI:ShowRecipesView(profName)
 
     local myKey   = GuildCrafts.Data:GetPlayerKey()
     self.expandedRecipes = self.expandedRecipes or {}
-    local yOffset = -8
-
+    local filteredRecipes = {}
     for _, recipe in ipairs(recipes) do
+        local expTag = GuildCrafts.Data:GetExpansionTag(profName, recipe.key)
+        if not expTag or not GuildCrafts.db or GuildCrafts.db.profile.expansionFilter[expTag] then
+            filteredRecipes[#filteredRecipes + 1] = recipe
+        end
+    end
+
+    local yOffset = -8
+    for _, recipe in ipairs(filteredRecipes) do
         local hasReagents = recipe.reagents and #recipe.reagents > 0
         local isExpanded  = self.expandedRecipes[recipe.key] or false
 

@@ -54,6 +54,9 @@ local TRACKED_PROFESSIONS = {
     ["Tailoring"] = true,
 }
 
+-- TBC_ITEM_IDS is populated by Data_TBC.lua on the GuildCrafts addon table.
+-- It maps every TBC Classic recipe spell ID to 1.
+
 ----------------------------------------------------------------------
 -- Locale-to-canonical profession name mapping
 -- GetSpellInfo(id) returns the *localised* profession name, which must
@@ -151,6 +154,15 @@ function Data:GetSpecialisationDescription(spec)
     return nil
 end
 
+--- Returns "TBC", "ORIG", or nil (show regardless) for a recipe.
+--- recipeKey: positive = createdItemId, negative = -spellId (enchanting).
+--- Looks up directly in TBC_ITEM_IDS — no scan required.
+function Data:GetExpansionTag(_profName, recipeKey)
+    local ids = GuildCrafts.TBC_ITEM_IDS
+    if not ids then return nil end
+    return ids[recipeKey] and "TBC" or "ORIG"
+end
+
 -- AceDB defaults
 local DB_DEFAULTS = {
     global = {
@@ -168,6 +180,7 @@ local DB_DEFAULTS = {
     },
     profile = {
         showOnlineOnly = false,
+        expansionFilter = { ORIG = true, TBC = true },
     },
 }
 

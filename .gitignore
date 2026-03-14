@@ -14,3 +14,6 @@ SavedVariables/
 
 # Build artifacts
 *.zip
+
+# Generator tooling (data files + scripts, not part of the addon)
+tools/

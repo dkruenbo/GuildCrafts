@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.2 — Expansion Filter — 2026-03-13
+
+### New Features
+
+- **Expansion filter buttons** — two toggle buttons `[Vanilla]` and `[TBC]` in the search bar let you narrow the recipe display to Original Classic recipes, TBC recipes, or both. Filter state persists across reloads per character. Both are active by default so first-run behaviour is unchanged
+- **Accurate TBC classification** — recipes are classified via a pre-generated lookup table (`TBC_ITEM_IDS`) covering all TBC crafting professions. Lookup is a direct hash — no per-frame scan, zero runtime cost
+- **Enchanting fully covered** — enchanting recipe keys are `-spellID` as returned by `GetCraftRecipeLink`; the lookup table is keyed accordingly so all TBC enchants classify correctly
+
+---
+
 ## 1.2.1 — Data Clarity & Search UX — 2026-03-13
 
 ### New Features
