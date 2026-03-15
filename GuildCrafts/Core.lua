@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.2.2"
+GuildCrafts.DISPLAY_VERSION = "1.2.3"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -113,11 +113,6 @@ function GuildCrafts:OnLoginReady()
     -- Init comms (Phase 2)
     if self.Comms then
         self.Comms:OnLoginReady()
-    end
-
-    -- Restore craft queue (may have failed during OnEnable if guild info wasn't ready yet)
-    if self.CraftRequest then
-        self.CraftRequest:RestoreQueue()
     end
 
     -- Remind the player to open profession windows so recipes get scanned

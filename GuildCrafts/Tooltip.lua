@@ -100,6 +100,7 @@ end
 
 function Tooltip:OnTooltipSetItem(tooltip)
     if not GuildCrafts.Data or not GuildCrafts.Data.db then return end
+    if GuildCrafts.db and GuildCrafts.db.profile.showTooltipCrafters == false then return end
 
     -- Rebuild index if stale
     if indexDirty then

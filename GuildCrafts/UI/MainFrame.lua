@@ -107,6 +107,7 @@ function UI:CreateMainFrame()
     self:CreateDetailPanel(f)
     self:CreateLeftPanel(f)
     self:CreateResizeGrip(f)
+    self:CreateBottomBar(f)
 
     self.mainFrame = f
     return f
@@ -205,6 +206,60 @@ end
 
 function UI:OnResize()
     -- Panels auto-adjust via anchoring
+end
+
+----------------------------------------------------------------------
+-- Bottom Bar  ([Online] + [Tooltip] filter buttons)
+----------------------------------------------------------------------
+
+function UI:CreateBottomBar(parent)
+    local bar = CreateFrame("Frame", nil, parent)
+    bar:SetHeight(20)
+    bar:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  8, 8)
+    bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -8, 8)
+
+    local function makeBarBtn(label, rightOffset, width)
+        local btn = CreateFrame("Button", nil, bar, "BackdropTemplate")
+        btn:SetSize(width, 16)
+        btn:SetPoint("RIGHT", bar, "RIGHT", rightOffset, 0)
+        btn:SetBackdrop({
+            bgFile   = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        btn:SetBackdropColor(0.07, 0.07, 0.07, 0.9)
+        btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetPoint("CENTER")
+        fs:SetText(label)
+        fs:SetTextColor(0.4, 0.4, 0.4)
+        btn._textFS = fs
+        return btn
+    end
+
+    local tooltipBtn = makeBarBtn("[Tooltip]", 0,   60)
+    local onlineBtn  = makeBarBtn("[Online]",  -64, 52)
+
+    onlineBtn:SetScript("OnClick", function() UI:ToggleOnlineFilter() end)
+    onlineBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:AddLine("Online Filter", 1, 1, 1)
+        GameTooltip:AddLine("Show only online crafters.", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    onlineBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    tooltipBtn:SetScript("OnClick", function() UI:ToggleTooltipCrafters() end)
+    tooltipBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:AddLine("Tooltip Crafters", 1, 1, 1)
+        GameTooltip:AddLine("Show crafters in item tooltips.", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    tooltipBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    self._onlineBtn  = onlineBtn
+    self._tooltipBtn = tooltipBtn
 end
 
 ----------------------------------------------------------------------
@@ -400,27 +455,6 @@ function UI:CreateLeftPanel(parent)
     end)
     favBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     self.favButton = favBtn
-
-    -- Online-only filter dot (left of the fav star)
-    local onlineDot = CreateFrame("Frame", nil, panel)
-    onlineDot:SetSize(16, 16)
-    onlineDot:SetPoint("TOPRIGHT", favBtn, "TOPLEFT", -4, 0)
-    onlineDot:EnableMouse(true)
-    local onlineDotFS = onlineDot:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    onlineDotFS:SetPoint("CENTER")
-    onlineDotFS:SetText("O")
-    onlineDotFS:SetTextColor(0.3, 0.3, 0.3)
-    onlineDot:SetScript("OnMouseDown", function()
-        UI:ToggleOnlineFilter()
-    end)
-    onlineDot:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Online Filter", 1, 1, 1)
-        GameTooltip:AddLine("Show only online members.", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    onlineDot:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    self.onlineFilterDotFS = onlineDotFS
 
     -- Scroll frame for list content
     local scrollFrame = CreateFrame("ScrollFrame", "GuildCraftsLeftScroll", panel, "UIPanelScrollFrameTemplate")
@@ -1129,8 +1163,18 @@ function UI:ShowSearchResults(results)
         end)
         postBtn:SetPoint("RIGHT", recipeRow, "RIGHT", 0, 0)
         self.detailRows[#self.detailRows + 1] = postBtn
+
+        -- Whisper button (left of post button)
+        local whisperBtn    = self:CreateWhisperButton(recipeRow, result.crafters, result.recipeName, myKey)
+        local whisperAnchor = postBtn
+        if whisperBtn then
+            whisperBtn:SetPoint("RIGHT", postBtn, "LEFT", -2, 0)
+            self.detailRows[#self.detailRows + 1] = whisperBtn
+            whisperAnchor = whisperBtn
+        end
+
         local crafterText = recipeRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        crafterText:SetPoint("RIGHT", postBtn, "LEFT", -2, 0)
+        crafterText:SetPoint("RIGHT", whisperAnchor, "LEFT", -2, 0)
         crafterText:SetWidth(140)
         crafterText:SetJustifyH("RIGHT")
         crafterText:SetWordWrap(false)
@@ -1143,7 +1187,7 @@ function UI:ShowSearchResults(results)
             local capturedMyKey    = myKey
             local capturedName     = result.recipeName
             local crafterHit = CreateFrame("Frame", nil, recipeRow)
-            crafterHit:SetPoint("RIGHT", postBtn, "LEFT", -2, 0)
+            crafterHit:SetPoint("RIGHT", whisperAnchor, "LEFT", -2, 0)
             crafterHit:SetSize(140, 20)
             crafterHit:EnableMouse(true)
             crafterHit:SetScript("OnEnter", function(self)
@@ -1200,121 +1244,6 @@ function UI:ShowSearchResults(results)
     end
 
     self.detailContent:SetHeight(math.max(math.abs(yOffset) + 8, 1))
-end
-
-----------------------------------------------------------------------
--- Show Craft Request Popup
-----------------------------------------------------------------------
-
-function UI:ShowCraftRequestPopup(request)
-    local popup = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-    popup:SetSize(280, 120)
-    popup:SetFrameStrata("DIALOG")
-    popup:SetMovable(true)
-    popup:EnableMouse(true)
-    popup:RegisterForDrag("LeftButton")
-    popup:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    popup:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-
-    -- Stack popups vertically
-    local existingPopups = self._activePopups or {}
-    local yOff = -60 * #existingPopups
-    popup:SetPoint("CENTER", UIParent, "CENTER", 0, 100 + yOff)
-
-    popup:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    popup:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
-    popup:SetBackdropBorderColor(0.5, 0.4, 0.1, 1)
-
-    -- Title
-    local title = popup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOP", popup, "TOP", 0, -10)
-    title:SetText("|cffffd100Craft Request|r")
-
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, popup, "UIPanelCloseButton")
-    closeBtn:SetSize(18, 18)
-    closeBtn:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -2, -2)
-
-    -- Body text
-    local body = popup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    body:SetPoint("CENTER", popup, "CENTER", 0, 10)
-    body:SetText((request.requester:match("^(.+)-") or request.requester) ..
-        " wants you to craft:\n|cffffd100" .. request.item .. "|r")
-    body:SetJustifyH("CENTER")
-
-    -- Accept button
-    local accept = CreateFrame("Button", nil, popup, "BackdropTemplate")
-    accept:SetSize(80, 24)
-    accept:SetPoint("BOTTOMRIGHT", popup, "BOTTOM", -8, 12)
-    accept:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    accept:SetBackdropColor(0.15, 0.4, 0.15, 0.9)
-    accept:SetBackdropBorderColor(0.3, 0.6, 0.3, 0.5)
-    local acceptText = accept:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    acceptText:SetPoint("CENTER")
-    acceptText:SetText("Accept")
-    acceptText:SetTextColor(0.8, 1, 0.8)
-
-    -- Decline button
-    local decline = CreateFrame("Button", nil, popup, "BackdropTemplate")
-    decline:SetSize(80, 24)
-    decline:SetPoint("BOTTOMLEFT", popup, "BOTTOM", 8, 12)
-    decline:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    decline:SetBackdropColor(0.4, 0.15, 0.15, 0.9)
-    decline:SetBackdropBorderColor(0.6, 0.3, 0.3, 0.5)
-    local declineText = decline:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    declineText:SetPoint("CENTER")
-    declineText:SetText("Decline")
-    declineText:SetTextColor(1, 0.8, 0.8)
-
-    -- Handlers — hide popup FIRST to ensure it disappears even if
-    -- downstream logic (queue refresh, comms) throws an error.
-    accept:SetScript("OnClick", function()
-        self:RemovePopup(popup)
-        if GuildCrafts.CraftRequest then
-            GuildCrafts.CraftRequest:AcceptRequest(request)
-        end
-    end)
-
-    decline:SetScript("OnClick", function()
-        self:RemovePopup(popup)
-        if GuildCrafts.CraftRequest then
-            GuildCrafts.CraftRequest:DeclineRequest(request)
-        end
-    end)
-
-    closeBtn:SetScript("OnClick", function()
-        self:RemovePopup(popup)
-        if GuildCrafts.CraftRequest then
-            GuildCrafts.CraftRequest:DeclineRequest(request)
-        end
-    end)
-
-    -- Track popup
-    self._activePopups = self._activePopups or {}
-    self._activePopups[#self._activePopups + 1] = popup
-end
-
-function UI:RemovePopup(popup)
-    popup:Hide()
-    if self._activePopups then
-        for i = #self._activePopups, 1, -1 do
-            if self._activePopups[i] == popup then
-                table.remove(self._activePopups, i)
-            end
-        end
-    end
 end
 
 ----------------------------------------------------------------------
@@ -1802,6 +1731,144 @@ function UI:CreatePostButton(parent, onClick)
     return btn
 end
 
+--- Pre-fill a whisper to a crafter in the chat edit box.
+function UI:OpenWhisper(charKey, itemName)
+    local name = charKey:match("^(.+)-") or charKey
+    ChatFrame_OpenChat("/w " .. name .. " Can you craft " .. itemName .. " for me?")
+end
+
+--- Create a [W] whisper button for the given crafter list.
+--- Returns nil when all crafters are self (no one to whisper).
+function UI:CreateWhisperButton(parent, crafters, itemName, myKey)
+    -- Collect non-self crafters, online first
+    local targets = {}
+    for _, c in ipairs(crafters) do
+        if c.key ~= myKey then
+            targets[#targets + 1] = c
+        end
+    end
+    if #targets == 0 then return nil end
+    table.sort(targets, function(a, b)
+        local aOn = GuildCrafts.Data:IsMemberOnline(a.key)
+        local bOn = GuildCrafts.Data:IsMemberOnline(b.key)
+        if aOn ~= bOn then return aOn end
+        return a.key < b.key
+    end)
+
+    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    btn:SetSize(26, 16)
+    btn:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    btn:SetBackdropColor(0.1, 0.1, 0.1, 0)
+    btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 0)
+    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    label:SetPoint("CENTER")
+    label:SetText("|cff666666[W]|r")
+    btn:SetScript("OnEnter", function()
+        btn:SetBackdropColor(0.15, 0.15, 0.15, 0.9)
+        btn:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
+        label:SetText("|cffdddddd[W]|r")
+        GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Whisper a crafter", 1, 0.82, 0)
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function()
+        btn:SetBackdropColor(0.1, 0.1, 0.1, 0)
+        btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 0)
+        label:SetText("|cff666666[W]|r")
+        GameTooltip:Hide()
+    end)
+
+    local capturedTargets = targets
+    local capturedItem    = itemName
+    if #targets == 1 then
+        btn:SetScript("OnClick", function()
+            UI:OpenWhisper(capturedTargets[1].key, capturedItem)
+        end)
+    else
+        btn:SetScript("OnClick", function()
+            UI:ShowWhisperPicker(btn, capturedTargets, capturedItem)
+        end)
+    end
+
+    return btn
+end
+
+--- Show a small dropdown picker to choose which crafter to whisper.
+function UI:ShowWhisperPicker(anchor, targets, itemName)
+    -- Close any existing picker first
+    if self._whisperPicker then
+        self._whisperPicker:Hide()
+        self._whisperPicker = nil
+    end
+
+    local rowH   = 18
+    local picker = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    picker:SetSize(130, #targets * rowH + 4)
+    picker:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMLEFT", -2, 0)
+    picker:SetFrameStrata("TOOLTIP")
+    picker:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    picker:SetBackdropColor(0.08, 0.08, 0.08, 0.97)
+    picker:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    picker:EnableMouse(true)
+
+    for i, c in ipairs(targets) do
+        local cname = c.key:match("^(.+)-") or c.key
+        local isOn  = GuildCrafts.Data:IsMemberOnline(c.key)
+        local row = CreateFrame("Button", nil, picker, "BackdropTemplate")
+        row:SetSize(126, rowH)
+        row:SetPoint("TOPLEFT", picker, "TOPLEFT", 2, -(i - 1) * rowH - 2)
+        row:SetBackdrop({
+            bgFile   = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        row:SetBackdropColor(0, 0, 0, 0)
+        row:SetBackdropBorderColor(0, 0, 0, 0)
+        local fs = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetPoint("LEFT", row, "LEFT", 4, 0)
+        fs:SetText(isOn and "|cff00ff00" .. cname .. "|r" or "|cff888888" .. cname .. "|r")
+        row:SetScript("OnEnter", function()
+            row:SetBackdropColor(0.2, 0.2, 0.2, 0.8)
+            row:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.5)
+        end)
+        row:SetScript("OnLeave", function()
+            row:SetBackdropColor(0, 0, 0, 0)
+            row:SetBackdropBorderColor(0, 0, 0, 0)
+        end)
+        local capturedKey  = c.key
+        local capturedItem = itemName
+        row:SetScript("OnClick", function()
+            UI:OpenWhisper(capturedKey, capturedItem)
+            picker:Hide()
+            UI._whisperPicker = nil
+        end)
+    end
+
+    -- Transparent catch-all backdrop to close on outside click
+    local backdrop = CreateFrame("Frame", nil, UIParent)
+    backdrop:SetAllPoints(UIParent)
+    backdrop:SetFrameStrata("TOOLTIP")
+    backdrop:SetFrameLevel(picker:GetFrameLevel() - 1)
+    backdrop:EnableMouse(true)
+    backdrop:SetScript("OnMouseDown", function()
+        picker:Hide()
+        backdrop:Hide()
+        UI._whisperPicker = nil
+    end)
+    backdrop:Show()
+    picker:SetScript("OnHide", function() backdrop:Hide() end)
+    picker:Show()
+    self._whisperPicker = picker
+end
+
 function UI:CreateStarButton(parent, size, onClick)
     local btn = CreateFrame("Frame", nil, parent)
     btn:SetSize(size, size)
@@ -2203,6 +2270,7 @@ function UI:ShowProfessionToggle(profName)
     -- Sync toggle button visuals with current view mode
     self:_UpdateViewToggleVisuals()
     self:_UpdateOnlineBtnVisuals()
+    self:_UpdateTooltipBtnVisuals()
     self:_UpdateExpansionFilterVisuals()
 
     -- Reanchor scroll frame below toggle bar
@@ -2248,14 +2316,33 @@ function UI:_UpdateViewToggleVisuals()
     end
 end
 
---- Update the Online Only dot visual to match the current filter state.
+--- Update the [Online] button visual to match the current filter state.
 function UI:_UpdateOnlineBtnVisuals()
-    if not self.onlineFilterDotFS then return end
+    if not self._onlineBtn then return end
     local on = GuildCrafts.db and GuildCrafts.db.profile.showOnlineOnly
     if on then
-        self.onlineFilterDotFS:SetTextColor(0.2, 1, 0.4)
+        self._onlineBtn:SetBackdropColor(0.12, 0.12, 0.12, 1)
+        self._onlineBtn:SetBackdropBorderColor(1, 0.82, 0, 1)
+        self._onlineBtn._textFS:SetTextColor(1, 0.82, 0)
     else
-        self.onlineFilterDotFS:SetTextColor(0.3, 0.3, 0.3)
+        self._onlineBtn:SetBackdropColor(0.07, 0.07, 0.07, 0.9)
+        self._onlineBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        self._onlineBtn._textFS:SetTextColor(0.4, 0.4, 0.4)
+    end
+end
+
+--- Update the [Tooltip] button visual to match the current setting.
+function UI:_UpdateTooltipBtnVisuals()
+    if not self._tooltipBtn then return end
+    local on = not (GuildCrafts.db and GuildCrafts.db.profile.showTooltipCrafters == false)
+    if on then
+        self._tooltipBtn:SetBackdropColor(0.12, 0.12, 0.12, 1)
+        self._tooltipBtn:SetBackdropBorderColor(1, 0.82, 0, 1)
+        self._tooltipBtn._textFS:SetTextColor(1, 0.82, 0)
+    else
+        self._tooltipBtn:SetBackdropColor(0.07, 0.07, 0.07, 0.9)
+        self._tooltipBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        self._tooltipBtn._textFS:SetTextColor(0.4, 0.4, 0.4)
     end
 end
 
@@ -2313,6 +2400,13 @@ function UI:ToggleOnlineFilter()
         -- On the profession list: just repopulate so counts refresh
         self:PopulateProfessionList()
     end
+end
+
+--- Toggle whether crafters are shown in item tooltips.
+function UI:ToggleTooltipCrafters()
+    if not GuildCrafts.db then return end
+    GuildCrafts.db.profile.showTooltipCrafters = not GuildCrafts.db.profile.showTooltipCrafters
+    self:_UpdateTooltipBtnVisuals()
 end
 
 --- Switch the profession view mode and refresh content accordingly.
@@ -2476,8 +2570,17 @@ function UI:ShowRecipesView(profName)
         postBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
         self.detailRows[#self.detailRows + 1] = postBtn
 
+        -- Whisper button (left of post button)
+        local whisperBtn    = self:CreateWhisperButton(row, recipe.crafters, recipe.name, myKey)
+        local whisperAnchor = postBtn
+        if whisperBtn then
+            whisperBtn:SetPoint("RIGHT", postBtn, "LEFT", -2, 0)
+            self.detailRows[#self.detailRows + 1] = whisperBtn
+            whisperAnchor = whisperBtn
+        end
+
         local crafterText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        crafterText:SetPoint("RIGHT", postBtn, "LEFT", -2, 0)
+        crafterText:SetPoint("RIGHT", whisperAnchor, "LEFT", -2, 0)
         crafterText:SetWidth(145)
         crafterText:SetJustifyH("RIGHT")
         crafterText:SetWordWrap(false)
@@ -2490,7 +2593,7 @@ function UI:ShowRecipesView(profName)
             local capturedMyKey    = myKey
             local capturedName     = recipe.name
             local crafterHit = CreateFrame("Frame", nil, row)
-            crafterHit:SetPoint("RIGHT", postBtn, "LEFT", -2, 0)
+            crafterHit:SetPoint("RIGHT", whisperAnchor, "LEFT", -2, 0)
             crafterHit:SetSize(145, 20)
             crafterHit:EnableMouse(true)
             crafterHit:SetScript("OnEnter", function(self)
@@ -2563,6 +2666,8 @@ function UI:Toggle()
         frame:Hide()
     else
         frame:Show()
+        self:_UpdateOnlineBtnVisuals()
+        self:_UpdateTooltipBtnVisuals()
         self:Refresh()
     end
 end

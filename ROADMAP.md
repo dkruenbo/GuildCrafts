@@ -73,69 +73,13 @@ This document describes planned releases with implementation notes for each item
 |-------|-------|--------|
 | [#49](https://github.com/dkruenbo/GuildCrafts/issues/49) | Recipe expansion filter (Classic / TBC) | Done in 1.2.2 |
 
----
+### 1.2.3 — Whisper & UI Polish
 
-## Upcoming
-
----
-
-## 1.2.3 — Craft Request Rework
-
-**Theme:** Replace the disruptive popup-based craft request system with a whisper button that delegates conversation to WoW's own chat. The popup system was opt-out, had no rate limiting, and was used for trolling. This release removes the entire addon-protocol request flow and replaces it with a single `[W]` button per recipe row that pre-fills a whisper — keeping the "ask a crafter" workflow intact while eliminating every abuse vector.
-
----
-
-### [#50] Replace craft request popup with whisper button
-
-> **What it is:** Remove the `CRAFT_REQUEST / CRAFT_ACCEPT / CRAFT_DECLINE / CRAFT_COMPLETE` addon message protocol, the incoming popup, and the craft queue panel. Add a `[W]` button to every recipe row in the Recipes view and Search Results view. Clicking `[W]` pre-fills the WoW chat input with a whisper to the chosen crafter — including a live item link — without sending it, so the player can review and edit before pressing Enter.
-
-**Why now:** The popup fires on the recipient's screen regardless of what they are doing, is stackable by anyone in the guild, and cannot be rate-limited without significant protocol complexity. Delegating to WoW's native whisper means the recipient can use `/ignore`, Blizzard handles spam, and the addon protocol shrinks rather than grows.
-
-**Implementation:**
-
-1. **Remove addon request protocol** — Delete `MSG_CRAFT_REQUEST`, `MSG_CRAFT_ACCEPT`, `MSG_CRAFT_DECLINE`, `MSG_CRAFT_COMPLETE` from `Comms.lua` along with their send and handle functions (`SendCraftRequest`, `SendCraftAccept`, `SendCraftDecline`, `SendCraftComplete`, `HandleCraftRequest`, `HandleCraftAccept`, `HandleCraftDecline`, `HandleCraftComplete`). The `PREFIX` registration and all other message types are unaffected.
-
-2. **Remove `CraftRequest.lua`** — The entire module (`pendingPopups`, `craftQueue`, persistence, popup display, accept/decline/complete logic) is deleted. Remove it from `GuildCrafts.toc` and remove the `GuildCrafts:NewModule("CraftRequest")` call from `Core.lua`.
-
-3. **Remove popup UI and queue panel** — Delete `UI:ShowCraftRequestPopup()`, `UI:RemovePopup()`, `UI:RefreshCraftQueue()`, and the craft queue section from `MainFrame.lua`. Remove `_activePopups` state.
-
-4. **Add `[W]` button factory** — Add `UI:CreateWhisperButton(parent, crafters, recipeName, recipeKey)` in `MainFrame.lua`, styled identically to the existing `CreatePostButton` (same size, same backdrop, same hover highlight). The label is `|cff666666[W]|r`, brightening to `|cffdddddd[W]|r` on hover. Tooltip on hover reads: *"Whisper a crafter"*.
-
-5. **Single crafter path** — If `#crafters == 1` and `crafters[1].key ~= myKey`, clicking `[W]` calls `OpenWhisper(crafters[1], recipeName, recipeKey)` directly, no picker shown.
-
-6. **Self-only path** — If the only crafter is the player themselves, `[W]` does not render.
-
-7. **Multi-crafter picker** — If `#crafters > 1` (excluding self), clicking `[W]` opens a small dropdown frame anchored `BOTTOMRIGHT` of the button. One row per crafter (self excluded), sorted online-first then alphabetical. Each row is a clickable button showing:
-   ```
-   ● Thrall        (green dot = online, |cff00ff00 ; grey |cff888888 = offline)
-   ```
-   Clicking a row calls `OpenWhisper(crafter, recipeName, recipeKey)` and closes the picker. Clicking anywhere outside the picker (detected via `OnUpdate` world-click check or a full-screen invisible intercept frame) closes it without action.
-
-8. **`OpenWhisper(crafter, recipeName, recipeKey)` helper** — Constructs the pre-filled message and opens chat:
-   ```lua
-   local function OpenWhisper(crafter, recipeName, recipeKey)
-       local name = crafter.key:match("^(.+)-") or crafter.key
-       local link
-       if recipeKey > 0 then
-           link = select(2, GetItemInfo(recipeKey))  -- item link or nil if uncached
-       else
-           link = GetSpellLink(-recipeKey)           -- spell link for enchants
-       end
-       local display = link or recipeName            -- fallback to plain name
-       ChatFrame_OpenChat("/w " .. name .. " Can you craft " .. display .. " for me?")
-   end
-   ```
-   `ChatFrame_OpenChat` pre-populates the chat editbox and focuses it without sending. The player edits freely and presses Enter (or Escape to cancel).
-
-9. **Placement** — `[W]` sits immediately to the left of `[>]` on every recipe row in `ShowSearchResults` and the Recipes-centric view (`ShowRecipesView`). The crafter text label anchors its right edge to `[W]`'s left edge, the same way it currently anchors to `[>]`. No layout changes elsewhere.
-
-**Backward compat:** Old clients (v1.2.2 and below) that send `CRAFT_REQUEST` messages to a v1.2.3 client will have them silently ignored — the prefix is still registered, but the handler is gone. No error, no response. Old clients receive no `CRAFT_ACCEPT` or `CRAFT_DECLINE` back, so their pending popup simply times out. Not ideal but acceptable for a transition period; the changelog should advise guilds to update together.
-
-**Files:** `Comms.lua` (~−80 lines), `CraftRequest.lua` (deleted), `Core.lua` (~5 lines — remove module load), `UI/MainFrame.lua` (~+80 lines for `[W]` button + picker, ~−120 lines removing popup/queue panel), `GuildCrafts.toc` (remove `CraftRequest.lua`).
-
----
-
-> **Exit criterion:** After 1.2.3, GuildCrafts is considered stable. Future work requires either confirmed user demand or an available contributor willing to own it end-to-end.
+| Issue | Title | Status |
+|-------|-------|--------|
+| [#50](https://github.com/dkruenbo/GuildCrafts/issues/50) | Replace craft request popup with `[W]` whisper button | Done in 1.2.3 |
+| — | Bottom bar with `[Online]` and `[Tooltip]` toggle buttons | Done in 1.2.3 |
+| — | Tooltip crafters toggle (`showTooltipCrafters`) | Done in 1.2.3 |
 
 ---
 
@@ -160,22 +104,6 @@ Items in this section are not a committed release. They are candidates — each 
 
 ---
 
-### [#6] In-Game Craft Request Chat
-
-> **What it is:** A small embedded chat panel between requester and crafter that appears when a craft request is accepted. Keeps negotiation (mats, tip, meeting point) in-context instead of switching to the whisper window.
-
-> **Honest assessment:** This is the weakest large feature in the roadmap. The underlying CRAFT_REQUEST protocol is already built, so the *protocol* cost is zero — but the UI wiring, edge-case handling (disconnect mid-craft, panel state on reload, both sides closing at different times), and a new `MSG_CRAFT_CHAT` message type add meaningful ongoing maintenance surface for a feature whose practical advantage over just using the built-in whisper window is marginal. Before implementing, validate with actual users that the whisper workflow is a real pain point, not a theoretical one. **If you want to end the project cleanly, skip this feature entirely.** It belongs on the roadmap only if contributors are available and user demand is confirmed.
-
-**Implementation notes:**
-- On `HandleCraftAccept`, open a slim chat panel frame (similar to `AceGUIContainer-Frame`) anchored to the main GuildCrafts window.
-- Messages are sent via addon whisper (the existing `SendMessage(..., "WHISPER", ...)` path with a new `MSG_CRAFT_CHAT` type), so they are invisible in normal chat.
-- The panel auto-closes when `MSG_CRAFT_COMPLETE` or `MSG_CRAFT_DECLINE` is received, or when the user clicks "Done".
-- Do **not** persist chat history to `SavedVariables` — session-only.
-
-**Files:** `UI/MainFrame.lua` (new chat panel), `Comms.lua` (new `MSG_CRAFT_CHAT` type and handler), `CraftRequest.lua` (wire up open/close).
-
----
-
 ### [#9] Code Modularisation
 
 > **What it is:** Split `Data.lua` (1,884 lines) and `UI/MainFrame.lua` (2,371 lines) into focused sub-modules.
@@ -194,7 +122,6 @@ Items in this section are not a committed release. They are candidates — each 
   - `UI/RecipesView.lua` — profession sidebar, recipes list, post button
   - `UI/SearchView.lua` — search bar, results list
   - `UI/MemberView.lua` — member detail panel
-  - `UI/CraftRequestView.lua` — craft request popup (overlaps with #6)
   - `UI/MainFrame.lua` — frame creation, tab navigation, `Refresh()`
 - All sub-modules share the same `GuildCrafts` global and use the same `local _, _ns = ...` bootstrap pattern.
 - Update `embeds.xml` and `GuildCrafts.toc` to load new files in dependency order.

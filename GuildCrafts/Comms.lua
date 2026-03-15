@@ -51,10 +51,6 @@ local MSG_SYNC_REQUEST       = "SYNC_REQUEST"
 local MSG_SYNC_RESPONSE      = "SYNC_RESPONSE"
 local MSG_SYNC_PULL          = "SYNC_PULL"
 local MSG_SYNC_PUSH          = "SYNC_PUSH"
-local MSG_CRAFT_REQUEST      = "CRAFT_REQUEST"
-local MSG_CRAFT_ACCEPT       = "CRAFT_ACCEPT"
-local MSG_CRAFT_DECLINE      = "CRAFT_DECLINE"
-local MSG_CRAFT_COMPLETE     = "CRAFT_COMPLETE"
 
 ----------------------------------------------------------------------
 -- State
@@ -778,82 +774,6 @@ function Comms:HandleDeltaUpdate(payload, sender)
     end
 end
 
-----------------------------------------------------------------------
--- CRAFT_* Messages
-----------------------------------------------------------------------
-
-function Comms:SendCraftRequest(targetKey, itemName)
-    local playerKey = GuildCrafts.Data:GetPlayerKey()
-
-    -- Check if target has the addon
-    if self.addonUsers[targetKey] then
-        self:SendMessage(MSG_CRAFT_REQUEST, {
-            requester = playerKey,
-            item      = itemName,
-        }, "WHISPER", targetKey, PRIO_NORMAL)
-        GuildCrafts:Printf("Request sent to %s for %s.", targetKey, itemName)
-    else
-        -- Fallback: visible whisper
-        local targetName = targetKey:match("^(.+)-")
-        if targetName then
-            SendChatMessage(
-                string.format("[GuildCrafts] %s is requesting you craft: %s. Whisper them to arrange!",
-                    playerKey:match("^(.+)-") or playerKey, itemName),
-                "WHISPER", nil, targetName
-            )
-            GuildCrafts:Printf("Whisper sent to %s for %s (no addon detected).", targetKey, itemName)
-        end
-    end
-end
-
-function Comms:SendCraftAccept(requesterKey, itemName)
-    local playerKey = GuildCrafts.Data:GetPlayerKey()
-    self:SendMessage(MSG_CRAFT_ACCEPT, {
-        crafter = playerKey,
-        item    = itemName,
-    }, "WHISPER", requesterKey, PRIO_NORMAL)
-end
-
-function Comms:SendCraftDecline(requesterKey, itemName)
-    local playerKey = GuildCrafts.Data:GetPlayerKey()
-    self:SendMessage(MSG_CRAFT_DECLINE, {
-        crafter = playerKey,
-        item    = itemName,
-    }, "WHISPER", requesterKey, PRIO_NORMAL)
-end
-
-function Comms:SendCraftComplete(requesterKey, itemName)
-    local playerKey = GuildCrafts.Data:GetPlayerKey()
-    self:SendMessage(MSG_CRAFT_COMPLETE, {
-        crafter = playerKey,
-        item    = itemName,
-    }, "WHISPER", requesterKey, PRIO_NORMAL)
-end
-
-function Comms:HandleCraftRequest(payload, _sender)
-    if not payload.requester or not payload.item then return end
-    GuildCrafts:Debug("CRAFT_REQUEST from", payload.requester, "for", payload.item)
-    if GuildCrafts.CraftRequest and GuildCrafts.CraftRequest.OnIncomingRequest then
-        GuildCrafts.CraftRequest:OnIncomingRequest(payload.requester, payload.item)
-    end
-end
-
-function Comms:HandleCraftAccept(payload, sender)
-    GuildCrafts:Printf("|cff00ff00%s|r accepted your request for |cffffd100%s|r.",
-        payload.crafter or sender, payload.item or "unknown item")
-    PlaySound(SOUNDKIT and SOUNDKIT.READY_CHECK or 8960)
-end
-
-function Comms:HandleCraftDecline(payload, sender)
-    GuildCrafts:Printf("|cffff4444%s|r declined your request for |cffffd100%s|r.",
-        payload.crafter or sender, payload.item or "unknown item")
-end
-
-function Comms:HandleCraftComplete(payload, sender)
-    GuildCrafts:Printf("|cff00ff00%s|r has completed crafting |cffffd100%s|r!",
-        payload.crafter or sender, payload.item or "unknown item")
-    PlaySound(SOUNDKIT and SOUNDKIT.AUCTION_WINDOW_CLOSE or 5274)
-end
 
 ----------------------------------------------------------------------
 -- Message Send / Receive Infrastructure
@@ -1027,14 +947,6 @@ function Comms:ProcessIncoming(message, _distribution, sender)
         self:HandleSyncPush(payload, sender)
     elseif msgType == MSG_DELTA_UPDATE then
         self:HandleDeltaUpdate(payload, sender)
-    elseif msgType == MSG_CRAFT_REQUEST then
-        self:HandleCraftRequest(payload, sender)
-    elseif msgType == MSG_CRAFT_ACCEPT then
-        self:HandleCraftAccept(payload, sender)
-    elseif msgType == MSG_CRAFT_DECLINE then
-        self:HandleCraftDecline(payload, sender)
-    elseif msgType == MSG_CRAFT_COMPLETE then
-        self:HandleCraftComplete(payload, sender)
     else
         GuildCrafts:Debug("Unknown message type:", msgType, "from", sender)
     end

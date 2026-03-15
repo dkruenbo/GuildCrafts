@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.3 — Whisper & UI Polish — 2026-03-14
+
+### New Features
+
+- **`[W]` whisper button** — each recipe row now has a `[W]` button to the left of `[>]`. Clicking it opens the chat edit box pre-filled with `/w CharName Can you craft X for me?`. If there is only one non-self crafter the whisper opens directly; if there are multiple, a small dropdown picker appears (online crafters shown in green, offline in grey). The button is hidden when you are the only known crafter
+
+- **Bottom bar with `[Online]` and `[Tooltip]` toggles** — the cryptic `O` dot has been replaced by proper labelled buttons in a thin bar at the bottom of the window. `[Online]` filters the crafter list to online members; `[Tooltip]` controls whether guild crafters are injected into hover tooltips. Both buttons glow yellow when active and dim when inactive, matching the existing `[Vanilla]` / `[TBC]` style
+
+- **Tooltip crafters toggle** — the new `[Tooltip]` button lets you disable the tooltip crafter injection entirely. Useful in large guilds where popular items (flasks, enchants) generate very long tooltips. Off means no crafter section is shown at all; the setting persists across sessions
+
+### Removed
+
+- **Craft request protocol** — the peer-to-peer craft request / accept / decline / complete flow (popup, comms commands, queue) has been removed. The `[W]` whisper button is the replacement workflow
+
+---
+
 ## 1.2.2 — Expansion Filter — 2026-03-13
 
 ### New Features
