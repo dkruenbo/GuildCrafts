@@ -81,15 +81,18 @@ See **every guild member who can craft a recipe**.
 * Expand recipes to view reagent materials
 * Hover reagents to inspect them
 * Hover the crafter preview to see the full crafter list
+* Click `[W]` to whisper a crafter directly — chat opens pre-filled, you review before sending
 * Click `[>]` to post crafters directly to guild chat
 
 This makes it easy to see **who can craft something and what it costs** at a glance.
 
-### Online Filter
+### Online Filter & Tooltip Toggle
 
-Toggle the **Online** indicator next to the favourites star to instantly hide offline members.
+Two toggle buttons sit in the **bottom bar** of the GuildCrafts window.
 
-The member list, crafter lists, and profession counts all update immediately — no need to scroll past a sea of grey names.
+**[Online]** hides offline members across the member list, crafter lists, and profession counts. The button glows gold when the filter is active.
+
+**[Tooltip]** controls whether GuildCrafts injects crafter info into item tooltips. Disable it when popular items (flasks, enchants) generate tooltips that are too long in large guilds. The setting persists across sessions.
 
 ---
 

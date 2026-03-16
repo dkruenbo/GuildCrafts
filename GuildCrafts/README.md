@@ -23,12 +23,13 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Profession icons** — WoW's built-in profession icons displayed next to each profession name in the browse panel
 - **Chunked sync** — large sync payloads are split into batches of 10 members, preventing chat throttle issues in large guilds
 - **Last-scanned timestamp** — member detail panels show "Scanned: 2h ago" so you can judge how fresh the data is
-- **Online-only filter** — a toggle in the left panel header hides offline members from the member list and crafter lists; profession counts update to reflect the filtered view
+- **Online filter & tooltip toggle** — a `[Online]` button and a `[Tooltip]` button sit in the bottom bar of the window. `[Online]` hides offline members from the member list and crafter lists; profession counts update to reflect the filtered view. `[Tooltip]` controls whether crafter info is injected into item tooltips — useful in large guilds where popular items generate very long tooltips. Both settings persist across sessions
 - **Expansion filter** — `[Vanilla]` and `[TBC]` toggle buttons in the search bar let you narrow recipes to Original Classic, TBC, or both; filter state persists per character; both on by default so first-run behaviour is unchanged
 - **Data staleness indicator** — member data older than 30 days is flagged with a red age tag (e.g. "30d ago", "2mo ago")
 - **Profession change detection** — dropping a profession automatically purges stale data
 - **Guild roster pruning** — ex-guild members are cleaned up automatically
-- **Post crafters to guild chat** — every recipe row in the Recipe-centric and Search Results views has a `[>]` button that posts the crafter list for that recipe to guild chat, so members without the addon can see who to ask; a 30-second per-recipe cooldown prevents accidental spam
+- **Whisper a crafter** — every recipe row has a `[W]` button. For a single non-self crafter it opens the chat edit box pre-filled with a whisper; for multiple crafters a small picker appears sorted online-first. The button is hidden when you are the only known crafter
+- **Post crafters to guild chat** — every recipe row also has a `[>]` button that posts the crafter list for that recipe to guild chat, so members without the addon can see who to ask; a 30-second per-recipe cooldown prevents accidental spam
 - **`!gc <query>` chat command** — any guild member can type `!gc <recipe name>` (or shift-click an item) in guild chat to get a crafter list reply without opening the addon; partial and fuzzy (vowel-tolerant) matching supported; DR responds immediately, BDR after 5 s, any other addon user after 12 s if no response appeared yet
 
 ## Tracked Professions

@@ -363,6 +363,15 @@ function Comms:CheckDRAlive()
         return
     end
 
+    -- GUILD addon messages are not delivered while inside an instance or arena.
+    -- Suppress the DR eviction timer so we don't falsely elect ourselves just
+    -- because we temporarily can't receive heartbeats.
+    local inInstance = IsInInstance and select(1, IsInInstance())
+    if inInstance then
+        self.lastDRHeartbeat = time()  -- keep the timer fresh
+        return
+    end
+
     local elapsed = time() - self.lastDRHeartbeat
     if elapsed > HEARTBEAT_TIMEOUT and self.currentDR then
         GuildCrafts:Debug("DR heartbeat timeout — removing", self.currentDR)
@@ -920,6 +929,21 @@ function Comms:ProcessIncoming(message, _distribution, sender)
     -- Inject envelope-level term so handlers can enforce authority without
     -- each sender needing to embed it redundantly in the payload.
     payload.term = envelope.term
+
+    -- Early term propagation: adopt a higher term from ANY incoming message.
+    -- This corrects a node that missed term increments while inside an instance
+    -- (where GUILD addon messages are not delivered). A stale DR will step down
+    -- as soon as it receives any message from the updated network.
+    if type(envelope.term) == "number" and envelope.term > self.currentTerm then
+        GuildCrafts:Debug("Higher term", envelope.term, "adopted from", msgType, "by", sender)
+        self.currentTerm = envelope.term
+        if self.myRole == "DR" then
+            GuildCrafts:Debug("Stepping down — higher-term authority arrived via", msgType)
+            self:StopHeartbeat()
+            self.myRole = "OTHER"
+            self:RecomputeElection()
+        end
+    end
 
     -- Version compatibility check
     if msgVersion > GuildCrafts.VERSION then

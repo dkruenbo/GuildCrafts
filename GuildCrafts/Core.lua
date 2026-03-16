@@ -97,6 +97,13 @@ function GuildCrafts:OnPlayerEnteringWorld(_event, isLogin, isReload)
         self:Debug("Login/reload detected. Will init comms after delay.")
         -- Delay to let guild channel initialize
         self:ScheduleTimer("OnLoginReady", 5)
+    else
+        -- Zone transition: crossing an instance/arena boundary or taking a portal.
+        -- Re-announce so other nodes don't falsely time us out, and so we
+        -- discover any traffic (heartbeats, hellos) we missed while instanced.
+        if self.Comms and IsInGuild() then
+            self.Comms:ScheduleTimer("BroadcastHello", 2)
+        end
     end
 end
 
