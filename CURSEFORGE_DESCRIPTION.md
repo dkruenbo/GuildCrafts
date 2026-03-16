@@ -94,6 +94,16 @@ Two toggle buttons sit in the **bottom bar** of the GuildCrafts window.
 
 **[Tooltip]** controls whether GuildCrafts injects crafter info into item tooltips. Disable it when popular items (flasks, enchants) generate tooltips that are too long in large guilds. The setting persists across sessions.
 
+### Online Status Indicator
+
+Every member row shows a small coloured `O` dot:
+
+* **Green** — online and GuildCrafts is active this session
+* **Yellow** — online, but GuildCrafts not detected (may have uninstalled)
+* **Grey** — offline
+
+Hover the dot to see a tooltip explaining the status.
+
 ---
 
 # Quality of Life
@@ -160,7 +170,8 @@ Your recipes will now automatically sync with other guild members who use the ad
 Built for **WoW TBC Anniversary Edition**  
 Interface version **20505**
 
-Supports all **8 TBC crafting professions**.
+Supports all **8 TBC crafting professions**:
+Alchemy · Blacksmithing · Cooking · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
 
 ---
 

@@ -149,6 +149,13 @@ function Comms:HandleHello(payload, sender)
     GuildCrafts:Debug("HELLO from", memberKey, "v" .. (payload.version or "?"))
     self:RecomputeElection()
 
+    -- Sync indicator depends on addonUsers count — update it immediately so
+    -- the DR (which skips SYNC_REQUEST and never gets a Refresh via sync path)
+    -- shows the correct status as soon as a new user is discovered.
+    if isNew and GuildCrafts.UI and GuildCrafts.UI.UpdateSyncIndicator then
+        GuildCrafts.UI:UpdateSyncIndicator()
+    end
+
     -- Reply with our own HELLO so the sender discovers us too.
     -- Reply if:
     --   (a) sender is new to us and didn't send a plain reply (normal discovery), OR
@@ -334,6 +341,9 @@ function Comms:HandleHeartbeat(payload)
                 lastSeen = time(),
             }
             self:RecomputeElection()
+            if GuildCrafts.UI and GuildCrafts.UI.UpdateSyncIndicator then
+                GuildCrafts.UI:UpdateSyncIndicator()
+            end
         else
             self.addonUsers[payload.dr].lastSeen = time()
         end
@@ -411,6 +421,13 @@ function Comms:SendSyncRequest()
         if self.syncTimer then
             self:CancelTimer(self.syncTimer)
             self.syncTimer = nil
+        end
+        -- DR never receives a SYNC_RESPONSE, so UI:Refresh() is never triggered
+        -- by the sync path. Update the sync indicator directly so the dot
+        -- reflects the correct addonUsers count (the re-sync was scheduled from
+        -- HandleHello after a new peer was discovered).
+        if GuildCrafts.UI and GuildCrafts.UI.UpdateSyncIndicator then
+            GuildCrafts.UI:UpdateSyncIndicator()
         end
         return
     end
@@ -1026,6 +1043,11 @@ function Comms:GetActiveAddonUserCount()
         end
     end
     return count
+end
+
+--- Returns true if the given member key is a currently known active addon user.
+function Comms:IsActiveAddonUser(key)
+    return self.addonUsers[key] ~= nil
 end
 
 --- Get sync status for UI indicator.

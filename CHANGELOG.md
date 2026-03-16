@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.2.3 — Whisper & UI Polish — 2026-03-14
+## 1.2.3 — Whisper & UI Polish — 2026-03-16
 
 ### New Features
 
@@ -9,6 +9,17 @@
 - **Bottom bar with `[Online]` and `[Tooltip]` toggles** — the cryptic `O` dot has been replaced by proper labelled buttons in a thin bar at the bottom of the window. `[Online]` filters the crafter list to online members; `[Tooltip]` controls whether guild crafters are injected into hover tooltips. Both buttons glow yellow when active and dim when inactive, matching the existing `[Vanilla]` / `[TBC]` style
 
 - **Tooltip crafters toggle** — the new `[Tooltip]` button lets you disable the tooltip crafter injection entirely. Useful in large guilds where popular items (flasks, enchants) generate very long tooltips. Off means no crafter section is shown at all; the setting persists across sessions
+
+- **Three-state online indicator** — the `O` dot next to each member name is now colour-coded with three states: **green** = online and GuildCrafts is active; **yellow** = online but GuildCrafts not detected (addon may be uninstalled); **grey** = offline. Hovering the dot shows a tooltip explaining the state
+
+### Fixes
+
+- **Cooking now appears in the profession list** — Cooking was tracked and synced correctly but was missing from the profession browser due to a hardcoded list that omitted it
+- **Cooking now has a profession icon** — the bread/food icon is shown next to Cooking in the profession list, matching all other professions
+- **Sync dot now updates correctly for the DR** — the Designated Router never receives a `SYNC_RESPONSE`, so the sync indicator was stuck on red even when other addon users were online. The dot now updates immediately when new peers are discovered via HELLO or heartbeat
+- **Sync dot now updates on roster change** — the online indicator cross-checks `addonUsers` against the guild roster cache; it now re-evaluates whenever the roster rebuilds
+- **Bottom bar buttons no longer overlap the resize grip** — the bar's right edge is offset far enough from the corner that it no longer touches the resize dragger
+- **Fixed instances causing false DR eviction** — GUILD addon messages are not delivered inside instances and arenas. The DR heartbeat watchdog now pauses eviction while the player is in an instance, preventing a false re-election every 3 minutes when the DR zones in
 
 ### Removed
 

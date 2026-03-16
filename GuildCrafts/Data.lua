@@ -1455,7 +1455,7 @@ local SAMPLE_CATEGORIES = {
     "Reagents",
 }
 
-local PROF_NAMES = { "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
+local PROF_NAMES = { "Alchemy", "Blacksmithing", "Cooking", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
 
 -- Sample reagent lists (arrays of {name, count, itemID})
 local SAMPLE_REAGENTS = {

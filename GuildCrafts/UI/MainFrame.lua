@@ -45,6 +45,40 @@ local STAR_TEXTURE = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1"
 -- Item quality lookup cache (avoids repeated GetItemInfo calls per frame render)
 local _qualityCache = {}
 
+--- Return the dot color-string and live online/addon state for a member.
+--- dot states: green = online + addon active; yellow = online, no addon; grey = offline.
+local function MemberDotState(memberKey)
+    local isOnline = GuildCrafts.Data:IsMemberOnline(memberKey)
+    local isAddon  = GuildCrafts.Comms and GuildCrafts.Comms:IsActiveAddonUser(memberKey)
+    local dot
+    if isOnline and isAddon then
+        dot = "|cff00ff00O|r "
+    elseif isOnline then
+        dot = "|cffffff00O|r "
+    else
+        dot = "|cff666666O|r "
+    end
+    return dot, isOnline, isAddon
+end
+
+--- Attach the online-indicator tooltip to a member row.
+local function SetMemberDotTooltip(row, isOnline, isAddon)
+    row:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if isOnline and isAddon then
+            GameTooltip:AddLine("Online", 0.2, 0.9, 0.2)
+            GameTooltip:AddLine("GuildCrafts active", 0.7, 0.7, 0.7)
+        elseif isOnline then
+            GameTooltip:AddLine("Online", 1, 1, 0)
+            GameTooltip:AddLine("GuildCrafts not detected", 0.7, 0.7, 0.7)
+        else
+            GameTooltip:AddLine("Offline", 0.4, 0.4, 0.4)
+        end
+        GameTooltip:Show()
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
 --- Format a Unix timestamp as a human-readable age string.
 local function FormatAge(ts)
     if not ts or ts == 0 then return "never" end
@@ -216,7 +250,7 @@ function UI:CreateBottomBar(parent)
     local bar = CreateFrame("Frame", nil, parent)
     bar:SetHeight(20)
     bar:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  8, 8)
-    bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -8, 8)
+    bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -22, 8)
 
     local function makeBarBtn(label, rightOffset, width)
         local btn = CreateFrame("Button", nil, bar, "BackdropTemplate")
@@ -600,6 +634,7 @@ end
 local PROFESSION_ICONS = {
     ["Alchemy"]        = "Interface\\Icons\\Trade_Alchemy",
     ["Blacksmithing"]  = "Interface\\Icons\\Trade_BlackSmithing",
+    ["Cooking"]        = "Interface\\Icons\\INV_Misc_Food_15",
     ["Enchanting"]     = "Interface\\Icons\\Trade_Engraving",
     ["Engineering"]    = "Interface\\Icons\\Trade_Engineering",
     ["Jewelcrafting"]  = "Interface\\Icons\\INV_Misc_Gem_01",
@@ -679,7 +714,7 @@ function UI:NavigateToMembers(profName)
     for _, memberInfo in ipairs(members) do
         local isOnline = GuildCrafts.Data:IsMemberOnline(memberInfo.key)
         if not showOnlineOnly or isOnline then
-            local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
+            local dot, _, isAddon = MemberDotState(memberInfo.key)
             local specTag = ""
             local skillTag = ""
             local staleTag = ""
@@ -709,6 +744,7 @@ function UI:NavigateToMembers(profName)
             row:SetScript("OnClick", function()
                 UI:ShowMemberRecipes(memberInfo.key, profName)
             end)
+            SetMemberDotTooltip(row, isOnline, isAddon)
             -- Member star
             local capturedMemberKey = memberInfo.key
             local memberStar = self:CreateStarButton(row, 14, function(btn)
@@ -1326,10 +1362,10 @@ function UI:FilterMemberList(query)
 
     local yOffset = 0
     for _, memberInfo in ipairs(members) do
-        local isOnline = GuildCrafts.Data:IsMemberOnline(memberInfo.key)
-        local dot = isOnline and "|cff00ff00O|r " or "|cff666666O|r "
+        local dot, isOnline, isAddon = MemberDotState(memberInfo.key)
         local label = dot .. memberInfo.key:match("^(.+)-")
         local row = self:CreateLeftRow(self.leftContent, yOffset, label, memberInfo.recipeCount .. " rec")
+        SetMemberDotTooltip(row, isOnline, isAddon)
         self.leftRows[#self.leftRows + 1] = row
         yOffset = yOffset + 24
     end
@@ -1447,7 +1483,7 @@ function UI:PopulateFavMembers(yOffset)
     end
 
     for _, info in ipairs(members) do
-        local dot = info.online and "|cff00ff00O|r " or "|cff666666O|r "
+        local dot, isOnline, isAddon = MemberDotState(info.key)
         local label = dot .. info.key:match("^(.+)-")
         local row = self:CreateLeftRow(self.leftContent, yOffset, label)
         row.memberKey = info.key
@@ -1463,6 +1499,7 @@ function UI:PopulateFavMembers(yOffset)
                 end
             end
         end)
+        SetMemberDotTooltip(row, isOnline, isAddon)
 
         -- Unfavorite star
         local capturedMemberKey = info.key
@@ -2024,7 +2061,9 @@ function UI:ClearLeftRows()
         row:ClearAllPoints()
         -- Only pool proper row frames (have _label), skip FontStrings/misc frames
         if row._label then
-            row:SetScript("OnClick", nil)
+            row:SetScript("OnClick",  nil)
+            row:SetScript("OnEnter",  nil)
+            row:SetScript("OnLeave",  nil)
             row.memberKey = nil
             -- Hide and detach any star buttons that were added as children
             if row._star then

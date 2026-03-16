@@ -149,6 +149,11 @@ function GuildCrafts:OnGuildRosterUpdate()
     if self.Comms then
         self.Comms:OnGuildRosterUpdate()
     end
+    -- GetActiveAddonUserCount() cross-checks addonUsers with _onlineCache, so
+    -- the sync indicator must be refreshed whenever the cache is rebuilt.
+    if self.UI and self.UI.UpdateSyncIndicator then
+        self.UI:UpdateSyncIndicator()
+    end
 end
 
 ----------------------------------------------------------------------
