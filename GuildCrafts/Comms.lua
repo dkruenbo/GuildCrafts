@@ -51,10 +51,6 @@ local MSG_SYNC_REQUEST       = "SYNC_REQUEST"
 local MSG_SYNC_RESPONSE      = "SYNC_RESPONSE"
 local MSG_SYNC_PULL          = "SYNC_PULL"
 local MSG_SYNC_PUSH          = "SYNC_PUSH"
-local MSG_CRAFT_REQUEST      = "CRAFT_REQUEST"
-local MSG_CRAFT_ACCEPT       = "CRAFT_ACCEPT"
-local MSG_CRAFT_DECLINE      = "CRAFT_DECLINE"
-local MSG_CRAFT_COMPLETE     = "CRAFT_COMPLETE"
 
 ----------------------------------------------------------------------
 -- State
@@ -152,6 +148,13 @@ function Comms:HandleHello(payload, sender)
 
     GuildCrafts:Debug("HELLO from", memberKey, "v" .. (payload.version or "?"))
     self:RecomputeElection()
+
+    -- Sync indicator depends on addonUsers count — update it immediately so
+    -- the DR (which skips SYNC_REQUEST and never gets a Refresh via sync path)
+    -- shows the correct status as soon as a new user is discovered.
+    if isNew and GuildCrafts.UI and GuildCrafts.UI.UpdateSyncIndicator then
+        GuildCrafts.UI:UpdateSyncIndicator()
+    end
 
     -- Reply with our own HELLO so the sender discovers us too.
     -- Reply if:
@@ -338,6 +341,9 @@ function Comms:HandleHeartbeat(payload)
                 lastSeen = time(),
             }
             self:RecomputeElection()
+            if GuildCrafts.UI and GuildCrafts.UI.UpdateSyncIndicator then
+                GuildCrafts.UI:UpdateSyncIndicator()
+            end
         else
             self.addonUsers[payload.dr].lastSeen = time()
         end
@@ -364,6 +370,15 @@ end
 function Comms:CheckDRAlive()
     if self.myRole == "DR" then
         self:StopDRWatchdog()
+        return
+    end
+
+    -- GUILD addon messages are not delivered while inside an instance or arena.
+    -- Suppress the DR eviction timer so we don't falsely elect ourselves just
+    -- because we temporarily can't receive heartbeats.
+    local inInstance = IsInInstance and select(1, IsInInstance())
+    if inInstance then
+        self.lastDRHeartbeat = time()  -- keep the timer fresh
         return
     end
 
@@ -406,6 +421,13 @@ function Comms:SendSyncRequest()
         if self.syncTimer then
             self:CancelTimer(self.syncTimer)
             self.syncTimer = nil
+        end
+        -- DR never receives a SYNC_RESPONSE, so UI:Refresh() is never triggered
+        -- by the sync path. Update the sync indicator directly so the dot
+        -- reflects the correct addonUsers count (the re-sync was scheduled from
+        -- HandleHello after a new peer was discovered).
+        if GuildCrafts.UI and GuildCrafts.UI.UpdateSyncIndicator then
+            GuildCrafts.UI:UpdateSyncIndicator()
         end
         return
     end
@@ -778,82 +800,6 @@ function Comms:HandleDeltaUpdate(payload, sender)
     end
 end
 
-----------------------------------------------------------------------
--- CRAFT_* Messages
-----------------------------------------------------------------------
-
-function Comms:SendCraftRequest(targetKey, itemName)
-    local playerKey = GuildCrafts.Data:GetPlayerKey()
-
-    -- Check if target has the addon
-    if self.addonUsers[targetKey] then
-        self:SendMessage(MSG_CRAFT_REQUEST, {
-            requester = playerKey,
-            item      = itemName,
-        }, "WHISPER", targetKey, PRIO_NORMAL)
-        GuildCrafts:Printf("Request sent to %s for %s.", targetKey, itemName)
-    else
-        -- Fallback: visible whisper
-        local targetName = targetKey:match("^(.+)-")
-        if targetName then
-            SendChatMessage(
-                string.format("[GuildCrafts] %s is requesting you craft: %s. Whisper them to arrange!",
-                    playerKey:match("^(.+)-") or playerKey, itemName),
-                "WHISPER", nil, targetName
-            )
-            GuildCrafts:Printf("Whisper sent to %s for %s (no addon detected).", targetKey, itemName)
-        end
-    end
-end
-
-function Comms:SendCraftAccept(requesterKey, itemName)
-    local playerKey = GuildCrafts.Data:GetPlayerKey()
-    self:SendMessage(MSG_CRAFT_ACCEPT, {
-        crafter = playerKey,
-        item    = itemName,
-    }, "WHISPER", requesterKey, PRIO_NORMAL)
-end
-
-function Comms:SendCraftDecline(requesterKey, itemName)
-    local playerKey = GuildCrafts.Data:GetPlayerKey()
-    self:SendMessage(MSG_CRAFT_DECLINE, {
-        crafter = playerKey,
-        item    = itemName,
-    }, "WHISPER", requesterKey, PRIO_NORMAL)
-end
-
-function Comms:SendCraftComplete(requesterKey, itemName)
-    local playerKey = GuildCrafts.Data:GetPlayerKey()
-    self:SendMessage(MSG_CRAFT_COMPLETE, {
-        crafter = playerKey,
-        item    = itemName,
-    }, "WHISPER", requesterKey, PRIO_NORMAL)
-end
-
-function Comms:HandleCraftRequest(payload, _sender)
-    if not payload.requester or not payload.item then return end
-    GuildCrafts:Debug("CRAFT_REQUEST from", payload.requester, "for", payload.item)
-    if GuildCrafts.CraftRequest and GuildCrafts.CraftRequest.OnIncomingRequest then
-        GuildCrafts.CraftRequest:OnIncomingRequest(payload.requester, payload.item)
-    end
-end
-
-function Comms:HandleCraftAccept(payload, sender)
-    GuildCrafts:Printf("|cff00ff00%s|r accepted your request for |cffffd100%s|r.",
-        payload.crafter or sender, payload.item or "unknown item")
-    PlaySound(SOUNDKIT and SOUNDKIT.READY_CHECK or 8960)
-end
-
-function Comms:HandleCraftDecline(payload, sender)
-    GuildCrafts:Printf("|cffff4444%s|r declined your request for |cffffd100%s|r.",
-        payload.crafter or sender, payload.item or "unknown item")
-end
-
-function Comms:HandleCraftComplete(payload, sender)
-    GuildCrafts:Printf("|cff00ff00%s|r has completed crafting |cffffd100%s|r!",
-        payload.crafter or sender, payload.item or "unknown item")
-    PlaySound(SOUNDKIT and SOUNDKIT.AUCTION_WINDOW_CLOSE or 5274)
-end
 
 ----------------------------------------------------------------------
 -- Message Send / Receive Infrastructure
@@ -1001,6 +947,21 @@ function Comms:ProcessIncoming(message, _distribution, sender)
     -- each sender needing to embed it redundantly in the payload.
     payload.term = envelope.term
 
+    -- Early term propagation: adopt a higher term from ANY incoming message.
+    -- This corrects a node that missed term increments while inside an instance
+    -- (where GUILD addon messages are not delivered). A stale DR will step down
+    -- as soon as it receives any message from the updated network.
+    if type(envelope.term) == "number" and envelope.term > self.currentTerm then
+        GuildCrafts:Debug("Higher term", envelope.term, "adopted from", msgType, "by", sender)
+        self.currentTerm = envelope.term
+        if self.myRole == "DR" then
+            GuildCrafts:Debug("Stepping down — higher-term authority arrived via", msgType)
+            self:StopHeartbeat()
+            self.myRole = "OTHER"
+            self:RecomputeElection()
+        end
+    end
+
     -- Version compatibility check
     if msgVersion > GuildCrafts.VERSION then
         -- One-time warning per sender about incompatible version
@@ -1027,14 +988,6 @@ function Comms:ProcessIncoming(message, _distribution, sender)
         self:HandleSyncPush(payload, sender)
     elseif msgType == MSG_DELTA_UPDATE then
         self:HandleDeltaUpdate(payload, sender)
-    elseif msgType == MSG_CRAFT_REQUEST then
-        self:HandleCraftRequest(payload, sender)
-    elseif msgType == MSG_CRAFT_ACCEPT then
-        self:HandleCraftAccept(payload, sender)
-    elseif msgType == MSG_CRAFT_DECLINE then
-        self:HandleCraftDecline(payload, sender)
-    elseif msgType == MSG_CRAFT_COMPLETE then
-        self:HandleCraftComplete(payload, sender)
     else
         GuildCrafts:Debug("Unknown message type:", msgType, "from", sender)
     end
@@ -1090,6 +1043,11 @@ function Comms:GetActiveAddonUserCount()
         end
     end
     return count
+end
+
+--- Returns true if the given member key is a currently known active addon user.
+function Comms:IsActiveAddonUser(key)
+    return self.addonUsers[key] ~= nil
 end
 
 --- Get sync status for UI indicator.

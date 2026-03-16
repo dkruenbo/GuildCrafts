@@ -15,7 +15,6 @@ The addon itself. This is the folder you drop into `World of Warcraft/_classic_/
 | `Data_TBC.lua` | Pre-generated TBC recipe lookup table (`TBC_ITEM_IDS`) used by the expansion filter |
 | `Comms.lua` | Network layer — DR/BDR election, sync protocol, delta updates, craft messages |
 | `Tooltip.lua` | Item tooltip hook — shows guild crafters on hover |
-| `CraftRequest.lua` | Craft request/accept/decline/complete workflow |
 | `MinimapButton.lua` | Draggable minimap icon toggle |
 | `UI/MainFrame.lua` | Two-panel browse/search interface |
 | `Libs/` | Embedded libraries (Ace3, LibDeflate, ChatThrottleLib) |

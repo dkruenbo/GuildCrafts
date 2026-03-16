@@ -179,8 +179,9 @@ local DB_DEFAULTS = {
         -- }
     },
     profile = {
-        showOnlineOnly = false,
-        expansionFilter = { ORIG = true, TBC = true },
+        showOnlineOnly     = false,
+        expansionFilter    = { ORIG = true, TBC = true },
+        showTooltipCrafters = true,
     },
 }
 
@@ -465,10 +466,12 @@ function Data:MigrateToGuildPartition()
         end
     end
 
-    -- Migrate _craftQueue into the guild partition
+    -- Clean up legacy _craftQueue (removed in 1.2.3)
     if self.db.global._craftQueue then
-        gdb._craftQueue = self.db.global._craftQueue
         self.db.global._craftQueue = nil
+    end
+    if gdb._craftQueue then
+        gdb._craftQueue = nil
     end
 
     if migrated > 0 then
@@ -1452,7 +1455,7 @@ local SAMPLE_CATEGORIES = {
     "Reagents",
 }
 
-local PROF_NAMES = { "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
+local PROF_NAMES = { "Alchemy", "Blacksmithing", "Cooking", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
 
 -- Sample reagent lists (arrays of {name, count, itemID})
 local SAMPLE_REAGENTS = {
@@ -1663,13 +1666,7 @@ function Data:SimDelta()
 end
 
 function Data:SimCraft()
-    -- Simulate an incoming CRAFT_REQUEST (Phase 6 will handle the actual popup)
-    if GuildCrafts.CraftRequest and GuildCrafts.CraftRequest.OnIncomingRequest then
-        GuildCrafts.CraftRequest:OnIncomingRequest("SimPlayer001", "Lionheart Helm")
-    else
-        GuildCrafts:Print("Simulated craft request: SimPlayer001 wants you to craft Lionheart Helm")
-        GuildCrafts:Print("(Craft popup will be available after Phase 6)")
-    end
+    GuildCrafts:Print("Craft request simulation removed in 1.2.3 — use [W] whisper button instead.")
 end
 
 ----------------------------------------------------------------------
