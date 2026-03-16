@@ -202,6 +202,7 @@ GuildCrafts synchronizes recipe data automatically between addon users.
 * no setup required  
 * low chat traffic  
 * new recipes broadcast automatically  
+* only one guild member ever responds to `!gc` — even when multiple addon users are online or some are inside dungeons/battlegrounds
 
 Members who leave the guild are automatically removed after 30 days.
 
