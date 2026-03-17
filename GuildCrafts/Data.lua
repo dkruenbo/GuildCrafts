@@ -1805,6 +1805,11 @@ function Data:IsSecondaryProfession(name)
     return false
 end
 
+--- Return true if the profession is a pure gathering skill (no craftable recipes).
+function Data:IsGatheringProfession(name)
+    return name == "Herbalism" or name == "Skinning"
+end
+
 --- Return all guild recipes for a given profession, aggregated across all members.
 --- Returns: { { key, name, crafters = { {key}, ... } }, ... } sorted alphabetically by name.
 function Data:GetAllRecipesForProfession(profName)

@@ -862,6 +862,13 @@ function UI:ShowMemberRecipes(memberKey, profName)
         return
     end
 
+    -- For gathering professions (Herbalism, Skinning) there are no recipes.
+    -- Show the member header with skill level and a clear explanation instead.
+    if GuildCrafts.Data:IsGatheringProfession(profName) then
+        self:ShowGatheringMemberDetail(memberKey, profName, entry)
+        return
+    end
+
     local recipes = entry.professions[profName].recipes
     if not recipes or next(recipes) == nil then
         self:ShowDetailEmpty(memberKey, profName)
@@ -1795,6 +1802,47 @@ function UI:ShowDetailEmpty(_memberKey, _profName)
     msg:SetJustifyH("CENTER")
     self.detailContent:SetHeight(160)
     self.detailRows[#self.detailRows + 1] = msg
+end
+
+--- Detail panel for a gathering profession member (Herbalism, Skinning).
+--- Shows name + skill level header, then a short explanatory note.
+function UI:ShowGatheringMemberDetail(memberKey, profName, entry)
+    self.detailWelcome:Hide()
+    self:ClearDetailRows()
+
+    local profData = entry.professions[profName]
+
+    -- Header: MemberName — ProfName  skill/max
+    local header = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    header:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, -8)
+    local headerText = memberKey:match("^(.+)-") .. " — " .. profName
+    if profData.skillLevel and profData.maxSkillLevel then
+        headerText = headerText .. "  " .. profData.skillLevel .. "/" .. profData.maxSkillLevel
+    end
+    local stale = GuildCrafts.Data:GetStalenessTag(entry.lastUpdate)
+    if stale then
+        headerText = headerText .. "  |cffff6666[" .. stale .. "]|r"
+    end
+    header:SetText(headerText)
+    header:SetTextColor(1, 0.82, 0)
+    self.detailRows[#self.detailRows + 1] = header
+
+    -- Scanned timestamp
+    local scanLabel = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    scanLabel:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, -26)
+    scanLabel:SetText("|cff808080Scanned: " .. FormatAge(entry.lastUpdate) .. "|r")
+    self.detailRows[#self.detailRows + 1] = scanLabel
+
+    -- Gathering note
+    local note = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    note:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, -50)
+    note:SetWidth(self.detailScrollFrame:GetWidth() - 24)
+    note:SetWordWrap(true)
+    note:SetJustifyH("LEFT")
+    note:SetText("|cff888888" .. profName .. " is a gathering profession.\nNo recipes to display.|r")
+    self.detailRows[#self.detailRows + 1] = note
+
+    self.detailContent:SetHeight(120)
 end
 
 ----------------------------------------------------------------------
