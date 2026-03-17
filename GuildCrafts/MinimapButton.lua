@@ -143,17 +143,22 @@ function MinimapButton:OnEnable()
     end)
 end
 
---- Toggle minimap button visibility (e.g. from slash command).
-function MinimapButton:Toggle()
+--- Toggle minimap button visibility.
+--- Pass silent=true to suppress the chat print (e.g. when called from the UI).
+function MinimapButton:Toggle(silent)
     if not self.btn then return end
     local db = GuildCrafts.db
     if self.btn:IsShown() then
         self.btn:Hide()
         db.global._minimapHide = true
-        GuildCrafts:Print("Minimap button hidden. Type /gc minimap to show it again.")
+        if not silent then
+            GuildCrafts:Print("Minimap button hidden. Type /gc minimap to show it again.")
+        end
     else
         self.btn:Show()
         db.global._minimapHide = false
-        GuildCrafts:Print("Minimap button shown.")
+        if not silent then
+            GuildCrafts:Print("Minimap button shown.")
+        end
     end
 end
