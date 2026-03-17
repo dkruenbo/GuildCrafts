@@ -26,7 +26,7 @@ local function CreateButton()
     btn:SetSize(BUTTON_SIZE, BUTTON_SIZE)
     btn:SetMovable(true)
     btn:EnableMouse(true)
-    btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    btn:RegisterForClicks("LeftButtonUp")
     btn:RegisterForDrag("LeftButton")
     btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
@@ -112,8 +112,6 @@ function MinimapButton:OnEnable()
     self.btn:SetScript("OnClick", function(_, button)
         if button == "LeftButton" then
             GuildCrafts.UI:Toggle()
-        elseif button == "RightButton" then
-            GuildCrafts:Print("Use /gc to toggle the window. Right-click options coming soon.")
         end
     end)
 
