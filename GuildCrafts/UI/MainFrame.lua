@@ -701,7 +701,7 @@ function UI:PopulateProfessionList()
     end
 
     -- Divider between primary crafting and secondary (gathering + cooking) professions
-    local sep = self:CreateLeftSeparator(self.leftContent, yOffset, "Secondary")
+    local sep = self:CreateLeftSeparator(self.leftContent, yOffset, "")
     self.leftRows[#self.leftRows + 1] = sep
     yOffset = yOffset + 20
 
