@@ -9,7 +9,13 @@
 - **Secondary profession divider in left panel** — a thin separator labelled `Secondary` divides the crafting professions (Alchemy, Blacksmithing, Enchanting, Engineering, Jewelcrafting, Leatherworking, Tailoring) from the secondary group (Mining, Herbalism, Skinning, Cooking) in the left navigation panel
 - **Cooking moved to secondary group** — Cooking now appears below the divider with the other secondary professions
 - **Gathering profession detail panel** — clicking a Herbalism or Skinning member shows their name, skill level, and last-scanned timestamp at the top, with a clear `Herbalism is a gathering profession. No recipes to display.` note below instead of the generic empty-state message
-- **`[Minimap]` toggle button in bottom bar** — a new `[Minimap]` button in the bottom bar lets you show or hide the minimap icon directly from the window. The button glows gold when visible, dim when hidden
+- **`[Minimap]` toggle button in bottom bar** — show or hide the minimap icon directly from the window without needing a slash command; glows gold when visible
+
+### Fixes
+
+- **Fixed DR term oscillation** — two online addon users could endlessly leapfrog each other's DR authority terms (1472 → 1473 → 1474...) spamming the debug window. Root cause: `RecomputeElection()` was called before the heartbeat sender was registered in the peer list, so the stepping-down node re-elected itself immediately. Fix: register the peer first, then compute election once with complete information
+- **Fixed gathering professions showing wrong content** — clicking Herbalism or Skinning while in Recipes view mode showed a misleading "members need to open their profession window" message. Gathering professions now always navigate directly to the Members list
+- **Fixed Members/Recipes toggle shown for gathering professions** — Herbalism and Skinning no longer show the Members/Recipes toggle bar (they have no Recipes view); the profession name header is still shown
 
 ---
 
