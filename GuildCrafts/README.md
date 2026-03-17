@@ -19,8 +19,9 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Skill level display** — see each member's current profession skill level (e.g. "375/375") in the member list and recipe detail view
 - **Recipe categorization** — recipes are grouped by sub-type (Potions, Elixirs, Flasks, Weapons, Armor, etc.) with visual category headers
 - **Favorites / Bookmarks** — star any recipe or member; dedicated Favorites tab with profession filter and quick access to your most-used crafters
-- **Minimap button** — small icon on the minimap to toggle the window; drag to reposition, hide with `/gc minimap`
+- **Minimap button** — small icon on the minimap to toggle the window; drag to reposition, hide with `/gc minimap` or the `[Minimap]` button in the bottom bar of the window
 - **Profession icons** — WoW's built-in profession icons displayed next to each profession name in the browse panel
+- **Secondary profession divider** — the left panel groups crafting professions above a thin `Secondary` divider, with gathering professions (Mining, Herbalism, Skinning) and Cooking below it
 - **Chunked sync** — large sync payloads are split into batches of 10 members, preventing chat throttle issues in large guilds
 - **Last-scanned timestamp** — member detail panels show "Scanned: 2h ago" so you can judge how fresh the data is
 - **Online filter & tooltip toggle** — a `[Online]` button and a `[Tooltip]` button sit in the bottom bar of the window. `[Online]` hides offline members from the member list and crafter lists; profession counts update to reflect the filtered view. `[Tooltip]` controls whether crafter info is injected into item tooltips — useful in large guilds where popular items generate very long tooltips. Both settings persist across sessions
@@ -35,7 +36,11 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 
 ## Tracked Professions
 
-Alchemy · Blacksmithing · Cooking · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
+**Crafting:** Alchemy · Blacksmithing · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
+
+**Secondary:** Mining (incl. Smelting) · Herbalism · Skinning · Cooking
+
+Gathering professions (Herbalism, Skinning) track skill levels and member counts but have no recipes. Mining tracks Smelting recipes scanned from the Smelting tradeskill window.
 
 ## Installation
 

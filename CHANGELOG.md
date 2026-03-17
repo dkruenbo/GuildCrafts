@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.4 — Secondary Professions — 2026-03-17
+
+### New Features
+
+- **Mining (Smelting), Herbalism, and Skinning now tracked** — gathering professions appear in the profession browser alongside crafting professions. Skill levels are tracked and synced; member counts show in the left panel the same way as any other profession
+- **Smelting recipes tracked under Mining** — the Smelting tradeskill window fires `TRADE_SKILL_SHOW` exactly like any crafting profession, so Smelting recipes are scanned and stored under the Mining entry. Pure miners without Blacksmithing are fully supported
+- **Secondary profession divider in left panel** — a thin separator labelled `Secondary` divides the crafting professions (Alchemy, Blacksmithing, Enchanting, Engineering, Jewelcrafting, Leatherworking, Tailoring) from the secondary group (Mining, Herbalism, Skinning, Cooking) in the left navigation panel
+- **Cooking moved to secondary group** — Cooking now appears below the divider with the other secondary professions
+- **Gathering profession detail panel** — clicking a Herbalism or Skinning member shows their name, skill level, and last-scanned timestamp at the top, with a clear `Herbalism is a gathering profession. No recipes to display.` note below instead of the generic empty-state message
+- **`[Minimap]` toggle button in bottom bar** — a new `[Minimap]` button in the bottom bar lets you show or hide the minimap icon directly from the window. The button glows gold when visible, dim when hidden
+
+---
+
 ## 1.2.3a — 2026-03-16
 
 ### Fixes
