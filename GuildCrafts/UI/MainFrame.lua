@@ -2628,6 +2628,12 @@ function UI:ShowRecipesView(profName)
     self.detailWelcome:Hide()
     self:ClearDetailRows()
 
+    -- Gathering professions have no recipes — redirect to Members view.
+    if GuildCrafts.Data:IsGatheringProfession(profName) then
+        self:NavigateToMembers(profName)
+        return
+    end
+
     local recipes = GuildCrafts.Data:GetAllRecipesForProfession(profName)
 
     if not recipes or #recipes == 0 then
