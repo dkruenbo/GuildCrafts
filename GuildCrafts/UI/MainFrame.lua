@@ -762,7 +762,11 @@ function UI:NavigateToMembers(profName)
     self.expandedRecipes = {}
 
     -- Show profession title + view toggle in detail panel
+    -- (gathering professions have no Recipes view, so hide the toggle buttons)
     self:ShowProfessionToggle(profName)
+    if GuildCrafts.Data:IsGatheringProfession(profName) then
+        self._viewToggleContainer:Hide()
+    end
 
     -- Show breadcrumb
     self.leftBreadcrumb:Show()
@@ -2362,6 +2366,12 @@ end
 --- Recipes mode: show all recipes in detail panel, profession list stays left.
 function UI:NavigateToProfession(profName)
     self._selectedProfession = profName
+    -- Gathering professions have no Recipes view — always use Members.
+    if GuildCrafts.Data:IsGatheringProfession(profName) then
+        self:NavigateToMembers(profName)
+        self:HideProfessionToggle()
+        return
+    end
     if self._viewMode == "recipes" then
         self:ShowRecipesView(profName)
         self:ShowProfessionToggle(profName)
