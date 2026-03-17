@@ -312,7 +312,23 @@ function Comms:SendHeartbeat()
 end
 
 function Comms:HandleHeartbeat(payload)
-    -- Term enforcement: drop beats from stale DRs; adopt higher authority.
+    -- Register the sender in addonUsers BEFORE any election logic so that
+    -- RecomputeElection() always has complete peer information.
+    local needsRecompute = false
+    if payload.dr then
+        self.lastDRHeartbeat = time()
+        if not self.addonUsers[payload.dr] then
+            self.addonUsers[payload.dr] = {
+                version  = 1,
+                lastSeen = time(),
+            }
+            needsRecompute = true
+        else
+            self.addonUsers[payload.dr].lastSeen = time()
+        end
+    end
+
+    -- Term enforcement: drop beats from stale DRs; step down to higher authority.
     if payload.term then
         if payload.term < self.currentTerm then
             GuildCrafts:Debug("Dropping stale HEARTBEAT (term", payload.term, "< current", self.currentTerm, ")")
@@ -320,32 +336,19 @@ function Comms:HandleHeartbeat(payload)
         end
         if payload.term > self.currentTerm then
             self.currentTerm = payload.term
-            GuildCrafts:Debug("Adopted higher term", self.currentTerm, "from HEARTBEAT")
+            GuildCrafts:Debug("Higher term", self.currentTerm, "adopted from HEARTBEAT by", payload.dr or "?")
             if self.myRole == "DR" then
                 GuildCrafts:Debug("Stepping down as DR — higher-term authority arrived")
                 self:StopHeartbeat()
-                -- Update myRole immediately so we stop acting as DR.
-                -- RecomputeElection() runs again below if the DR is a new node,
-                -- but if the DR was already known that branch is skipped — calling
-                -- it here ensures myRole is always consistent.
-                self:RecomputeElection()
+                needsRecompute = true
             end
         end
     end
-    if payload.dr then
-        self.lastDRHeartbeat = time()
-        -- Ensure DR is in our user list
-        if not self.addonUsers[payload.dr] then
-            self.addonUsers[payload.dr] = {
-                version  = 1,
-                lastSeen = time(),
-            }
-            self:RecomputeElection()
-            if GuildCrafts.UI and GuildCrafts.UI.UpdateSyncIndicator then
-                GuildCrafts.UI:UpdateSyncIndicator()
-            end
-        else
-            self.addonUsers[payload.dr].lastSeen = time()
+
+    if needsRecompute then
+        self:RecomputeElection()
+        if GuildCrafts.UI and GuildCrafts.UI.UpdateSyncIndicator then
+            GuildCrafts.UI:UpdateSyncIndicator()
         end
     end
 end
