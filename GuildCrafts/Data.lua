@@ -44,14 +44,19 @@ local STALE_THRESHOLD = 30 * 24 * 3600
 
 -- TBC crafting professions we track (canonical English keys)
 local TRACKED_PROFESSIONS = {
-    ["Alchemy"] = true,
-    ["Blacksmithing"] = true,
-    ["Cooking"] = true,
-    ["Enchanting"] = true,
-    ["Engineering"] = true,
-    ["Jewelcrafting"] = true,
+    -- Primary (crafting)
+    ["Alchemy"]        = true,
+    ["Blacksmithing"]  = true,
+    ["Enchanting"]     = true,
+    ["Engineering"]    = true,
+    ["Jewelcrafting"]  = true,
     ["Leatherworking"] = true,
-    ["Tailoring"] = true,
+    ["Tailoring"]      = true,
+    -- Secondary (gathering + cooking)
+    ["Mining"]         = true,
+    ["Herbalism"]      = true,
+    ["Skinning"]       = true,
+    ["Cooking"]        = true,
 }
 
 -- TBC_ITEM_IDS is populated by Data_TBC.lua on the GuildCrafts addon table.
@@ -73,6 +78,17 @@ local PROFESSION_SPELL_IDS = {
     ["Jewelcrafting"]  = 25229,
     ["Leatherworking"] = 2108,
     ["Tailoring"]      = 3908,
+    ["Mining"]         = 2575,
+    ["Herbalism"]      = 2366,
+    ["Skinning"]       = 8613,
+}
+
+-- Tradeskill window titles that differ from the GetSkillLineInfo name.
+-- Maps the rank-1 spell ID of the window title → canonical profession key.
+-- Example: Smelting fires TRADE_SKILL_SHOW with title "Smelting", but the
+-- skill line (and DB key) is always "Mining".
+local TRADESKILL_TITLE_SPELL_IDS = {
+    ["Mining"] = 2656,  -- rank-1 Smelting spell → maps localized "Smelting" → "Mining"
 }
 
 -- Populated lazily on first use (GetSpellInfo is not reliable at file-load time)
@@ -84,6 +100,18 @@ local function BuildLocaleMap()
         if localizedName then
             _localeToCanonical[localizedName] = canonical
         end
+    end
+    -- Add tradeskill window-title aliases (e.g. "Smelting" → "Mining")
+    for canonical, spellID in pairs(TRADESKILL_TITLE_SPELL_IDS) do
+        local localizedName = GetSpellInfo(spellID)
+        if localizedName then
+            _localeToCanonical[localizedName] = canonical
+        end
+    end
+    -- Hardcoded English fallback for the Smelting window title in case the
+    -- spell ID lookup fails (e.g. on a client build that moved the spell ID).
+    if not _localeToCanonical["Smelting"] then
+        _localeToCanonical["Smelting"] = "Mining"
     end
 end
 
@@ -1455,7 +1483,12 @@ local SAMPLE_CATEGORIES = {
     "Reagents",
 }
 
-local PROF_NAMES = { "Alchemy", "Blacksmithing", "Cooking", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
+local PRIMARY_PROF_NAMES   = { "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
+local SECONDARY_PROF_NAMES = { "Mining", "Herbalism", "Skinning", "Cooking" }
+-- Flat list for DB iteration, member counts, sim code, etc.
+local PROF_NAMES = {}
+for _, n in ipairs(PRIMARY_PROF_NAMES)   do PROF_NAMES[#PROF_NAMES + 1] = n end
+for _, n in ipairs(SECONDARY_PROF_NAMES) do PROF_NAMES[#PROF_NAMES + 1] = n end
 
 -- Sample reagent lists (arrays of {name, count, itemID})
 local SAMPLE_REAGENTS = {
@@ -1756,6 +1789,20 @@ end
 --- Get all profession names (static list).
 function Data:GetTrackedProfessions()
     return PROF_NAMES
+end
+
+--- Get primary and secondary profession name lists separately.
+--- Primary: crafting professions. Secondary: gathering + cooking.
+function Data:GetProfessionGroups()
+    return PRIMARY_PROF_NAMES, SECONDARY_PROF_NAMES
+end
+
+--- Return true if the given profession name is a secondary (gathering/cooking) profession.
+function Data:IsSecondaryProfession(name)
+    for _, n in ipairs(SECONDARY_PROF_NAMES) do
+        if n == name then return true end
+    end
+    return false
 end
 
 --- Return all guild recipes for a given profession, aggregated across all members.

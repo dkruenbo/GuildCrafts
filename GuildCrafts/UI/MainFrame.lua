@@ -17,8 +17,9 @@ local MIN_WIDTH      = 560
 local MIN_HEIGHT     = 380
 local LEFT_PANEL_WIDTH = 240
 
--- Frame pool for left-panel row recycling
-UI._leftRowPool = {}
+-- Frame pools for left-panel recycling
+UI._leftRowPool       = {}
+UI._leftSeparatorPool = {}
 
 -- Colors
 local COLOR_BG       = { 0.05, 0.05, 0.05, 0.92 }
@@ -643,14 +644,19 @@ end
 ----------------------------------------------------------------------
 
 local PROFESSION_ICONS = {
+    -- Primary
     ["Alchemy"]        = "Interface\\Icons\\Trade_Alchemy",
     ["Blacksmithing"]  = "Interface\\Icons\\Trade_BlackSmithing",
-    ["Cooking"]        = "Interface\\Icons\\INV_Misc_Food_15",
     ["Enchanting"]     = "Interface\\Icons\\Trade_Engraving",
     ["Engineering"]    = "Interface\\Icons\\Trade_Engineering",
     ["Jewelcrafting"]  = "Interface\\Icons\\INV_Misc_Gem_01",
     ["Leatherworking"] = "Interface\\Icons\\INV_Misc_ArmorKit_17",
     ["Tailoring"]      = "Interface\\Icons\\Trade_Tailoring",
+    -- Secondary
+    ["Mining"]         = "Interface\\Icons\\Trade_Mining",
+    ["Herbalism"]      = "Interface\\Icons\\Trade_Herbalism",
+    ["Skinning"]       = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01",
+    ["Cooking"]        = "Interface\\Icons\\INV_Misc_Food_15",
 }
 
 ----------------------------------------------------------------------
@@ -667,11 +673,11 @@ function UI:PopulateProfessionList()
     -- Clear existing rows
     self:ClearLeftRows()
 
-    local professions = GuildCrafts.Data:GetTrackedProfessions()
+    local primaryProfs, secondaryProfs = GuildCrafts.Data:GetProfessionGroups()
+    local showOnlineOnly = GuildCrafts.db and GuildCrafts.db.profile.showOnlineOnly
     local yOffset = 0
 
-    for _, profName in ipairs(professions) do
-        local showOnlineOnly = GuildCrafts.db and GuildCrafts.db.profile.showOnlineOnly
+    local function addProfRow(profName)
         local count
         if showOnlineOnly then
             count = GuildCrafts.Data:GetProfessionMemberCount(profName, true)
@@ -690,9 +696,59 @@ function UI:PopulateProfessionList()
         yOffset = yOffset + 24
     end
 
+    for _, profName in ipairs(primaryProfs) do
+        addProfRow(profName)
+    end
+
+    -- Divider between primary crafting and secondary (gathering + cooking) professions
+    local sep = self:CreateLeftSeparator(self.leftContent, yOffset, "Secondary")
+    self.leftRows[#self.leftRows + 1] = sep
+    yOffset = yOffset + 20
+
+    for _, profName in ipairs(secondaryProfs) do
+        addProfRow(profName)
+    end
+
     self.leftContent:SetHeight(math.max(yOffset + 8, 1))
     self:ClearDetailRows()   -- remove any leftover detail content before showing welcome
     self:UpdateDetailWelcome()
+end
+
+--- Create (or reuse) a non-interactive separator row for the left panel.
+function UI:CreateLeftSeparator(parent, yOffset, label)
+    local sep = table.remove(self._leftSeparatorPool)
+    if sep then
+        sep:SetParent(parent)
+        sep:ClearAllPoints()
+        sep:SetPoint("TOPLEFT",  parent, "TOPLEFT",  4, -yOffset)
+        sep:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -yOffset)
+        sep._sepLabel:SetText(label)
+        sep:Show()
+        return sep
+    end
+
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetHeight(20)
+    f:SetPoint("TOPLEFT",  parent, "TOPLEFT",  4, -yOffset)
+    f:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -yOffset)
+    f._isSeparator = true
+
+    -- Thin horizontal rule
+    local line = f:CreateTexture(nil, "ARTWORK")
+    line:SetHeight(1)
+    line:SetPoint("LEFT",  f, "LEFT",  0, 2)
+    line:SetPoint("RIGHT", f, "RIGHT", 0, 2)
+    line:SetTexture("Interface\\Buttons\\WHITE8x8")
+    line:SetVertexColor(0.25, 0.25, 0.25, 0.8)
+
+    -- Label
+    local fs = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    fs:SetPoint("LEFT", f, "LEFT", 4, 0)
+    fs:SetText(label)
+    fs:SetTextColor(0.45, 0.45, 0.45)
+    f._sepLabel = fs
+
+    return f
 end
 
 ----------------------------------------------------------------------
@@ -2070,8 +2126,10 @@ function UI:ClearLeftRows()
     for _, row in ipairs(self.leftRows) do
         row:Hide()
         row:ClearAllPoints()
-        -- Only pool proper row frames (have _label), skip FontStrings/misc frames
-        if row._label then
+        if row._isSeparator then
+            self._leftSeparatorPool[#self._leftSeparatorPool + 1] = row
+        elseif row._label then
+            -- Only pool proper row frames (have _label), skip FontStrings/misc frames
             row:SetScript("OnClick",  nil)
             row:SetScript("OnEnter",  nil)
             row:SetScript("OnLeave",  nil)
