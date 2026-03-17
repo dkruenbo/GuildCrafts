@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.2.3"
+GuildCrafts.DISPLAY_VERSION = "1.2.3a"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -240,8 +240,9 @@ end
 GuildCrafts._gcLastGuildCraftsMsg = 0
 
 --- CHAT_MSG_GUILD handler for !gc <query> commands.
---- DR responds immediately; BDR falls back after 5 s; any other addon user
---- after 12 s — but only if no [GuildCrafts] response has appeared in chat yet.
+--- DR responds immediately; BDR falls back after 5 s; anyone else after 12 s.
+--- DR inside an instance uses 8–12 s so a newly elected outside DR/BDR can
+--- respond first — prevents double-posting when the DR is in a BG/dungeon.
 --- The guild-chat echo acts as the cross-client deduplication signal.
 function GuildCrafts:OnGuildChatMessage(_event, msg)
     -- Track any [GuildCrafts] response so fallback timers can detect it.
@@ -272,15 +273,21 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
     -- Cooldown is stamped only on a successful response (see below),
     -- so a no-match query can be retried immediately with a corrected spelling.
 
-    -- Staggered delay: DR=0 s, BDR=5 s, anyone else=12 s.
+    -- Staggered delay: DR=0 s, BDR=5 s, anyone else=12–20 s.
+    -- If DR is inside an instance it may have been silently replaced by the BDR
+    -- (heartbeats don't cross instance boundaries). Treat an in-instance DR as
+    -- OTHER so the outside DR/BDR responds first. When the DR leaves the
+    -- instance it broadcasts HELLO, roles re-converge, and it reclaims DR.
     local myRole = self.Comms.myRole
+    local inInstance = IsInInstance and select(1, IsInInstance())
+    local effectiveRole = (myRole == "DR" and inInstance) and "OTHER" or myRole
     local delay = 0
-    if myRole == "BDR" then
+    if effectiveRole == "BDR" then
         delay = 5
-    elseif myRole == "OTHER" then
-        -- Add per-client jitter so 50 OTHER nodes don't all fire at t=12 s.
-        -- The first to post emits [GuildCrafts] in guild chat, causing all
-        -- others to cancel when their timer fires.
+    elseif effectiveRole == "OTHER" then
+        -- Add per-client jitter so many OTHER nodes don't all fire at the same
+        -- time. The first to post emits [GuildCrafts] in guild chat, causing
+        -- all others to cancel when their timer fires.
         delay = 12 + math.random(0, 8)
     end
 

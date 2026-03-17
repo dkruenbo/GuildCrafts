@@ -271,8 +271,9 @@ function UI:CreateBottomBar(parent)
         return btn
     end
 
-    local tooltipBtn = makeBarBtn("[Tooltip]", 0,   60)
-    local onlineBtn  = makeBarBtn("[Online]",  -64, 52)
+    local tooltipBtn  = makeBarBtn("[Tooltip]",  0,    60)
+    local onlineBtn   = makeBarBtn("[Online]",   -64,  52)
+    local minimapBtn  = makeBarBtn("[Minimap]",  -120, 60)
 
     onlineBtn:SetScript("OnClick", function() UI:ToggleOnlineFilter() end)
     onlineBtn:SetScript("OnEnter", function(btn)
@@ -292,8 +293,18 @@ function UI:CreateBottomBar(parent)
     end)
     tooltipBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
+    minimapBtn:SetScript("OnClick", function() UI:ToggleMinimapBtn() end)
+    minimapBtn:SetScript("OnEnter", function(btn)
+        GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+        GameTooltip:AddLine("Minimap Button", 1, 1, 1)
+        GameTooltip:AddLine("Show or hide the minimap icon.", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    minimapBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     self._onlineBtn  = onlineBtn
     self._tooltipBtn = tooltipBtn
+    self._minimapBtn = minimapBtn
 end
 
 ----------------------------------------------------------------------
@@ -2310,6 +2321,7 @@ function UI:ShowProfessionToggle(profName)
     self:_UpdateViewToggleVisuals()
     self:_UpdateOnlineBtnVisuals()
     self:_UpdateTooltipBtnVisuals()
+    self:_UpdateMinimapBtnVisuals()
     self:_UpdateExpansionFilterVisuals()
 
     -- Reanchor scroll frame below toggle bar
@@ -2367,6 +2379,21 @@ function UI:_UpdateOnlineBtnVisuals()
         self._onlineBtn:SetBackdropColor(0.07, 0.07, 0.07, 0.9)
         self._onlineBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
         self._onlineBtn._textFS:SetTextColor(0.4, 0.4, 0.4)
+    end
+end
+
+--- Update the [Minimap] button visual to match the current setting.
+function UI:_UpdateMinimapBtnVisuals()
+    if not self._minimapBtn then return end
+    local hidden = GuildCrafts.db and GuildCrafts.db.global._minimapHide
+    if not hidden then
+        self._minimapBtn:SetBackdropColor(0.12, 0.12, 0.12, 1)
+        self._minimapBtn:SetBackdropBorderColor(1, 0.82, 0, 1)
+        self._minimapBtn._textFS:SetTextColor(1, 0.82, 0)
+    else
+        self._minimapBtn:SetBackdropColor(0.07, 0.07, 0.07, 0.9)
+        self._minimapBtn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        self._minimapBtn._textFS:SetTextColor(0.4, 0.4, 0.4)
     end
 end
 
@@ -2439,6 +2466,14 @@ function UI:ToggleOnlineFilter()
         -- On the profession list: just repopulate so counts refresh
         self:PopulateProfessionList()
     end
+end
+
+--- Toggle the minimap button visibility.
+function UI:ToggleMinimapBtn()
+    if GuildCrafts.MinimapButton then
+        GuildCrafts.MinimapButton:Toggle(true)  -- silent: visual feedback from button state
+    end
+    self:_UpdateMinimapBtnVisuals()
 end
 
 --- Toggle whether crafters are shown in item tooltips.
@@ -2707,6 +2742,7 @@ function UI:Toggle()
         frame:Show()
         self:_UpdateOnlineBtnVisuals()
         self:_UpdateTooltipBtnVisuals()
+        self:_UpdateMinimapBtnVisuals()
         self:Refresh()
     end
 end

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.3a — 2026-03-16
+
+### Fixes
+
+- **Fixed `!gc` double-response when DR is inside an instance** — when the Designated Router enters a battleground or dungeon, heartbeats stop crossing the instance boundary. After 3 minutes the BDR is promoted to DR outside, but the original DR is still alive and also responding to `!gc` queries — causing two replies in guild chat. The fix: a DR inside an instance now treats itself as a regular node for `!gc` purposes (12–20 s delay with jitter). The outside DR/BDR responds first; the in-instance DR sees the `[GuildCrafts]` echo in guild chat and cancels its pending reply. When the DR leaves the instance it broadcasts HELLO, roles re-converge within seconds, and it reclaims the DR role normally
+
+---
+
 ## 1.2.3 — Whisper & UI Polish — 2026-03-16
 
 ### New Features
