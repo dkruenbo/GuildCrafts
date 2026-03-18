@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.4a — 2026-03-18
+
+### Fixes
+
+- **Fixed role change log showing wrong transition** — when a node stepped down from DR after receiving a higher-term heartbeat, the debug log showed `OTHER → BDR` instead of `DR → BDR`. Root cause: `myRole` was reset to `OTHER` in the generic message handler before `RecomputeElection()` ran, so `oldRole` was always `OTHER`
+- **Fixed sync panel showing stale DR** — `RecomputeElection()` was called in the generic message handler before `HandleHeartbeat` had registered the sender in `addonUsers`, so the election ran with an incomplete peer list and `currentDR` came out wrong. Fix: removed the premature role reset and election call from the generic handler; `HandleHeartbeat` now always calls `RecomputeElection()` and updates the sync indicator after registering the sender
+
+---
+
 ## 1.2.4 — Secondary Professions — 2026-03-17
 
 ### New Features
