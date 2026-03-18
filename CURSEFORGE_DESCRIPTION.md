@@ -94,6 +94,8 @@ Two toggle buttons sit in the **bottom bar** of the GuildCrafts window.
 
 **[Tooltip]** controls whether GuildCrafts injects crafter info into item tooltips. Disable it when popular items (flasks, enchants) generate tooltips that are too long in large guilds. The setting persists across sessions.
 
+**[Minimap]** shows or hides the minimap icon without needing a slash command. Glows gold when the minimap button is visible.
+
 ### Online Status Indicator
 
 Every member row shows a small coloured `O` dot:
@@ -170,8 +172,13 @@ Your recipes will now automatically sync with other guild members who use the ad
 Built for **WoW TBC Anniversary Edition**  
 Interface version **20505**
 
-Supports all **8 TBC crafting professions**:
-Alchemy · Blacksmithing · Cooking · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
+Supports all crafting and gathering professions:
+
+**Crafting:** Alchemy · Blacksmithing · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
+
+**Secondary:** Mining (incl. Smelting) · Herbalism · Skinning · Cooking
+
+Gathering professions track skill levels and member counts. Mining additionally tracks Smelting recipes.
 
 ---
 
@@ -207,3 +214,21 @@ GuildCrafts synchronizes recipe data automatically between addon users.
 Members who leave the guild are automatically removed after 30 days.
 
 Works best when multiple guild members use the addon — the more players sync, the more complete the database becomes.
+
+***
+
+## Project Status
+
+GuildCrafts is now considered **feature complete** for its original scope.
+
+The core problem the addon was created to solve — helping guild members quickly discover who can craft an item — has been solved, and the addon has reached a stable state.
+
+From this point on, GuildCrafts will move into **maintenance mode**.
+
+This means:
+
+• No new features are currently planned  
+• Critical bug fixes may still be addressed  
+• Contributions and new maintainers are welcome if the community wants to build on it further
+
+If no new maintainers step forward, the addon will remain available in its current form.

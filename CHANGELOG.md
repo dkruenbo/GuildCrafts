@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.4 — Secondary Professions — 2026-03-17
+
+### New Features
+
+- **Mining (Smelting), Herbalism, and Skinning now tracked** — gathering professions appear in the profession browser alongside crafting professions. Skill levels are tracked and synced; member counts show in the left panel the same way as any other profession
+- **Smelting recipes tracked under Mining** — the Smelting tradeskill window fires `TRADE_SKILL_SHOW` exactly like any crafting profession, so Smelting recipes are scanned and stored under the Mining entry. 
+- **Secondary profession divider in left panel** — a thin separator divides the crafting professions (Alchemy, Blacksmithing, Enchanting, Engineering, Jewelcrafting, Leatherworking, Tailoring) from the secondary group (Mining, Herbalism, Skinning, Cooking) in the left navigation panel
+- **Cooking moved to secondary group** — Cooking now appears below the divider with the other secondary professions
+- **Gathering profession detail panel** — clicking a Herbalism or Skinning member shows their name, skill level, and last-scanned timestamp at the top, with a clear `Herbalism is a gathering profession. No recipes to display.` note below instead of the generic empty-state message
+
+### Fixes
+
+- **Fixed DR term oscillation** — two online addon users could endlessly leapfrog each other's DR authority terms (1472 → 1473 → 1474...) spamming the debug window. Root cause: `RecomputeElection()` was called before the heartbeat sender was registered in the peer list, so the stepping-down node re-elected itself immediately. Fix: register the peer first, then compute election once with complete information 
+
+---
+
 ## 1.2.3a — 2026-03-16
 
 ### Fixes

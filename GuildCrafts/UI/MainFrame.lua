@@ -17,8 +17,9 @@ local MIN_WIDTH      = 560
 local MIN_HEIGHT     = 380
 local LEFT_PANEL_WIDTH = 240
 
--- Frame pool for left-panel row recycling
-UI._leftRowPool = {}
+-- Frame pools for left-panel recycling
+UI._leftRowPool       = {}
+UI._leftSeparatorPool = {}
 
 -- Colors
 local COLOR_BG       = { 0.05, 0.05, 0.05, 0.92 }
@@ -643,14 +644,19 @@ end
 ----------------------------------------------------------------------
 
 local PROFESSION_ICONS = {
+    -- Primary
     ["Alchemy"]        = "Interface\\Icons\\Trade_Alchemy",
     ["Blacksmithing"]  = "Interface\\Icons\\Trade_BlackSmithing",
-    ["Cooking"]        = "Interface\\Icons\\INV_Misc_Food_15",
     ["Enchanting"]     = "Interface\\Icons\\Trade_Engraving",
     ["Engineering"]    = "Interface\\Icons\\Trade_Engineering",
     ["Jewelcrafting"]  = "Interface\\Icons\\INV_Misc_Gem_01",
     ["Leatherworking"] = "Interface\\Icons\\INV_Misc_ArmorKit_17",
     ["Tailoring"]      = "Interface\\Icons\\Trade_Tailoring",
+    -- Secondary
+    ["Mining"]         = "Interface\\Icons\\Trade_Mining",
+    ["Herbalism"]      = "Interface\\Icons\\Trade_Herbalism",
+    ["Skinning"]       = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01",
+    ["Cooking"]        = "Interface\\Icons\\INV_Misc_Food_15",
 }
 
 ----------------------------------------------------------------------
@@ -667,11 +673,11 @@ function UI:PopulateProfessionList()
     -- Clear existing rows
     self:ClearLeftRows()
 
-    local professions = GuildCrafts.Data:GetTrackedProfessions()
+    local primaryProfs, secondaryProfs = GuildCrafts.Data:GetProfessionGroups()
+    local showOnlineOnly = GuildCrafts.db and GuildCrafts.db.profile.showOnlineOnly
     local yOffset = 0
 
-    for _, profName in ipairs(professions) do
-        local showOnlineOnly = GuildCrafts.db and GuildCrafts.db.profile.showOnlineOnly
+    local function addProfRow(profName)
         local count
         if showOnlineOnly then
             count = GuildCrafts.Data:GetProfessionMemberCount(profName, true)
@@ -690,9 +696,59 @@ function UI:PopulateProfessionList()
         yOffset = yOffset + 24
     end
 
+    for _, profName in ipairs(primaryProfs) do
+        addProfRow(profName)
+    end
+
+    -- Divider between primary crafting and secondary (gathering + cooking) professions
+    local sep = self:CreateLeftSeparator(self.leftContent, yOffset, "")
+    self.leftRows[#self.leftRows + 1] = sep
+    yOffset = yOffset + 20
+
+    for _, profName in ipairs(secondaryProfs) do
+        addProfRow(profName)
+    end
+
     self.leftContent:SetHeight(math.max(yOffset + 8, 1))
     self:ClearDetailRows()   -- remove any leftover detail content before showing welcome
     self:UpdateDetailWelcome()
+end
+
+--- Create (or reuse) a non-interactive separator row for the left panel.
+function UI:CreateLeftSeparator(parent, yOffset, label)
+    local sep = table.remove(self._leftSeparatorPool)
+    if sep then
+        sep:SetParent(parent)
+        sep:ClearAllPoints()
+        sep:SetPoint("TOPLEFT",  parent, "TOPLEFT",  4, -yOffset)
+        sep:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -yOffset)
+        sep._sepLabel:SetText(label)
+        sep:Show()
+        return sep
+    end
+
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetHeight(20)
+    f:SetPoint("TOPLEFT",  parent, "TOPLEFT",  4, -yOffset)
+    f:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, -yOffset)
+    f._isSeparator = true
+
+    -- Thin horizontal rule
+    local line = f:CreateTexture(nil, "ARTWORK")
+    line:SetHeight(1)
+    line:SetPoint("LEFT",  f, "LEFT",  0, 2)
+    line:SetPoint("RIGHT", f, "RIGHT", 0, 2)
+    line:SetTexture("Interface\\Buttons\\WHITE8x8")
+    line:SetVertexColor(0.25, 0.25, 0.25, 0.8)
+
+    -- Label
+    local fs = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    fs:SetPoint("LEFT", f, "LEFT", 4, 0)
+    fs:SetText(label)
+    fs:SetTextColor(0.45, 0.45, 0.45)
+    f._sepLabel = fs
+
+    return f
 end
 
 ----------------------------------------------------------------------
@@ -706,7 +762,11 @@ function UI:NavigateToMembers(profName)
     self.expandedRecipes = {}
 
     -- Show profession title + view toggle in detail panel
+    -- (gathering professions have no Recipes view, so hide the toggle buttons)
     self:ShowProfessionToggle(profName)
+    if GuildCrafts.Data:IsGatheringProfession(profName) then
+        self._viewToggleContainer:Hide()
+    end
 
     -- Show breadcrumb
     self.leftBreadcrumb:Show()
@@ -803,6 +863,13 @@ function UI:ShowMemberRecipes(memberKey, profName)
     local entry = db[memberKey]
     if not entry or not entry.professions or not entry.professions[profName] then
         self:ShowDetailEmpty(memberKey, profName)
+        return
+    end
+
+    -- For gathering professions (Herbalism, Skinning) there are no recipes.
+    -- Show the member header with skill level and a clear explanation instead.
+    if GuildCrafts.Data:IsGatheringProfession(profName) then
+        self:ShowGatheringMemberDetail(memberKey, profName, entry)
         return
     end
 
@@ -1741,6 +1808,47 @@ function UI:ShowDetailEmpty(_memberKey, _profName)
     self.detailRows[#self.detailRows + 1] = msg
 end
 
+--- Detail panel for a gathering profession member (Herbalism, Skinning).
+--- Shows name + skill level header, then a short explanatory note.
+function UI:ShowGatheringMemberDetail(memberKey, profName, entry)
+    self.detailWelcome:Hide()
+    self:ClearDetailRows()
+
+    local profData = entry.professions[profName]
+
+    -- Header: MemberName — ProfName  skill/max
+    local header = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    header:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, -8)
+    local headerText = memberKey:match("^(.+)-") .. " — " .. profName
+    if profData.skillLevel and profData.maxSkillLevel then
+        headerText = headerText .. "  " .. profData.skillLevel .. "/" .. profData.maxSkillLevel
+    end
+    local stale = GuildCrafts.Data:GetStalenessTag(entry.lastUpdate)
+    if stale then
+        headerText = headerText .. "  |cffff6666[" .. stale .. "]|r"
+    end
+    header:SetText(headerText)
+    header:SetTextColor(1, 0.82, 0)
+    self.detailRows[#self.detailRows + 1] = header
+
+    -- Scanned timestamp
+    local scanLabel = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    scanLabel:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, -26)
+    scanLabel:SetText("|cff808080Scanned: " .. FormatAge(entry.lastUpdate) .. "|r")
+    self.detailRows[#self.detailRows + 1] = scanLabel
+
+    -- Gathering note
+    local note = self.detailContent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    note:SetPoint("TOPLEFT", self.detailContent, "TOPLEFT", 8, -50)
+    note:SetWidth(self.detailScrollFrame:GetWidth() - 24)
+    note:SetWordWrap(true)
+    note:SetJustifyH("LEFT")
+    note:SetText("|cff888888" .. profName .. " is a gathering profession.\nNo recipes to display.|r")
+    self.detailRows[#self.detailRows + 1] = note
+
+    self.detailContent:SetHeight(120)
+end
+
 ----------------------------------------------------------------------
 -- Star Button Factory
 ----------------------------------------------------------------------
@@ -2070,8 +2178,10 @@ function UI:ClearLeftRows()
     for _, row in ipairs(self.leftRows) do
         row:Hide()
         row:ClearAllPoints()
-        -- Only pool proper row frames (have _label), skip FontStrings/misc frames
-        if row._label then
+        if row._isSeparator then
+            self._leftSeparatorPool[#self._leftSeparatorPool + 1] = row
+        elseif row._label then
+            -- Only pool proper row frames (have _label), skip FontStrings/misc frames
             row:SetScript("OnClick",  nil)
             row:SetScript("OnEnter",  nil)
             row:SetScript("OnLeave",  nil)
@@ -2256,6 +2366,12 @@ end
 --- Recipes mode: show all recipes in detail panel, profession list stays left.
 function UI:NavigateToProfession(profName)
     self._selectedProfession = profName
+    -- Gathering professions have no Recipes view — always use Members.
+    if GuildCrafts.Data:IsGatheringProfession(profName) then
+        self:NavigateToMembers(profName)
+        self:HideProfessionToggle()
+        return
+    end
     if self._viewMode == "recipes" then
         self:ShowRecipesView(profName)
         self:ShowProfessionToggle(profName)
@@ -2521,6 +2637,12 @@ function UI:ShowRecipesView(profName)
     self._selectedProfession = profName
     self.detailWelcome:Hide()
     self:ClearDetailRows()
+
+    -- Gathering professions have no recipes — redirect to Members view.
+    if GuildCrafts.Data:IsGatheringProfession(profName) then
+        self:NavigateToMembers(profName)
+        return
+    end
 
     local recipes = GuildCrafts.Data:GetAllRecipesForProfession(profName)
 
