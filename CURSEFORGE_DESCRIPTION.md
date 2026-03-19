@@ -231,4 +231,14 @@ This means:
 • Critical bug fixes may still be addressed  
 • Contributions and new maintainers are welcome if the community wants to build on it further
 
-If no new maintainers step forward, the addon will remain available in its current form.
+---
+
+## Support the Developer
+
+GuildCrafts is built to solve a real problem, and I'm thrilled to see so many guilds finding it useful.
+
+If it's saved you time or helped your guild coordinate better, consider buying me a coffee — it's genuinely appreciated.
+
+[Support me on Ko-fi ☕](https://ko-fi.com/lektor)
+
+*A huge thank you to everyone using the addon, reporting bugs, and sharing it with their guilds.*

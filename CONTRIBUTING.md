@@ -47,11 +47,14 @@ To test locally:
 
 ## What to Contribute
 
-Check `spec/improvements.md` for the roadmap. Good first contributions:
-- Bug fixes
-- Locale/translation support
-- UI improvements
-- Documentation improvements
+GuildCrafts is feature complete for its original scope and is in maintenance mode. No new features are currently planned, but contributions are still welcome in these areas:
+
+- **Bug fixes** — if something behaves incorrectly, a focused fix is always welcome
+- **Locale/translation support** — the multi-language system is in place but real-world edge cases still surface occasionally
+- **Documentation improvements** — clearer explanations, better examples, corrected outdated information
+- **Performance or correctness improvements** — if you spot something wasteful or subtly wrong in the protocol or data handling
+
+If you have an idea for a larger feature, open an issue to discuss it first — the project may not be actively extended, but the conversation is welcome.
 
 ## Pull Request Guidelines
 

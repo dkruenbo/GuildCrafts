@@ -1,5 +1,7 @@
    # GuildCrafts — Specification
 
+> **Historical document.** This was the original design specification written before development began. The addon is now complete and in maintenance mode. Some sections (e.g. the Craft Request popup and Craft Queue panel) describe features that were built and subsequently removed. The implemented addon may differ from what is described here.
+
    ## Overview
    World of Warcraft addon for tracking **all learned recipes** across guild members' professions. Every recipe a guild member knows is stored and synced — the built-in search and filter system makes it easy to find exactly what you need.
 

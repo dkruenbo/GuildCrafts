@@ -312,9 +312,8 @@ function Comms:SendHeartbeat()
 end
 
 function Comms:HandleHeartbeat(payload)
-    -- Register the sender in addonUsers BEFORE any election logic so that
+    -- Register the sender in addonUsers BEFORE election logic so that
     -- RecomputeElection() always has complete peer information.
-    local needsRecompute = false
     if payload.dr then
         self.lastDRHeartbeat = time()
         if not self.addonUsers[payload.dr] then
@@ -322,34 +321,24 @@ function Comms:HandleHeartbeat(payload)
                 version  = 1,
                 lastSeen = time(),
             }
-            needsRecompute = true
         else
             self.addonUsers[payload.dr].lastSeen = time()
         end
     end
 
-    -- Term enforcement: drop beats from stale DRs; step down to higher authority.
-    if payload.term then
-        if payload.term < self.currentTerm then
-            GuildCrafts:Debug("Dropping stale HEARTBEAT (term", payload.term, "< current", self.currentTerm, ")")
-            return
-        end
-        if payload.term > self.currentTerm then
-            self.currentTerm = payload.term
-            GuildCrafts:Debug("Higher term", self.currentTerm, "adopted from HEARTBEAT by", payload.dr or "?")
-            if self.myRole == "DR" then
-                GuildCrafts:Debug("Stepping down as DR — higher-term authority arrived")
-                self:StopHeartbeat()
-                needsRecompute = true
-            end
-        end
+    -- Drop heartbeats from stale DRs. Term adoption already happened in the
+    -- OnReceive dispatcher, so payload.term == currentTerm for the current
+    -- authority and < currentTerm for superseded ones.
+    if payload.term and payload.term < self.currentTerm then
+        GuildCrafts:Debug("Dropping stale HEARTBEAT (term", payload.term, "< current", self.currentTerm, ")")
+        return
     end
 
-    if needsRecompute then
-        self:RecomputeElection()
-        if GuildCrafts.UI and GuildCrafts.UI.UpdateSyncIndicator then
-            GuildCrafts.UI:UpdateSyncIndicator()
-        end
+    -- Always recompute after a valid heartbeat so currentDR/BDR stay accurate
+    -- in the sync panel and role change log.
+    self:RecomputeElection()
+    if GuildCrafts.UI and GuildCrafts.UI.UpdateSyncIndicator then
+        GuildCrafts.UI:UpdateSyncIndicator()
     end
 end
 
@@ -960,8 +949,10 @@ function Comms:ProcessIncoming(message, _distribution, sender)
         if self.myRole == "DR" then
             GuildCrafts:Debug("Stepping down — higher-term authority arrived via", msgType)
             self:StopHeartbeat()
-            self.myRole = "OTHER"
-            self:RecomputeElection()
+            -- Do NOT set myRole or call RecomputeElection here: the sender is not
+            -- yet registered in addonUsers. The specific message handler (e.g.
+            -- HandleHeartbeat) will register the sender and run RecomputeElection
+            -- with the complete peer list, correctly computing the new role.
         end
     end
 
