@@ -105,7 +105,7 @@ This document describes planned releases with implementation notes for each item
 >    end
 >    return -(hash + 1000000)
 >    ```
-> 3. Replace with a namespaced key that cannot collide with any real spellID or itemID. The simplest safe approach is to prefix the craft name before hashing, and use a larger modulus so the output space is separated from both positive itemIDs and from the real-spellID negative keys. Real spellIDs for TBC enchants are in the range 13–28000, so keeping the fallback below −2,000,000 guarantees no collision with real keys:
+> 3. Replace with a namespaced key in a dedicated negative range, separated from both positive itemIDs and real spellID-based negative keys. Real spellIDs for TBC enchants are in the range 13–28000, so placing the fallback below −2,000,000 avoids overlap with real keys:
 >    ```lua
 >    local namespacedInput = "enc:" .. craftName
 >    local hash = 0
@@ -114,7 +114,7 @@ This document describes planned releases with implementation notes for each item
 >    end
 >    return -(hash + 2000000)
 >    ```
-> 4. Add a comment: `-- Fallback: collision-safe namespaced hash. Only fires if both item and spell links are nil (should not happen for any known TBC enchant).`
+> 4. Add a comment: `-- Fallback: namespaced hash in a dedicated negative range. Collision risk is reduced but not eliminated. Only fires if both item and spell links are nil (should not happen for known TBC enchants).`
 > 5. No DB migration needed — this fallback path fires only for unknown recipes that have no valid link at all. If any old entry was stored under the old hash range (−1,000,000 to −2,000,000), it will simply become an orphan (not found by the new key) and be silently ignored. That is acceptable since these entries had no real identity to begin with.
 
 > **Files:** `GuildCrafts/Data.lua` — only `GetCraftRecipeKey()`.
@@ -130,48 +130,31 @@ This document describes planned releases with implementation notes for each item
 
 > **Why:** With 50+ members and hundreds of recipes per profession, the full rebuild iterates thousands of table entries in a single frame. WoW's Lua runs on the main thread with no background execution, so a large rebuild blocks frame rendering for a perceptible moment.
 
-> **How:**
-> 1. Instead of a single dirty flag that forces a full rebuild, maintain the index incrementally:
->    - On `MergeDelta()` (a single new recipe for one member): call a new `Tooltip:IndexRecipe(memberKey, profName, recipeKey, recipeData)` that inserts only the new entry into `indexByID` and `indexByName` without touching anything else.
->    - On `MergeIncoming()` (a full member replacement after sync): call a new `Tooltip:ReIndexMember(memberKey, entry)` that removes all existing entries for that member key and inserts the new ones.
->    - On guild DB wipe or partition switch: keep the full `RebuildIndex()` for that case only.
-> 2. Implement `Tooltip:RemoveMemberFromIndex(memberKey)`:
+> **How (deferred rebuild — recommended for maintenance mode):**
+>
+> A naive incremental approach (scanning `indexByID` and `indexByName` to remove a member's entries on every sync) moves the work from hover-time to sync-time but does not eliminate it — it just shifts the spike to a less user-visible moment. For a truly incremental index, a reverse-ref map (`memberToRecipeKeys`, `memberToRecipeNames`) would be needed to avoid full scans on removal. That adds coupling and is out of scope for maintenance mode.
+>
+> The simpler, lower-risk approach:
+> 1. Keep `indexDirty` as-is. Keep `InvalidateIndex()` as-is.
+> 2. **Remove the `RebuildIndex()` call from `OnTooltipSetItem`.** Do not rebuild on hover.
+> 3. Instead, schedule a deferred rebuild via a short timer when the index is marked dirty:
 >    ```lua
->    function Tooltip:RemoveMemberFromIndex(memberKey)
->        for id, list in pairs(indexByID) do
->            for i = #list, 1, -1 do
->                if list[i].key == memberKey then table.remove(list, i) end
->            end
->        end
->        for name, list in pairs(indexByName) do
->            for i = #list, 1, -1 do
->                if list[i].key == memberKey then table.remove(list, i) end
->            end
+>    function Tooltip:InvalidateIndex()
+>        indexDirty = true
+>        if not self._rebuildTimer then
+>            self._rebuildTimer = C_Timer.After(2, function()
+>                self._rebuildTimer = nil
+>                if indexDirty then self:RebuildIndex() end
+>            end)
 >        end
 >    end
 >    ```
-> 3. Implement `Tooltip:ReIndexMember(memberKey, entry)`:
->    ```lua
->    function Tooltip:ReIndexMember(memberKey, entry)
->        self:RemoveMemberFromIndex(memberKey)
->        if entry and entry.professions then
->            for profName, profData in pairs(entry.professions) do
->                if profData.recipes then
->                    for recipeKey, recipeData in pairs(profData.recipes) do
->                        self:IndexRecipe(memberKey, profName, recipeKey, recipeData)
->                    end
->                end
->            end
->        end
->    end
->    ```
-> 4. In `Data:MergeIncoming()`, after updating a member entry, call `GuildCrafts.Tooltip:ReIndexMember(memberKey, updatedEntry)` if the Tooltip module is loaded.
-> 5. In `Data:MergeDelta()`, after inserting a recipe, call `GuildCrafts.Tooltip:IndexRecipe(memberKey, profName, recipeKey, recipeData)`.
-> 6. Remove the `indexDirty` / `RebuildIndex()` call from `OnTooltipSetItem`. The index is now always current. Keep `RebuildIndex()` callable but only trigger it on `OnInitialize` (initial population) and on full DB resets.
-> 7. Guard all Tooltip calls in Data.lua: `if GuildCrafts.Tooltip and GuildCrafts.Tooltip.ReIndexMember then`.
+>    This means the rebuild happens 2 seconds after the last data change — well after the sync burst completes — and never during a hover event.
+> 4. `OnTooltipSetItem` uses whatever index is currently built. If the index is still mid-rebuild (i.e. a hover fires within 2 seconds of a data change), it uses the previous index. This is acceptable — a briefly stale tooltip is far better than a hover hitch.
+> 5. On `OnInitialize`, call `RebuildIndex()` directly (no timer needed — no user interaction yet).
 
-> **Files:** `GuildCrafts/Tooltip.lua` (new incremental methods, remove dirty-rebuild from `OnTooltipSetItem`), `GuildCrafts/Data.lua` (call new Tooltip methods from `MergeIncoming` and `MergeDelta`).
-> **Risk:** Medium — touches the data merge path. Test thoroughly: hover tooltips should work immediately after a fresh login sync, after a delta update, and after `/reload`.
+> **Files:** `GuildCrafts/Tooltip.lua` only — `InvalidateIndex()` and `OnTooltipSetItem`. No changes to `Data.lua`.
+> **Risk:** Low. The change is fully contained in Tooltip.lua. Test: hover immediately after login sync (uses existing index, no hitch), hover 3 seconds after a delta update (uses freshly rebuilt index).
 
 ---
 
@@ -182,11 +165,8 @@ This document describes planned releases with implementation notes for each item
 > **Why:** Users with the debug panel open can see election activity but there is no easy way to judge whether the data they're looking at is trustworthy. Adding "last synced" and a stale-member count to the hover tooltip costs little (all the data exists) and meaningfully increases trust in the addon.
 
 > **How:**
-> 1. **Track sync completion time in Comms.** In `Comms.lua`, add a field `self.lastSyncCompletedAt = nil`. Set it to `time()` in `HandleSyncResponse` when the final chunk is received (i.e. when `payload.chunkIndex == payload.chunkTotal` and `self.syncPending` is cleared). Also set it when a DR skips sync because it is already current (`myRole == "DR"` and no response needed).
->    ```lua
->    self.lastSyncCompletedAt = time()
->    ```
-> 2. **Expose it via a getter:**
+> 1. **Track sync completion time in Comms.** In `Comms.lua`, add a field `self.lastSyncCompletedAt = nil`. Set it to `time()` only when a real sync transaction completes — i.e. in `HandleSyncResponse` when the final chunk is received (`payload.chunkIndex == payload.chunkTotal`) and `self.syncPending` is cleared. **Do not set it when the DR skips sync because it is already current** — that would show "Last synced: 10s ago" without any data actually having been exchanged, which is misleading.
+>    The DR never receives a `SYNC_RESPONSE` (it is the one sending them), so `lastSyncCompletedAt` will remain `nil` for a DR node that has not synced with anyone. That is correct and honest — the DR's tooltip can show "not yet" for last synced, which accurately reflects that it has not gone through a sync transaction this session.
 >    ```lua
 >    function Comms:GetLastSyncTime()
 >        return self.lastSyncCompletedAt
@@ -218,7 +198,7 @@ This document describes planned releases with implementation notes for each item
 >        local ageStr = GuildCrafts.Data:FormatAge(age)  -- reuse existing formatter
 >        GameTooltip:AddDoubleLine("Last synced:", ageStr .. " ago", 0.7,0.7,0.7, 1,1,1)
 >    else
->        GameTooltip:AddDoubleLine("Last synced:", "this session", 0.7,0.7,0.7, 0.6,0.6,0.6)
+>        GameTooltip:AddDoubleLine("Last synced:", "not yet this session", 0.7,0.7,0.7, 0.6,0.6,0.6)
 >    end
 >    local stale = GuildCrafts.Data and GuildCrafts.Data:CountStaleMembers(30) or 0
 >    if stale > 0 then
@@ -229,24 +209,6 @@ This document describes planned releases with implementation notes for each item
 
 > **Files:** `GuildCrafts/Comms.lua` (add `lastSyncCompletedAt`, `GetLastSyncTime()`), `GuildCrafts/Data.lua` (add `CountStaleMembers()`), `GuildCrafts/UI/MainFrame.lua` (extend sync dot tooltip).
 > **Risk:** Low — all changes are additive. Nothing existing is modified except the tooltip content.
-
----
-
-#### Old guild partition cleanup (#11) — *conditional*
-
-> **What:** Guild recipe data is stored under `db.global["GuildName-Realm"]`. If a user has been in multiple guilds over time (guild-hop, server transfer, alt in different guild), old partition keys accumulate silently in `SavedVariables` and are never cleaned up.
-
-> **Why:** For most users this is invisible. For a guild-hopper it could mean megabytes of stale data persisting indefinitely. The fix is simple and purely defensive.
-
-> **How — only include in 1.2.5 if the implementation stays strictly opt-out and non-destructive:**
-> 1. In `Data:OnInitialize()`, after loading the DB, iterate `db.global` for partition keys (those matching the `"GuildName-Realm"` format — i.e. containing a hyphen and not being a system key).
-> 2. Track the current guild partition key. For any partition key that is not the current guild and has not been accessed in 90 days (use a `lastAccessed` timestamp stored per partition on each successful sync or login), mark it as purgeable.
-> 3. **Do not delete automatically.** Instead print a one-time notice: `[GuildCrafts] Old guild data found for <GuildName>. Type /gc cleanup to remove it.`
-> 4. Implement `/gc cleanup` in `Core.lua` which lists stale partitions and asks for confirmation before deleting.
-> 5. Store `lastAccessed = time()` on the current partition in `OnInitialize` each session.
-
-> **Files:** `GuildCrafts/Data.lua` (`OnInitialize`, new `/gc cleanup` helper), `GuildCrafts/Core.lua` (slash command handler).
-> **Risk:** Low if auto-delete is not implemented. If this feels like scope creep for 1.2.5, defer to backlog — the problem is slow-moving and non-urgent.
 
 ---
 
@@ -304,6 +266,6 @@ Items in this section are not a committed release. They are candidates — each 
 | [#21](https://github.com/dkruenbo/GuildCrafts/issues/21) | Coalesce login sync storms on DR | Premature optimisation — no reported user pain. Revisit if DR lag is observed during raid-start login surges. |
 | [#22](https://github.com/dkruenbo/GuildCrafts/issues/22) | Piggyback version vector hash on HEARTBEAT | Premature optimisation — SYNC_REQUESTs at login are legitimate, not redundant. Revisit if telemetry shows unnecessary round-trips. |
 | [#19](https://github.com/dkruenbo/GuildCrafts/issues/19) | Incremental sync: send only changed professions | Premature optimisation. `DELTA_UPDATE` already handles the real-time case; the full-member SYNC_RESPONSE only fires for members who were offline, and LibDeflate already compresses those payloads well. The implementation touches version vector format, merge semantics, `StripSyncFields`, and requires capability negotiation in `HELLO` — meaningful surface area for a problem with no reported user pain. Revisit only if a 50+ member guild reports slow post-login sync or chat throttle hits. Benchmark first. |
-| — | Search result ranking by skill level / online status | Useful QoL but requires ranking model design. |
+| — | Old guild partition cleanup | Detect and offer to clean up `db.global` partitions from guilds the user is no longer in. Detection heuristic ("contains a hyphen") is weak — needs a more explicit partition identity model (e.g. a `_guildPartition = true` metadata flag written at partition creation time) before auto-detection is safe enough to act on. Non-destructive `/gc cleanup` command with confirmation is the right shape. Non-urgent — slow-moving problem, only affects guild-hoppers. |
 | — | Quick-action buttons in search results (Request / Post) | Convenience shortcut. Low complexity, good candidate for a 1.2.x patch after 1.2.0 ships. |
 | — | Cooldown panel: dedicated UI panel showing who has what on cooldown and when it expires | Basic cooldown tracking (Mooncloth, Shadowcloth, Spellcloth, Transmutes) is already implemented and visible in the existing UI. This item is a separate, focused panel — a dedicated view listing all guild cooldowns with expiry countdowns. Requires DR to broadcast cooldown state in real time; design needed before implementation. |
