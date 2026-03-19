@@ -1,5 +1,7 @@
 # GuildCrafts — Implementation Plan
 
+> **Historical document.** This was the phased implementation plan written before development began. The addon is now complete and in maintenance mode. All phases were executed, though some details changed along the way — notably Phase 6 (Craft Request System) was built and later removed in favour of the `[W]` whisper button workflow.
+
 ## Guiding Principles
 - **Vertical slices**: Each phase delivers a testable, working addon. Don't build all of comms before all of UI — build thin end-to-end features and thicken them.
 - **Hardest risk first**: The communication protocol is the riskiest part (throttling, DR election, bidirectional sync). Get it working with simple test data before polishing the UI.

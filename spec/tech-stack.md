@@ -1,5 +1,7 @@
 # GuildCrafts — Tech Stack
 
+> **Historical document.** This was the original tech stack reference written during development. The addon is now complete and in maintenance mode. Some entries (e.g. `CraftRequest.lua` and the craft request UI files) describe components that were later removed. The actual codebase may differ from what is described here.
+
 ## Platform
 - **Game**: World of Warcraft — The Burning Crusade Anniversary (Classic TBC client, API version 2.5.x)
 - **Language**: Lua 5.1 (WoW embedded runtime)

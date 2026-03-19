@@ -1,5 +1,7 @@
 # GuildCrafts — Ranked Improvements & Suggestions
 
+> **Maintenance mode.** The addon is feature complete for its original scope. Items marked **DONE** have been implemented. Remaining items are not currently planned — see [CONTRIBUTING.md](../CONTRIBUTING.md) if you want to take one on.
+
 ## Tier 1 — High Impact
 
 | # | Feature | Description | Why |
@@ -14,7 +16,7 @@
 | # | Feature | Description | Why |
 |---|---------|-------------|-----|
 | 5 | ~~Skill Level Display~~ | ~~Show each member's current profession skill (e.g. "Alchemy 375/375").~~ | **DONE** — Skill level captured during DetectProfessions, displayed in member list and recipe detail header |
-| 6 | Favorites / Bookmarks | Let users star recipes for quick access in a dedicated "Favorites" tab. | Avoids repeated searches for the same commonly-needed items (flasks, enchants). |
+| 6 | ~~Favorites / Bookmarks~~ | ~~Let users star recipes for quick access in a dedicated "Favorites" tab.~~ | **DONE** — Implemented in 1.1.0, Favorites tab with Members and Recipes sub-tabs |
 | 7 | ~~Recipe Categorization~~ | ~~Group recipes by sub-type (Potions, Elixirs, Flasks for Alchemy; Weapons, Armor for Blacksmithing, etc.).~~ | **DONE** — Category captured from profession window headers during scan, displayed as grouped headers in recipe detail view |
 | 8 | ~~Minimap Button~~ | ~~Small icon on the minimap to toggle the window. Uses LibDBIcon.~~ | **DONE** — Self-contained MinimapButton.lua module with draggable icon, saved position, /gc minimap toggle |
 
@@ -22,7 +24,7 @@
 
 | # | Feature | Description | Why |
 |---|---------|-------------|-----|
-| 9 | In-Game Craft Request Chat | Small embedded chat box between requester and crafter to discuss mats, tips, meeting location. | Keeps the conversation in context instead of switching to whisper windows. |
+| 9 | ~~In-Game Craft Request Chat~~ | ~~Small embedded chat box between requester and crafter to discuss mats, tips, meeting location.~~ | **BUILT THEN REMOVED** — Full craft request popup, queue, and comms protocol was implemented, then removed in 1.2.3 in favour of the `[W]` whisper button |
 | 10 | ~~Profession Icons~~ | ~~Use WoW's built-in profession icons next to each profession name in the left panel.~~ | **DONE** — Icon textures rendered next to profession names in the left panel via CreateLeftRow icon parameter |
 | 11 | ~~Data Expiry / Staleness Indicator~~ | ~~Flag member data that hasn't been updated in 30+ days. Optional auto-hide for inactive players.~~ | **DONE** — Red [30d ago] / [2mo ago] tag shown in member list and recipe detail header for entries older than 30 days |
 
@@ -32,7 +34,7 @@
 |---|---------|-------------|-----|
 | 12 | ~~Chunked Sync~~ | ~~Break large sync responses into smaller batches instead of one big payload.~~ | **DONE** — SYNC_RESPONSE and SYNC_PUSH payloads are split into chunks of 10 members each with chunkIndex/chunkTotal metadata; receivers merge incrementally and reset sync timeout per chunk |
 | 13 | Export to CSV / Text | Dump the full guild recipe database to a text file for guild websites or spreadsheets. | Useful for guild management outside the game. |
-| 14 | Locale Support | Handle multi-locale guilds where recipe names differ by client language. Use spellID-based keys (already partially implemented) with localized display names. | Relevant for EU servers where players may run different language clients. |
+| 14 | ~~Locale Support~~ | ~~Handle multi-locale guilds where recipe names differ by client language. Use spellID-based keys (already partially implemented) with localized display names.~~ | **DONE** — Multi-language support implemented in 1.1.6; recipe keys are itemID/spellID based, display names are localised per client |
 | 15 | Code Modularisation | Split large files (Data.lua, MainFrame.lua, Comms.lua) into focused sub-modules for easier onboarding and contribution. | Files over 1,000 lines are harder for new contributors to navigate. Smaller, single-purpose modules reduce merge conflicts and make PRs easier to review. |
 
 ## Tier 5 — Server-Wide Craft Marketplace
