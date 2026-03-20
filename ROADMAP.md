@@ -108,13 +108,21 @@ This document describes planned releases with implementation notes for each item
 
 #### Tombstone design
 
-> A tombstone is a lightweight record stored in the guild DB alongside member entries:
+> A tombstone is a lightweight record stored in the guild DB under a reserved key, separate from member entries:
 > ```lua
 > db["__tombstones"] = {
 >     ["PlayerName-Realm"] = { deletedAt = timestamp, deletedBy = "OfficerName-Realm" },
 >     ...
 > }
 > ```
+> **Reserved key guard — critical:** `db["__tombstones"]` must be explicitly skipped in every `pairs(db)` loop in `Data.lua`. Functions that currently iterate all DB keys without a guard include `CountStaleMembers`, `MergeIncoming`, `GetVersionVector`, `PruneStaleMembers`, and several others. Without the guard, each of these will treat the tombstone table as a member entry and behave incorrectly (e.g. `GetVersionVector` would include `__tombstones.lastUpdate` in the vector; `PruneStaleMembers` would try to evict it from the roster). The safest pattern is a shared helper:
+> ```lua
+> local function IsMemberKey(key)
+>     return type(key) == "string" and key ~= "__tombstones"
+> end
+> ```
+> Apply this check at the top of every `for key, entry in pairs(db)` loop before any other logic. This is the highest-risk part of the implementation — easy to add the tombstone table, easy to forget to guard one loop.
+>
 > **Merge precedence** — `MergeIncoming` must follow this exact decision tree for each incoming member entry:
 > ```
 > 1. Does a tombstone exist for this member key?
@@ -134,10 +142,17 @@ This document describes planned releases with implementation notes for each item
 > Any officer can run `/gc prune [days]` (default: 90). The client does not need to be the DR. Flow:
 > 1. Officer runs `/gc prune [days]` — their client lists candidates locally (still-in-guild members with `lastUpdate` older than threshold) and asks for confirmation.
 > 2. On confirm, a `PRUNE_REQUEST` message is sent via whisper to the current DR (same pattern as `SYNC_REQUEST`). The payload contains the list of member keys to tombstone and the requesting officer's player key.
-> 3. The DR validates that the requester holds officer rank or above — checked via `GuildControlGetRankName` / `GetGuildRosterInfo` on the DR's client. If validation fails, the DR whispers back a rejection. If it passes, the DR creates the tombstone entries and broadcasts a `PRUNE_BROADCAST` to the guild channel.
+> 3. The DR validates that the requester holds a privileged rank — see **Rank validation** below. If validation fails, the DR whispers back a rejection. If it passes, the DR creates the tombstone entries and broadcasts a `PRUNE_BROADCAST` to the guild channel.
 > 4. All peers apply the tombstones on receipt.
 >
 > If the officer *is* the DR, the request is handled locally without a whisper round-trip.
+>
+> **DR unavailability:** If `self.currentDR` is nil at the time the officer confirms, show an error immediately: *"GuildCrafts: No DR is currently elected. Try again in a moment."* Do not send the request — there is no one to receive it. Re-run `/gc prune` once a DR is elected (the sync dot turning green is the signal).
+>
+> **Rank validation — implementation detail:** `GetGuildRosterInfo` returns a rank *index* (0 = Guild Master), not a named role. Guild rank names vary per guild so checking by name is fragile. Two options:
+> - **Convention (simpler):** Treat rank index ≤ 2 as authorised (GM + first two officer ranks). Works for most guilds with a traditional rank structure.
+> - **Configurable (robust):** Add a `/gc set-prune-rank <index>` command for the GM to set the minimum authorised rank index, stored in `db.global.pruneRankThreshold`. Defaults to 2.
+> The configurable approach is recommended for 1.3.0 to avoid assumptions about guild structure.
 
 #### Member self-removal (`/gc remove-my-data`)
 
