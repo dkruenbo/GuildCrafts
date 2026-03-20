@@ -862,7 +862,7 @@ function Data:CountStaleMembers(thresholdDays)
     local db = self:GetGuildDB()
     if not db then return 0 end
     for _, entry in pairs(db) do
-        if type(entry) == "table" and entry.lastUpdate then
+        if type(entry) == "table" and entry.lastUpdate and entry.lastUpdate > 0 then
             if (now - entry.lastUpdate) > threshold then
                 count = count + 1
             end
