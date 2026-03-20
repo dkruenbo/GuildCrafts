@@ -155,25 +155,32 @@ This document describes planned releases with implementation notes for each item
 > ```
 > The message only fires for the local player's own entry — not for other members. Jaina's 5-day-old data produces no message. Thrall's 32-day-old data gets the warning.
 >
-> **Hook point:** `Core.lua` `OnInitialize` or a `PLAYER_ENTERING_WORLD` handler — local data is already loaded from SavedVariables at this point, no sync needed:
+> **Hook point:** `PLAYER_ENTERING_WORLD`, delayed by a short `C_Timer.After(3, ...)` — same pattern already used in `Tooltip.lua`. This ensures chat and UI are fully settled before the message appears and avoids it drowning in load-screen spam. Do **not** use `OnInitialize` — too early, chat frame is not ready.
+>
+> **Once per session:** Gate the entire block with a session flag to prevent re-firing on zone changes and `/reload`:
 > ```lua
-> local playerKey = GuildCrafts.Data:GetPlayerKey()
-> local db = GuildCrafts.Data:GetGuildDB()
-> local entry = db and db[playerKey]
-> if entry and entry.lastUpdate and entry.lastUpdate > 0 then
->     local age = time() - entry.lastUpdate
->     if age > STALE_DISPLAY_THRESHOLD then
->         local days = math.floor(age / 86400)
->         GuildCrafts:Print("|cffff9900Your profession data is " .. days ..
->             " days old and will be pruned soon. Open your profession windows to resync.|r")
->     end
+> function GuildCrafts:OnPlayerEnteringWorld()
+>     if self._staleWarnShown then return end
+>     C_Timer.After(3, function()
+>         if self._staleWarnShown then return end  -- guard re-entry on rapid reloads
+>         self._staleWarnShown = true
+>         local playerKey = GuildCrafts.Data:GetPlayerKey()
+>         local db = GuildCrafts.Data:GetGuildDB()
+>         local entry = db and db[playerKey]
+>         if entry and entry.lastUpdate and entry.lastUpdate > 0 then
+>             local age = time() - entry.lastUpdate
+>             if age > STALE_DISPLAY_THRESHOLD then
+>                 local days = math.floor(age / 86400)
+>                 GuildCrafts:Print("|cffff9900Your profession data is " .. days ..
+>                     " days old and will be pruned soon. Open your profession windows to resync.|r")
+>             end
+>         end
+>     end)
 > end
 > ```
-> **Suppress on first login:** If `entry.lastUpdate == 0` (never scanned), show a different message instead:
-> ```
-> |cffff9900GuildCrafts:|r No profession data found for your character. Open your profession windows to add yourself to the guild database.
-> ```
-> **Files:** `Core.lua` — `OnInitialize` or `PLAYER_ENTERING_WORLD` handler. No new dependencies.
+> **No "data not found" message:** Skip the `entry.lastUpdate == 0` case entirely. Showing it every login until the player scans becomes annoying quickly, and gating it to "first install only" requires SavedVariables persistence that isn't worth the complexity. Ship the stale warning only.
+>
+> **Files:** `Core.lua` — `PLAYER_ENTERING_WORLD` handler. No new dependencies.
 
 ---
 
