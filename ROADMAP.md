@@ -98,7 +98,64 @@ This document describes planned releases with implementation notes for each item
 
 ## Planned
 
-*(Nothing currently planned. See Future Candidates below.)*
+---
+
+### 1.3.0 — Ghost Member Data & Tombstone Protocol
+
+> **Problem:** Members who uninstall GuildCrafts but remain in the guild are never pruned. The existing `PruneStaleMembers` only removes members who have *left the guild* (roster absence + 30-day grace via `_absentSince`). A still-in-guild member who stops running the addon accumulates an ever-staler entry with no cleanup path. Making the prune *stick* requires tombstones — any local deletion without them gets synced back in by the first peer who still has the data.
+
+> **Why this is 1.3.0 and not a patch:** A correct tombstone implementation requires touching the sync protocol (new `TOMBSTONE` message type), `MergeIncoming` (tombstone wins over entries with older timestamps), `StripSyncFields` / SYNC_RESPONSE payload (tombstones must be carried in sync), persistent DB storage (tombstones must survive relogs), and a protocol version bump. This is meaningful surface area — more than any 1.2.x change.
+
+#### Tombstone design
+
+> A tombstone is a lightweight record stored in the guild DB alongside member entries:
+> ```lua
+> db["__tombstones"] = {
+>     ["PlayerName-Realm"] = { deletedAt = timestamp, deletedBy = "OfficerName-Realm" },
+>     ...
+> }
+> ```
+> **Merge precedence** — `MergeIncoming` must follow this exact decision tree for each incoming member entry:
+> ```
+> 1. Does a tombstone exist for this member key?
+>    YES → Is incoming lastUpdate > tombstone.deletedAt?
+>          YES → Member re-scanned after the prune (resurrection). Clear tombstone, accept data.
+>          NO  → Tombstone wins. Drop incoming data.
+>    NO  → Run standard merge: newest lastUpdate wins.
+> ```
+> This order is critical. Reversing the checks would allow a stale sync from a lagging peer to silently resurrect a pruned member.
+>
+> **Sync:** Tombstones are included in SYNC_RESPONSE and DELTA_UPDATE payloads. A peer coming back online after being absent during a prune will receive the tombstone during their initial sync and correctly discard their stale copy.
+>
+> **Expiry:** Tombstones expire after 90 days. This prevents unbounded growth. Edge case: a peer who was offline for 91+ days logs in with the original member data, but the tombstone is gone. This is acceptable — the existing `PruneStaleMembers` already evicts guild-roster-absent members after 30 days, giving a 60-day safety margin before a tombstone would expire. A peer carrying 91-day-old data for a member who has long since left the roster would also have that entry removed by their own prune on login. The overlap is safe.
+
+#### Officer prune (`/gc prune`)
+
+> Any officer can run `/gc prune [days]` (default: 90). The client does not need to be the DR. Flow:
+> 1. Officer runs `/gc prune [days]` — their client lists candidates locally (still-in-guild members with `lastUpdate` older than threshold) and asks for confirmation.
+> 2. On confirm, a `PRUNE_REQUEST` message is sent via whisper to the current DR (same pattern as `SYNC_REQUEST`). The payload contains the list of member keys to tombstone and the requesting officer's player key.
+> 3. The DR validates that the requester holds officer rank or above — checked via `GuildControlGetRankName` / `GetGuildRosterInfo` on the DR's client. If validation fails, the DR whispers back a rejection. If it passes, the DR creates the tombstone entries and broadcasts a `PRUNE_BROADCAST` to the guild channel.
+> 4. All peers apply the tombstones on receipt.
+>
+> If the officer *is* the DR, the request is handled locally without a whisper round-trip.
+
+#### Member self-removal (`/gc remove-my-data`)
+
+> Any member can request removal of their own data. The request is sent to the current DR as a `REMOVE_REQUEST` message. The DR validates the sender (only the member themselves can remove their own entry — enforce via sender check on the message), creates the tombstone, and broadcasts it. This is the correct self-service path that doesn't require officer involvement.
+
+#### Protocol version bump
+
+> `VERSION` in `Core.lua` bumped from `2` to `3`. Nodes on VERSION 2 will not understand `PRUNE_BROADCAST` or `REMOVE_REQUEST` — they will ignore unknown message types (existing behaviour) and simply re-sync the pruned data back in.
+>
+> **v2 peer isolation:** VERSION 3 nodes must not send tombstone data to VERSION 2 peers. Tombstone payloads in SYNC_RESPONSE should be stripped when the requester's VERSION is < 3 (the requester's version is known from their `HELLO` message and stored in `addonUsers`). Sending tombstone tables to a v2 client wastes bandwidth and risks confusing their merge logic if they happen to handle unknown keys unexpectedly.
+>
+> **Update reminder:** When a VERSION 3 node receives any message from a VERSION 2 peer, print once per session (not per message):
+> ```
+> GuildCrafts: [PlayerName] is running an older version (v2). Pruning and advanced sync features are disabled for this peer. Ask them to update to 1.3.0.
+> ```
+> Use a `_warnedLegacyPeers` set to suppress repeat warnings for the same sender.
+
+> **Files:** `Comms.lua` (new `PRUNE_BROADCAST`, `REMOVE_REQUEST` handlers, DR-gated broadcast), `Data.lua` (`MergeIncoming` tombstone logic, `PruneInactiveGuildMembers`, tombstone expiry), `Core.lua` (`/gc prune`, `/gc remove-my-data` slash handlers, VERSION bump), `UI/MainFrame.lua` (prune candidate list UI, confirmation dialog).
 
 ---
 
