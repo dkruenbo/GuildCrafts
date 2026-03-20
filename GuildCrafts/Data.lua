@@ -1166,12 +1166,17 @@ function Data:GetCraftRecipeKey(index)
     -- Last resort: use craft name hash as key
     local craftName = GetCraftInfo(index)
     if craftName then
-        -- Simple string hash to create a stable negative key
+        -- Fallback: namespaced hash in a dedicated negative range (below -2,000,000),
+        -- separated from real spellID-based negative keys (TBC enchant spellIDs top out
+        -- around -28000). Collision risk is reduced but not eliminated (modulo 1,000,000).
+        -- Only fires if both item and spell links are nil — should not happen for any
+        -- known TBC enchant.
+        local namespacedInput = "enc:" .. craftName
         local hash = 0
-        for c = 1, #craftName do
-            hash = (hash * 31 + craftName:byte(c)) % 1000000
+        for c = 1, #namespacedInput do
+            hash = (hash * 31 + namespacedInput:byte(c)) % 1000000
         end
-        return -(hash + 1000000)
+        return -(hash + 2000000)
     end
 
     return nil

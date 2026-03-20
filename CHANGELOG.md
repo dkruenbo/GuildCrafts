@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.4b — 2026-03-19
+
+### Fixes
+
+- **Fixed Enchanting fallback key collision risk** — the last-resort recipe key for enchants that yield neither an itemID nor a spellID was derived from a plain `craftName` hash in the range −1,000,000 to −2,000,000. This shared the same modulo space across all enchant names and could silently overwrite one recipe with another. Fix: the input is now namespaced (`"enc:" .. craftName`) and the hash is placed in a dedicated range below −2,000,000, separated from real spellID-based keys. Collision risk is reduced; the fallback path should never fire for any known TBC enchant
+
+---
+
 ## 1.2.4a — 2026-03-18
 
 ### Fixes
