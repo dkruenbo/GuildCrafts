@@ -102,38 +102,50 @@ This document describes planned releases with implementation notes for each item
 
 ### 1.3.0 — Ghost Member Auto-Prune
 
-> **Problem:** Members who uninstall GuildCrafts but remain in the guild are never pruned. The existing `PruneStaleMembers` only removes members who have *left the guild* (roster absence + 30-day grace via `_absentSince`). A still-in-guild member who stops running the addon accumulates an ever-staler entry indefinitely.
+> **Problem:** Members who uninstall GuildCrafts but remain in the guild are never pruned. The existing `PruneStaleMembers` only removes members who have *left the guild* (roster absence + 30-day grace via `_absentSince`). A still-in-guild member who stops running the addon accumulates an ever-staler entry indefinitely. Additionally, the 30-day grace period for ex-guild members is too long — someone who left the guild is immediately irrelevant and their data should be gone within a week.
 
-> **Solution:** Extend `PruneStaleMembers` to also evict still-in-guild members whose `lastUpdate` is older than a configurable threshold (default: 90 days). No tombstones, no protocol changes, no DR involvement.
+> **Solution:** Two threshold changes + one new sweep. `Data.lua` only, no protocol changes, no VERSION bump.
 
-> **Sync-back:** A lagging peer who was offline during the prune may re-sync the old data back in. This is acceptable — the entry re-appears stale-tagged and gets pruned again on the next prune cycle. It is self-correcting. If the member genuinely wants to be back in the DB, they simply open their profession window and their data re-syncs with a fresh `lastUpdate`.
+#### Threshold changes
 
-#### Implementation
-
-> Extend `Data:PruneStaleMembers()` — currently called on login and on roster events. Add a second sweep after the existing ex-guild-member sweep:
+> `STALE_THRESHOLD` is currently a single constant (`30 * 24 * 3600`) shared between three distinct uses:
+> 1. The ex-guild member grace period in `PruneStaleMembers` (`_absentSince` check)
+> 2. The staleness tag display threshold in `GetStalenessTag`
+> 3. The stale member count in `CountStaleMembers`
+>
+> These need to be split into separate named constants so each can be tuned independently:
 > ```lua
-> -- Prune still-in-guild members who haven't scanned in INACTIVE_THRESHOLD days
-> local INACTIVE_THRESHOLD = 90 * 86400
+> local STALE_DISPLAY_THRESHOLD  = 30 * 24 * 3600  -- show [30d ago] tag (keep as-is)
+> local EX_GUILD_GRACE_PERIOD    =  7 * 24 * 3600  -- prune ex-members after 7 days
+> local INACTIVE_MEMBER_THRESHOLD = 45 * 24 * 3600  -- prune inactive in-guild members after 45 days
+> ```
+> Update references:
+> - `PruneStaleMembers` `_absentSince` check → use `EX_GUILD_GRACE_PERIOD`
+> - `GetStalenessTag` → use `STALE_DISPLAY_THRESHOLD` (no change in behaviour)
+> - `CountStaleMembers` → use `STALE_DISPLAY_THRESHOLD` (no change in behaviour)
+> - New inactive sweep → use `INACTIVE_MEMBER_THRESHOLD`
+
+#### New inactive member sweep
+
+> Add a second sweep in `PruneStaleMembers` after the existing ex-guild sweep:
+> ```lua
+> -- Prune still-in-guild members who haven't scanned in 45 days
 > for memberKey, entry in pairs(db) do
->     if IsMemberKey(memberKey)                      -- skip __tombstones if present
+>     if type(memberKey) == "string"
 >     and type(entry) == "table"
 >     and entry.lastUpdate and entry.lastUpdate > 0
->     and (now - entry.lastUpdate) > INACTIVE_THRESHOLD
->     and not rosterSet[memberKey] then              -- still in guild but inactive
+>     and (now - entry.lastUpdate) > INACTIVE_MEMBER_THRESHOLD
+>     and rosterKeys[memberKey] then   -- IS still in guild but data is stale
 >         db[memberKey] = nil
 >         pruned = pruned + 1
 >     end
 > end
 > ```
-> Wait — the `not rosterSet[memberKey]` check above would skip still-in-guild members entirely. The correct condition for this sweep is members who *are* in the guild roster but haven't scanned in 90 days:
-> ```lua
-> and rosterSet[memberKey]   -- IS still in guild, but data is stale
-> ```
-> Log: `"Auto-pruned N inactive guild member(s) (90d+ no scan)."` at the debug level.
+> Log: `"Auto-pruned N inactive guild member(s) (45d+ no scan)."` at debug level.
+>
+> **Sync-back:** A lagging peer may re-sync the old data. Acceptable — the entry re-appears stale-tagged and is pruned again on the next cycle. If the member wants back in, they open their profession window and data re-syncs with a fresh `lastUpdate`.
 
-> **No protocol change.** No VERSION bump. `INACTIVE_THRESHOLD` can be made configurable via a future `/gc set-inactive-days <N>` command if users request it.
-
-> **Files:** `Data.lua` only — `PruneStaleMembers()`.
+> **Files:** `Data.lua` only — constants block and `PruneStaleMembers()`.
 
 ---
 
