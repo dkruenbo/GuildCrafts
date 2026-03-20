@@ -147,6 +147,34 @@ This document describes planned releases with implementation notes for each item
 
 > **Files:** `Data.lua` only — constants block and `PruneStaleMembers()`.
 
+#### Login stale-data warning
+
+> When a player logs in, if their *own* entry in the guild DB has a `lastUpdate` older than `STALE_DISPLAY_THRESHOLD` (30 days), show a one-time chat warning:
+> ```
+> |cffff9900GuildCrafts:|r Your profession data is 32 days old and will be pruned soon. Open your profession windows to resync.
+> ```
+> The message only fires for the local player's own entry — not for other members. Jaina's 5-day-old data produces no message. Thrall's 32-day-old data gets the warning.
+>
+> **Hook point:** `Core.lua` `OnInitialize` or a `PLAYER_ENTERING_WORLD` handler — local data is already loaded from SavedVariables at this point, no sync needed:
+> ```lua
+> local playerKey = GuildCrafts.Data:GetPlayerKey()
+> local db = GuildCrafts.Data:GetGuildDB()
+> local entry = db and db[playerKey]
+> if entry and entry.lastUpdate and entry.lastUpdate > 0 then
+>     local age = time() - entry.lastUpdate
+>     if age > STALE_DISPLAY_THRESHOLD then
+>         local days = math.floor(age / 86400)
+>         GuildCrafts:Print("|cffff9900Your profession data is " .. days ..
+>             " days old and will be pruned soon. Open your profession windows to resync.|r")
+>     end
+> end
+> ```
+> **Suppress on first login:** If `entry.lastUpdate == 0` (never scanned), show a different message instead:
+> ```
+> |cffff9900GuildCrafts:|r No profession data found for your character. Open your profession windows to add yourself to the guild database.
+> ```
+> **Files:** `Core.lua` — `OnInitialize` or `PLAYER_ENTERING_WORLD` handler. No new dependencies.
+
 ---
 
 ## Future Candidates
