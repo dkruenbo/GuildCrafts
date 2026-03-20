@@ -201,6 +201,16 @@ function UI:CreateTitleBar(parent)
         GameTooltip:AddDoubleLine("Status:", status, 0.7, 0.7, 0.7, 1, 1, 1)
         GameTooltip:AddDoubleLine("DR:", dr, 0.7, 0.7, 0.7, 1, 1, 1)
         GameTooltip:AddDoubleLine("Addon users:", tostring(users), 0.7, 0.7, 0.7, 1, 1, 1)
+        local lastSync = GuildCrafts.Comms and GuildCrafts.Comms:GetLastSyncTime()
+        if lastSync then
+            GameTooltip:AddDoubleLine("Last synced:", FormatAge(lastSync), 0.7, 0.7, 0.7, 1, 1, 1)
+        else
+            GameTooltip:AddDoubleLine("Last synced:", "not yet this session", 0.7, 0.7, 0.7, 0.6, 0.6, 0.6)
+        end
+        local stale = GuildCrafts.Data and GuildCrafts.Data:CountStaleMembers(30) or 0
+        if stale > 0 then
+            GameTooltip:AddDoubleLine("Stale members (30d+):", tostring(stale), 0.7, 0.7, 0.7, 1, 0.5, 0.2)
+        end
         GameTooltip:Show()
     end)
     syncDot:SetScript("OnLeave", function() GameTooltip:Hide() end)

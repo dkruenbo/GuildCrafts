@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.5 — 2026-03-20
+
+### Improvements
+
+- **Deferred tooltip index rebuild** — the reverse-lookup index used by item tooltips is no longer rebuilt synchronously during a hover event. `InvalidateIndex()` now schedules a 2-second deferred rebuild via `C_Timer.After`; hover events always use the most recently built index. This eliminates frame hitches on first hover after a sync burst in large guilds
+- **Richer sync status tooltip** — hovering the sync dot in the title bar now shows two additional lines: _Last synced_ (time since the last completed `SYNC_RESPONSE` transaction this session, or "not yet this session" for a DR that has not synced with anyone) and _Stale members (30d+)_ (count of member entries older than 30 days, shown in amber only when non-zero)
+
+---
+
 ## 1.2.4b — 2026-03-19
 
 ### Fixes

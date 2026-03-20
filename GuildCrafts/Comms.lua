@@ -71,10 +71,11 @@ function Comms:OnInitialize()
     self.lastDRHeartbeat  = 0
 
     -- Sync state
-    self.syncPending       = false
-    self.syncRetryCount    = 0
-    self.syncTimer         = nil
-    self._postSyncHelloDone = false
+    self.syncPending          = false
+    self.syncRetryCount       = 0
+    self.syncTimer            = nil
+    self._postSyncHelloDone   = false
+    self.lastSyncCompletedAt  = nil  -- set when a full SYNC_RESPONSE is received
 
     -- Term: incremented each time this client is promoted to DR.
     -- Carried in every outgoing message so stale authority can be detected.
@@ -630,8 +631,9 @@ function Comms:HandleSyncResponse(payload, sender)
     end
 
     -- All chunks received (or single un-chunked response) — sync complete
-    self.syncPending = false
-    self.syncRetryCount = 0
+    self.syncPending         = false
+    self.syncRetryCount      = 0
+    self.lastSyncCompletedAt = time()
     if self.syncTimer then
         self:CancelTimer(self.syncTimer)
         self.syncTimer = nil
@@ -650,6 +652,10 @@ function Comms:HandleSyncResponse(payload, sender)
         self._postSyncHelloDone = true
         self:ScheduleTimer("BroadcastPostSyncHello", 5)
     end
+end
+
+function Comms:GetLastSyncTime()
+    return self.lastSyncCompletedAt
 end
 
 function Comms:BroadcastPostSyncHello()

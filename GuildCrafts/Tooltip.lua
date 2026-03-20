@@ -23,9 +23,16 @@ local indexByID   = {}   -- [itemID]   = { {key=memberKey, profName=...}, ... }
 local indexByName = {}   -- [itemName] = { {key=memberKey, profName=...}, ... }
 local indexDirty  = true -- flag to rebuild on next tooltip
 
---- Mark the index as stale so it rebuilds on next hover.
+--- Mark the index as stale and schedule a deferred rebuild (2 s after the
+--- last data change, well clear of sync bursts and never during a hover).
 function Tooltip:InvalidateIndex()
     indexDirty = true
+    if not self._rebuildTimer then
+        self._rebuildTimer = C_Timer.After(2, function()
+            self._rebuildTimer = nil
+            if indexDirty then self:RebuildIndex() end
+        end)
+    end
 end
 
 --- Rebuild the reverse lookup index from the full database.
@@ -91,7 +98,8 @@ function Tooltip:OnEnable()
         self:SecureHookScript(ItemRefTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
     end
 
-    indexDirty = true
+    -- Rebuild immediately on enable — no user interaction yet, safe to block.
+    self:RebuildIndex()
 end
 
 ----------------------------------------------------------------------
@@ -102,10 +110,7 @@ function Tooltip:OnTooltipSetItem(tooltip)
     if not GuildCrafts.Data or not GuildCrafts.Data.db then return end
     if GuildCrafts.db and GuildCrafts.db.profile.showTooltipCrafters == false then return end
 
-    -- Rebuild index if stale
-    if indexDirty then
-        self:RebuildIndex()
-    end
+    -- Use whatever index is current; deferred timer handles rebuilds after data changes.
 
     -- Get the item from the tooltip
     local _, itemLink = tooltip:GetItem()

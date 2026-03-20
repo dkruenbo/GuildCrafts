@@ -81,134 +81,24 @@ This document describes planned releases with implementation notes for each item
 | — | Bottom bar with `[Online]` and `[Tooltip]` toggle buttons | Done in 1.2.3 |
 | — | Tooltip crafters toggle (`showTooltipCrafters`) | Done in 1.2.3 |
 
+### 1.2.4b — Correctness & Safety Patch
+
+| Issue | Title | Status |
+|-------|-------|--------|
+| — | Enchanting fallback key collision fix (namespaced hash, dedicated range) | Done in 1.2.4b |
+
+### 1.2.5 — Responsiveness & Trust
+
+| Issue | Title | Status |
+|-------|-------|--------|
+| — | Deferred tooltip index rebuild (no rebuild on hover) | Done in 1.2.5 |
+| — | Richer sync dot tooltip (last synced time + stale member count) | Done in 1.2.5 |
+
 ---
 
 ## Planned
 
----
-
-### 1.2.4b — Correctness & Safety Patch
-
-#### Enchanting recipe key collision fix
-
-> **What:** The fallback key generation in `Data:GetCraftRecipeKey()` for enchants that yield neither an itemID nor a spellID produces a negative integer derived from a simple `(hash * 31 + byte) % 1000000` hash of the localised craft name. This creates a real (if small) collision risk: two different enchant names could hash to the same key, causing one recipe to silently overwrite the other in the DB, with no error surfaced.
-
-> **Why:** The stable spellID-based negative key (`-spellID`) is already used for the vast majority of enchants and is collision-free. The name-hash fallback should only ever fire if both `GetCraftItemLink` and `GetCraftRecipeLink` return nil — which in practice should not happen for any known TBC enchant. But if it does, the current hash is not safe enough given that the key is stored persistently and synced to other clients.
-
-> **How:**
-> 1. Open `Data.lua` and find `Data:GetCraftRecipeKey()` (around line 1143).
-> 2. The last-resort block currently does:
->    ```lua
->    local hash = 0
->    for c = 1, #craftName do
->        hash = (hash * 31 + craftName:byte(c)) % 1000000
->    end
->    return -(hash + 1000000)
->    ```
-> 3. Replace with a namespaced key in a dedicated negative range, separated from both positive itemIDs and real spellID-based negative keys. Real spellIDs for TBC enchants are in the range 13–28000, so placing the fallback below −2,000,000 avoids overlap with real keys:
->    ```lua
->    local namespacedInput = "enc:" .. craftName
->    local hash = 0
->    for c = 1, #namespacedInput do
->        hash = (hash * 31 + namespacedInput:byte(c)) % 1000000
->    end
->    return -(hash + 2000000)
->    ```
-> 4. Add a comment: `-- Fallback: namespaced hash in a dedicated negative range. Collision risk is reduced but not eliminated. Only fires if both item and spell links are nil (should not happen for known TBC enchants).`
-> 5. No DB migration needed — this fallback path fires only for unknown recipes that have no valid link at all. If any old entry was stored under the old hash range (−1,000,000 to −2,000,000), it will simply become an orphan (not found by the new key) and be silently ignored. That is acceptable since these entries had no real identity to begin with.
-
-> **Files:** `GuildCrafts/Data.lua` — only `GetCraftRecipeKey()`.
-> **Risk:** Very low. The change only affects the fallback path, which should be dead code for all known TBC enchants.
-
----
-
-### 1.2.5 — Responsiveness & Trust
-
-#### Tooltip index incremental rebuild (#6)
-
-> **What:** `Tooltip:RebuildIndex()` iterates the entire guild DB every time it runs — scanning all members, all professions, all recipes — and rebuilds the `indexByID` and `indexByName` tables from scratch. `indexDirty` is set to `true` whenever data changes (via `InvalidateIndex()`). This means the first tooltip hover after any sync or delta update triggers a full rebuild, which can cause a visible frame hitch in large guilds.
-
-> **Why:** With 50+ members and hundreds of recipes per profession, the full rebuild iterates thousands of table entries in a single frame. WoW's Lua runs on the main thread with no background execution, so a large rebuild blocks frame rendering for a perceptible moment.
-
-> **How (deferred rebuild — recommended for maintenance mode):**
->
-> A naive incremental approach (scanning `indexByID` and `indexByName` to remove a member's entries on every sync) moves the work from hover-time to sync-time but does not eliminate it — it just shifts the spike to a less user-visible moment. For a truly incremental index, a reverse-ref map (`memberToRecipeKeys`, `memberToRecipeNames`) would be needed to avoid full scans on removal. That adds coupling and is out of scope for maintenance mode.
->
-> The simpler, lower-risk approach:
-> 1. Keep `indexDirty` as-is. Keep `InvalidateIndex()` as-is.
-> 2. **Remove the `RebuildIndex()` call from `OnTooltipSetItem`.** Do not rebuild on hover.
-> 3. Instead, schedule a deferred rebuild via a short timer when the index is marked dirty:
->    ```lua
->    function Tooltip:InvalidateIndex()
->        indexDirty = true
->        if not self._rebuildTimer then
->            self._rebuildTimer = C_Timer.After(2, function()
->                self._rebuildTimer = nil
->                if indexDirty then self:RebuildIndex() end
->            end)
->        end
->    end
->    ```
->    This means the rebuild happens 2 seconds after the last data change — well after the sync burst completes — and never during a hover event.
-> 4. `OnTooltipSetItem` uses whatever index is currently built. If the index is still mid-rebuild (i.e. a hover fires within 2 seconds of a data change), it uses the previous index. This is acceptable — a briefly stale tooltip is far better than a hover hitch.
-> 5. On `OnInitialize`, call `RebuildIndex()` directly (no timer needed — no user interaction yet).
-
-> **Files:** `GuildCrafts/Tooltip.lua` only — `InvalidateIndex()` and `OnTooltipSetItem`. No changes to `Data.lua`.
-> **Risk:** Low. The change is fully contained in Tooltip.lua. Test: hover immediately after login sync (uses existing index, no hitch), hover 3 seconds after a delta update (uses freshly rebuilt index).
-
----
-
-#### Richer sync status in tooltip (#12)
-
-> **What:** The sync dot in the title bar shows three states: green (synced), yellow (syncing), red (no addon users / disconnected). Hovering shows `Status`, `DR`, and `Addon users`. This tells you the current sync state but nothing about *data freshness* — you cannot tell if the data was last synced 10 minutes ago or 3 days ago, or whether any members have stale entries.
-
-> **Why:** Users with the debug panel open can see election activity but there is no easy way to judge whether the data they're looking at is trustworthy. Adding "last synced" and a stale-member count to the hover tooltip costs little (all the data exists) and meaningfully increases trust in the addon.
-
-> **How:**
-> 1. **Track sync completion time in Comms.** In `Comms.lua`, add a field `self.lastSyncCompletedAt = nil`. Set it to `time()` only when a real sync transaction completes — i.e. in `HandleSyncResponse` when the final chunk is received (`payload.chunkIndex == payload.chunkTotal`) and `self.syncPending` is cleared. **Do not set it when the DR skips sync because it is already current** — that would show "Last synced: 10s ago" without any data actually having been exchanged, which is misleading.
->    The DR never receives a `SYNC_RESPONSE` (it is the one sending them), so `lastSyncCompletedAt` will remain `nil` for a DR node that has not synced with anyone. That is correct and honest — the DR's tooltip can show "not yet" for last synced, which accurately reflects that it has not gone through a sync transaction this session.
->    ```lua
->    function Comms:GetLastSyncTime()
->        return self.lastSyncCompletedAt
->    end
->    ```
-> 3. **Count stale members in Data.** Add a method `Data:CountStaleMembers(thresholdDays)`:
->    ```lua
->    function Data:CountStaleMembers(thresholdDays)
->        local threshold = thresholdDays * 86400
->        local now = time()
->        local count = 0
->        local db = self:GetGuildDB()
->        if not db then return 0 end
->        for _, entry in pairs(db) do
->            if type(entry) == "table" and entry.lastUpdate then
->                if (now - entry.lastUpdate) > threshold then
->                    count = count + 1
->                end
->            end
->        end
->        return count
->    end
->    ```
-> 4. **Update the sync dot tooltip** in `UI/MainFrame.lua` in the `syncDot:SetScript("OnEnter", ...)` block. After the existing three `AddDoubleLine` calls, add:
->    ```lua
->    local lastSync = GuildCrafts.Comms and GuildCrafts.Comms:GetLastSyncTime()
->    if lastSync then
->        local age = time() - lastSync
->        local ageStr = GuildCrafts.Data:FormatAge(age)  -- reuse existing formatter
->        GameTooltip:AddDoubleLine("Last synced:", ageStr .. " ago", 0.7,0.7,0.7, 1,1,1)
->    else
->        GameTooltip:AddDoubleLine("Last synced:", "not yet this session", 0.7,0.7,0.7, 0.6,0.6,0.6)
->    end
->    local stale = GuildCrafts.Data and GuildCrafts.Data:CountStaleMembers(30) or 0
->    if stale > 0 then
->        GameTooltip:AddDoubleLine("Stale members (30d+):", tostring(stale), 0.7,0.7,0.7, 1,0.5,0.2)
->    end
->    ```
-> 5. Verify that `Data:FormatAge()` exists and is accessible — it is used in the member detail panel already. If the function is local, promote it to a method or duplicate the logic inline.
-
-> **Files:** `GuildCrafts/Comms.lua` (add `lastSyncCompletedAt`, `GetLastSyncTime()`), `GuildCrafts/Data.lua` (add `CountStaleMembers()`), `GuildCrafts/UI/MainFrame.lua` (extend sync dot tooltip).
-> **Risk:** Low — all changes are additive. Nothing existing is modified except the tooltip content.
+*(Nothing currently planned. See Future Candidates below.)*
 
 ---
 
