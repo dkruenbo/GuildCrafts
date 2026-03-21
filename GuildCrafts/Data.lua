@@ -1391,7 +1391,7 @@ function Data:PruneRoster()
         return
     end
 
-    -- Prune entries not in the roster (with 30-day grace period)
+    -- Prune entries not in the roster (with 7-day grace period)
     local pruned = 0
     local marked = 0
     local restored = 0
