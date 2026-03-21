@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.0 — 2026-03-21
+
+### Improvements
+
+- **Ghost member auto-prune** — members who are still in the guild but haven't scanned their professions in 45 days are now automatically removed from the guild database. Previously only ex-guild members were pruned; a still-in-guild member who uninstalled GuildCrafts would accumulate an ever-staler entry indefinitely
+- **Ex-guild grace period reduced: 30d → 7d** — someone who leaves the guild is immediately irrelevant; their entry is now gone within a week instead of a month
+- **Login stale-data warning** — if your own profession data is more than 30 days old, a one-time amber message appears in chat on login reminding you to open your profession windows to resync. Fires once per session only
+
+---
+
 ## 1.2.5 — 2026-03-20
 
 ### Improvements

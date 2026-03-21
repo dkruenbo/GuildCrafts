@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.2.5"
+GuildCrafts.DISPLAY_VERSION = "1.3.0"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -81,6 +81,25 @@ end
 ----------------------------------------------------------------------
 
 function GuildCrafts:OnPlayerEnteringWorld(_event, isLogin, isReload)
+    -- One-time stale-data warning for the local player's own entry
+    if not self._staleWarnShown then
+        C_Timer.After(3, function()
+            if self._staleWarnShown then return end
+            self._staleWarnShown = true
+            local playerKey = GuildCrafts.Data:GetPlayerKey()
+            local db = GuildCrafts.Data:GetGuildDB()
+            local entry = db and db[playerKey]
+            if entry and entry.lastUpdate and entry.lastUpdate > 0 then
+                local age = time() - entry.lastUpdate
+                if age > 30 * 86400 then
+                    local days = math.floor(age / 86400)
+                    GuildCrafts:Print("|cffff9900Your profession data is " .. days ..
+                        " days old and will be pruned soon. Open your profession windows to resync.|r")
+                end
+            end
+        end)
+    end
+
     if not IsInGuild() then
         self:Debug("Not in a guild — sync disabled.")
         return
