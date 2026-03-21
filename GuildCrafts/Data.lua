@@ -854,6 +854,23 @@ function Data:GetStalenessTag(lastUpdate)
     end
 end
 
+--- Return the number of member entries whose lastUpdate is older than thresholdDays.
+function Data:CountStaleMembers(thresholdDays)
+    local threshold = thresholdDays * 86400
+    local now = time()
+    local count = 0
+    local db = self:GetGuildDB()
+    if not db then return 0 end
+    for _, entry in pairs(db) do
+        if type(entry) == "table" and entry.lastUpdate and entry.lastUpdate > 0 then
+            if (now - entry.lastUpdate) > threshold then
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
 ----------------------------------------------------------------------
 -- Recipe Scanning (requires profession window to be open)
 ----------------------------------------------------------------------
