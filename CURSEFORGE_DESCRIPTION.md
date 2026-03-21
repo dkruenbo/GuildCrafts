@@ -211,7 +211,7 @@ GuildCrafts synchronizes recipe data automatically between addon users.
 * new recipes broadcast automatically  
 * only one guild member ever responds to `!gc` — even when multiple addon users are online or some are inside dungeons/battlegrounds
 
-Members who leave the guild are automatically removed after 7 days. Guild members who haven't updated their data in 45 days are auto-pruned — they can resync instantly by opening a profession window.
+Members who leave the guild are automatically removed after 7 days. Guild members who haven't updated their data in 45 days are auto-pruned. Entries from early addon versions with no scan timestamp are also cleaned up automatically. Any active member can resync instantly by opening a profession window.
 
 If your own profession data is more than 30 days old, the addon shows a one-time reminder on login to rescan.
 

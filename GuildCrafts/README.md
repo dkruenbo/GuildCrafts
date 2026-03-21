@@ -29,7 +29,7 @@ A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** ac
 - **Expansion filter** — `[Vanilla]` and `[TBC]` toggle buttons in the search bar let you narrow recipes to Original Classic, TBC, or both; filter state persists per character; both on by default so first-run behaviour is unchanged
 - **Data staleness indicator** — member data older than 30 days is flagged with a red age tag (e.g. "30d ago", "2mo ago")
 - **Profession change detection** — dropping a profession automatically purges stale data
-- **Guild roster pruning** — ex-guild members are cleaned up after 7 days; in-guild members who haven't scanned in 45 days are auto-pruned
+- **Guild roster pruning** — ex-guild members are cleaned up after 7 days; in-guild members who haven't scanned in 45 days are auto-pruned; legacy entries with no scan timestamp (from early versions) are removed immediately
 - **Login stale-data warning** — if your own profession data is more than 30 days old, an amber chat message reminds you to open your profession windows (once per session)
 - **Whisper a crafter** — every recipe row has a `[W]` button. For a single non-self crafter it opens the chat edit box pre-filled with a whisper; for multiple crafters a small picker appears sorted online-first. The button is hidden when you are the only known crafter
 - **Post crafters to guild chat** — every recipe row also has a `[>]` button that posts the crafter list for that recipe to guild chat, so members without the addon can see who to ask; a 30-second per-recipe cooldown prevents accidental spam
