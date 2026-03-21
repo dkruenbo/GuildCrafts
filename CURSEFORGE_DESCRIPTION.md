@@ -211,25 +211,11 @@ GuildCrafts synchronizes recipe data automatically between addon users.
 * new recipes broadcast automatically  
 * only one guild member ever responds to `!gc` — even when multiple addon users are online or some are inside dungeons/battlegrounds
 
-Members who leave the guild are automatically removed after 30 days.
+Members who leave the guild are automatically removed after 7 days. Guild members who haven't updated their data in 45 days are auto-pruned — they can resync instantly by opening a profession window.
+
+If your own profession data is more than 30 days old, the addon shows a one-time reminder on login to rescan.
 
 Works best when multiple guild members use the addon — the more players sync, the more complete the database becomes.
-
-***
-
-## Project Status
-
-GuildCrafts is now considered **feature complete** for its original scope.
-
-The core problem the addon was created to solve — helping guild members quickly discover who can craft an item — has been solved, and the addon has reached a stable state.
-
-From this point on, GuildCrafts will move into **maintenance mode**.
-
-This means:
-
-• No new features are currently planned  
-• Critical bug fixes may still be addressed  
-• Contributions and new maintainers are welcome if the community wants to build on it further
 
 ---
 
