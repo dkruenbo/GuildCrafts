@@ -1444,6 +1444,21 @@ function Data:PruneRoster()
     if inactivePruned > 0 then
         GuildCrafts:Debug("Auto-pruned", inactivePruned, "inactive guild member(s) (45d+ no scan).")
     end
+
+    -- Prune legacy entries with no scan timestamp (lastUpdate nil or 0)
+    local legacyPruned = 0
+    for memberKey, entry in pairs(gdb) do
+        if type(memberKey) == "string"
+        and type(entry) == "table"
+        and (not entry.lastUpdate or entry.lastUpdate == 0)
+        and not entry._simulated then
+            gdb[memberKey] = nil
+            legacyPruned = legacyPruned + 1
+        end
+    end
+    if legacyPruned > 0 then
+        GuildCrafts:Debug("Pruned", legacyPruned, "legacy entry/entries with no scan timestamp.")
+    end
 end
 
 ----------------------------------------------------------------------
