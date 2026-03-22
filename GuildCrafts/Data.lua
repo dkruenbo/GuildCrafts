@@ -1446,9 +1446,12 @@ function Data:PruneRoster()
     end
 
     -- Prune legacy entries with no scan timestamp (lastUpdate nil or 0)
+    -- Skip the local player — we're always authoritative for our own data
     local legacyPruned = 0
+    local localPlayerKey = self:GetPlayerKey()
     for memberKey, entry in pairs(gdb) do
         if type(memberKey) == "string"
+        and memberKey ~= localPlayerKey
         and type(entry) == "table"
         and (not entry.lastUpdate or entry.lastUpdate == 0)
         and not entry._simulated then
