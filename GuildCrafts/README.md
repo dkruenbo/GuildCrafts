@@ -58,10 +58,6 @@ Gathering professions (Herbalism, Skinning) track skill levels and member counts
 | `/gc dump` | Print local data summary |
 | `/gc comms` | Print addon user list, DR/BDR roles, sync status |
 | `/gc mem` | Print addon memory usage |
-| `/gc sim <N>` | Inject N simulated guild members (debug mode only) |
-| `/gc sim clear` | Remove all simulated data |
-| `/gc sim sync` | Simulate a full sync response |
-| `/gc sim delta` | Simulate an incoming recipe update |
 | `/gc minimap` | Toggle minimap button visibility |
 | `/gc reset` | Wipe all saved data and reload |
 

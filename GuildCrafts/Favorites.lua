@@ -41,14 +41,6 @@ function Favorites:IsRecipeFavorite(recipeKey)
     return GuildCraftsCharDB.favoriteRecipes[recipeKey] == true
 end
 
-function Favorites:GetFavoriteRecipeKeys()
-    local keys = {}
-    for k in pairs(GuildCraftsCharDB.favoriteRecipes) do
-        keys[#keys + 1] = k
-    end
-    return keys
-end
-
 ----------------------------------------------------------------------
 -- Member Favorites
 ----------------------------------------------------------------------
@@ -67,14 +59,6 @@ end
 
 function Favorites:IsMemberFavorite(memberKey)
     return GuildCraftsCharDB.favoriteMembers[memberKey] == true
-end
-
-function Favorites:GetFavoriteMemberKeys()
-    local keys = {}
-    for k in pairs(GuildCraftsCharDB.favoriteMembers) do
-        keys[#keys + 1] = k
-    end
-    return keys
 end
 
 ----------------------------------------------------------------------

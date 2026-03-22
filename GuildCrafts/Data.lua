@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------
 -- GuildCrafts — Data.lua
 -- SavedVariables management, recipe scanning, data merging,
--- guild roster pruning, and simulation mode
+-- and guild roster pruning
 ----------------------------------------------------------------------
 local _, _ns = ... -- luacheck: ignore (WoW addon bootstrap)
 local GuildCrafts = _G.GuildCrafts
@@ -205,7 +205,6 @@ local DB_DEFAULTS = {
         --         },
         --     },
         --     lastUpdate = timestamp,
-        --     _simulated = nil,  -- only set on simulated entries
         -- }
     },
     profile = {
@@ -1213,7 +1212,6 @@ function Data:StripSyncFields(entry)
     local copy = {
         lastUpdate = entry.lastUpdate,
         dataFormat = GuildCrafts.DATA_FORMAT_VERSION,
-        _simulated = entry._simulated,
         professions = {},
     }
 
@@ -1400,17 +1398,14 @@ function Data:PruneRoster()
     if not gdb then return end
     for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.lastUpdate and not rosterKeys[memberKey] then
-            -- Don't prune simulated entries (they won't be in the roster)
-            if not entry._simulated then
-                if not entry._absentSince then
-                    -- First time absent — mark with timestamp
-                    entry._absentSince = now
-                    marked = marked + 1
-                elseif now - entry._absentSince > EX_GUILD_GRACE_PERIOD then
-                    -- Grace period expired — prune
-                    gdb[memberKey] = nil
-                    pruned = pruned + 1
-                end
+            if not entry._absentSince then
+                -- First time absent — mark with timestamp
+                entry._absentSince = now
+                marked = marked + 1
+            elseif now - entry._absentSince > EX_GUILD_GRACE_PERIOD then
+                -- Grace period expired — prune
+                gdb[memberKey] = nil
+                pruned = pruned + 1
             end
         elseif type(entry) == "table" and entry._absentSince and rosterKeys[memberKey] then
             -- Back in guild — clear absent flag
@@ -1453,8 +1448,7 @@ function Data:PruneRoster()
         if type(memberKey) == "string"
         and memberKey ~= localPlayerKey
         and type(entry) == "table"
-        and (not entry.lastUpdate or entry.lastUpdate == 0)
-        and not entry._simulated then
+        and (not entry.lastUpdate or entry.lastUpdate == 0) then
             gdb[memberKey] = nil
             legacyPruned = legacyPruned + 1
         end
@@ -1512,253 +1506,15 @@ function Data:DumpSummary()
 end
 
 ----------------------------------------------------------------------
--- Simulation System
+-- Profession Name Lists
 ----------------------------------------------------------------------
-
-local SAMPLE_RECIPES = {
-    "Flask of Supreme Power", "Flask of Fortification", "Flask of Mighty Restoration",
-    "Elixir of Major Agility", "Elixir of Major Firepower", "Elixir of Draenic Wisdom",
-    "Super Mana Potion", "Super Healing Potion", "Haste Potion", "Destruction Potion",
-    "Lionheart Helm", "Felsteel Longblade", "Khorium Champion", "Dirge",
-    "Drakefist Hammer", "Thunder", "Deep Thunder", "Stormherald",
-    "Enchant Weapon - Mongoose", "Enchant Chest - Exceptional Stats",
-    "Enchant Cloak - Subtlety", "Enchant Boots - Cat's Swiftness",
-    "Gyro-Balanced Khorium Destroyer", "Tankatronic Goggles", "Deathblow X11 Goggles",
-    "Delicate Living Ruby", "Bold Living Ruby", "Solid Star of Elune", "Lustrous Star of Elune",
-    "Brilliant Dawnstone", "Smooth Dawnstone", "Rigid Dawnstone",
-    "Primal Mooncloth Robe", "Spellfire Robe", "Frozen Shadoweave Robe",
-    "Belt of Blasting", "Belt of Natural Power", "Battlecast Pants",
-    "Nethercobra Leg Armor", "Nethercleft Leg Armor", "Heavy Knothide Armor Kit",
-    "Windhawk Armor", "Thick Draenic Vest", "Fel Leather Boots",
-    "Felsteel Helm", "Adamantite Breastplate", "Flamebane Helm",
-    "Major Mana Potion", "Ironshield Potion", "Insane Strength Potion",
-    "Greater Planar Essence", "Large Prismatic Shard", "Void Crystal",
-}
-
-local SAMPLE_CATEGORIES = {
-    "Flasks", "Elixirs", "Potions", "Weapons", "Armor", "Enchantments",
-    "Goggles", "Gems", "Robes", "Leg Armor", "Leather Armor", "Plate Armor",
-    "Reagents",
-}
 
 local PRIMARY_PROF_NAMES   = { "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
 local SECONDARY_PROF_NAMES = { "Mining", "Herbalism", "Skinning", "Cooking" }
--- Flat list for DB iteration, member counts, sim code, etc.
+-- Flat list for DB iteration, member counts, etc.
 local PROF_NAMES = {}
 for _, n in ipairs(PRIMARY_PROF_NAMES)   do PROF_NAMES[#PROF_NAMES + 1] = n end
 for _, n in ipairs(SECONDARY_PROF_NAMES) do PROF_NAMES[#PROF_NAMES + 1] = n end
-
--- Sample reagent lists (arrays of {name, count, itemID})
-local SAMPLE_REAGENTS = {
-    { { name = "Fel Lotus", count = 1, itemID = 22794 }, { name = "Mana Thistle", count = 3, itemID = 22793 }, { name = "Imbued Vial", count = 1, itemID = 18256 } },
-    { { name = "Felsteel Bar", count = 6, itemID = 23449 }, { name = "Hardened Adamantite Bar", count = 2, itemID = 23573 }, { name = "Primal Fire", count = 4, itemID = 21884 } },
-    { { name = "Large Prismatic Shard", count = 4, itemID = 22449 }, { name = "Greater Planar Essence", count = 6, itemID = 22446 }, { name = "Void Crystal", count = 2, itemID = 22450 } },
-    { { name = "Khorium Bar", count = 8, itemID = 23449 }, { name = "Felsteel Stabilizer", count = 2, itemID = 23787 }, { name = "Hardened Adamantite Tube", count = 1, itemID = 23784 } },
-    { { name = "Living Ruby", count = 1, itemID = 24036 } },
-    { { name = "Heavy Knothide Leather", count = 4, itemID = 23793 }, { name = "Primal Earth", count = 2, itemID = 22452 } },
-    { { name = "Bolt of Imbued Netherweave", count = 8, itemID = 21844 }, { name = "Netherweb Spider Silk", count = 2, itemID = 21881 }, { name = "Primal Mooncloth", count = 4, itemID = 21845 } },
-    { { name = "Primal Nether", count = 1, itemID = 23572 }, { name = "Hardened Adamantite Bar", count = 8, itemID = 23573 } },
-    { { name = "Dawnstone", count = 1, itemID = 24048 } },
-    { { name = "Star of Elune", count = 1, itemID = 24051 } },
-}
-
--- Profession → possible specialisation names
-local SAMPLE_SPECIALISATIONS = {
-    ["Alchemy"]         = { "Potion Master", "Elixir Master", "Transmutation Master" },
-    ["Blacksmithing"]   = { "Armorsmith", "Weaponsmith", "Master Swordsmith", "Master Hammersmith", "Master Axesmith" },
-    ["Engineering"]     = { "Gnomish Engineer", "Goblin Engineer" },
-    ["Leatherworking"]  = { "Dragonscale Leatherworking", "Elemental Leatherworking", "Tribal Leatherworking" },
-    ["Tailoring"]       = { "Mooncloth Tailoring", "Shadoweave Tailoring", "Spellfire Tailoring" },
-}
-
--- Profession → possible cooldown recipe names
-local SAMPLE_COOLDOWNS = {
-    ["Alchemy"]    = { "Transmute: Primal Might", "Transmute: Earthstorm Diamond", "Transmute: Skyfire Diamond" },
-    ["Tailoring"]  = { "Primal Mooncloth", "Spellcloth", "Shadowcloth" },
-}
-
-function Data:HandleSimCommand(arg)
-    if not GuildCrafts.debugMode then
-        GuildCrafts:Print("Simulation requires debug mode. Run /gc debug first.")
-        return
-    end
-
-    if arg == "clear" then
-        self:SimClear()
-    elseif arg == "sync" then
-        self:SimSync()
-    elseif arg == "delta" then
-        self:SimDelta()
-    elseif arg == "craft" then
-        self:SimCraft()
-    else
-        local count = tonumber(arg)
-        if count and count > 0 then
-            self:SimGenerate(count)
-        else
-            GuildCrafts:Print("Usage: /gc sim <N> | /gc sim clear | /gc sim sync | /gc sim delta | /gc sim craft")
-        end
-    end
-end
-
-function Data:SimGenerate(count)
-    local gdb = self:GetGuildDB()
-    if not gdb then
-        GuildCrafts:Print("Cannot simulate — not in a guild.")
-        return
-    end
-    local generated = 0
-    local realm = GetRealmName() or "SimRealm"
-
-    for i = 1, count do
-        local memberKey = string.format("SimPlayer%03d-%s", i, realm)
-
-        -- Pick 2 random professions
-        local prof1 = PROF_NAMES[math.random(#PROF_NAMES)]
-        local prof2 = prof1
-        while prof2 == prof1 do
-            prof2 = PROF_NAMES[math.random(#PROF_NAMES)]
-        end
-
-        -- Some members have stale data (30-90 days old) for testing
-        local maxAge = (i % 5 == 0) and math.random(30 * 86400, 90 * 86400) or math.random(0, 604800)
-        local entry = {
-            professions = {},
-            lastUpdate = time() - maxAge,
-            _simulated = true,
-        }
-
-        for _, profName in ipairs({ prof1, prof2 }) do
-            local recipes = {}
-            local numRecipes = math.random(20, math.min(150, #SAMPLE_RECIPES))
-            local used = {}
-            for r = 1, numRecipes do
-                local idx = math.random(#SAMPLE_RECIPES)
-                -- Avoid duplicates within same profession
-                while used[idx] do
-                    idx = (idx % #SAMPLE_RECIPES) + 1
-                end
-                used[idx] = true
-                local recipeKey = 10000 + (i * 1000) + r  -- synthetic itemID
-                recipes[recipeKey] = {
-                    name = SAMPLE_RECIPES[idx],
-                    source = (math.random() > 0.5) and "Trainer" or "World Drop",
-                    category = SAMPLE_CATEGORIES[math.random(#SAMPLE_CATEGORIES)],
-                    reagents = SAMPLE_REAGENTS[math.random(#SAMPLE_REAGENTS)],
-                }
-            end
-
-            local profEntry = { recipes = recipes, skillLevel = math.random(300, 375), maxSkillLevel = 375 }
-
-            -- ~40% chance of having a specialisation (only for profs that have one)
-            local specs = SAMPLE_SPECIALISATIONS[profName]
-            if specs and math.random() < 0.4 then
-                profEntry.specialisation = specs[math.random(#specs)]
-            end
-
-            -- ~20% chance of an active cooldown (only for profs that have them)
-            local cds = SAMPLE_COOLDOWNS[profName]
-            if cds and math.random() < 0.2 then
-                local cdName = cds[math.random(#cds)]
-                local remaining = math.random(3600, 72 * 3600)  -- 1h to 3d
-                profEntry.cooldowns = {
-                    [cdName] = { endTime = time() + remaining, duration = remaining },
-                }
-            end
-
-            entry.professions[profName] = profEntry
-        end
-
-        gdb[memberKey] = entry
-        self:ExtractToRecipeDB(entry)
-        generated = generated + 1
-    end
-
-    GuildCrafts:Printf("Simulated %d guild members injected.", generated)
-end
-
-function Data:SimClear()
-    local gdb = self:GetGuildDB()
-    if not gdb then return end
-    local cleared = 0
-    for memberKey, entry in pairs(gdb) do
-        if type(entry) == "table" and entry._simulated then
-            gdb[memberKey] = nil
-            cleared = cleared + 1
-        end
-    end
-    GuildCrafts:Printf("Cleared %d simulated member(s).", cleared)
-end
-
-function Data:SimSync()
-    -- Generate a fake SYNC_RESPONSE containing 10 simulated members
-    -- and feed it through the normal merge path
-    local fakeData = {}
-    local realm = GetRealmName() or "SimRealm"
-    for i = 1, 10 do
-        local memberKey = string.format("SyncSim%03d-%s", i, realm)
-        local profName = PROF_NAMES[math.random(#PROF_NAMES)]
-        local recipes = {}
-        for r = 1, math.random(5, 20) do
-            local recipeKey = 90000 + (i * 100) + r
-            recipes[recipeKey] = {
-                name = SAMPLE_RECIPES[math.random(#SAMPLE_RECIPES)],
-                source = "Simulated Sync",
-                category = SAMPLE_CATEGORIES[math.random(#SAMPLE_CATEGORIES)],
-                reagents = SAMPLE_REAGENTS[math.random(#SAMPLE_REAGENTS)],
-            }
-        end
-        local profEntry = { recipes = recipes, skillLevel = math.random(300, 375), maxSkillLevel = 375 }
-        local specs = SAMPLE_SPECIALISATIONS[profName]
-        if specs and math.random() < 0.4 then
-            profEntry.specialisation = specs[math.random(#specs)]
-        end
-        local cds = SAMPLE_COOLDOWNS[profName]
-        if cds and math.random() < 0.2 then
-            local cdName = cds[math.random(#cds)]
-            local remaining = math.random(3600, 72 * 3600)
-            profEntry.cooldowns = {
-                [cdName] = { endTime = time() + remaining, duration = remaining },
-            }
-        end
-        fakeData[memberKey] = {
-            professions = { [profName] = profEntry },
-            lastUpdate = time(),
-            _simulated = true,
-        }
-    end
-
-    local merged = self:MergeIncoming(fakeData)
-    GuildCrafts:Printf("Simulated sync: 10 members, merged=%s", tostring(merged))
-end
-
-function Data:SimDelta()
-    -- Pick a random existing simulated member and add a recipe
-    local gdb = self:GetGuildDB()
-    if not gdb then return end
-    for memberKey, entry in pairs(gdb) do
-        if type(entry) == "table" and entry._simulated then
-            local profName = next(entry.professions)
-            if profName then
-                local newKey = 99000 + math.random(1, 9999)
-                local recipe = {
-                    name = SAMPLE_RECIPES[math.random(#SAMPLE_RECIPES)] .. " (NEW)",
-                    source = "Simulated Delta",
-                    category = SAMPLE_CATEGORIES[math.random(#SAMPLE_CATEGORIES)],
-                    reagents = SAMPLE_REAGENTS[math.random(#SAMPLE_REAGENTS)],
-                }
-                self:MergeDelta(memberKey, profName, newKey, recipe, time())
-                GuildCrafts:Printf("Simulated delta: %s → %s → %s", memberKey, profName, recipe.name)
-                return
-            end
-        end
-    end
-    GuildCrafts:Print("No simulated members found. Run /gc sim <N> first.")
-end
-
-function Data:SimCraft()
-    GuildCrafts:Print("Craft request simulation removed in 1.2.3 — use [W] whisper button instead.")
-end
 
 ----------------------------------------------------------------------
 -- Member Data Accessors (for UI)
@@ -1855,14 +1611,6 @@ function Data:GetProfessionGroups()
     return PRIMARY_PROF_NAMES, SECONDARY_PROF_NAMES
 end
 
---- Return true if the given profession name is a secondary (gathering/cooking) profession.
-function Data:IsSecondaryProfession(name)
-    for _, n in ipairs(SECONDARY_PROF_NAMES) do
-        if n == name then return true end
-    end
-    return false
-end
-
 --- Return true if the profession is a pure gathering skill (no craftable recipes).
 function Data:IsGatheringProfession(name)
     return name == "Herbalism" or name == "Skinning"
@@ -1930,6 +1678,69 @@ end
 --- "agylity" → "glty", "agility" → "glty"
 local function StripVowels(s)
     return s:lower():gsub("[aeiouAEIOU]", "")
+end
+
+--- Exact-match search by numeric recipe key (itemID or negative spellID).
+--- Returns the same result shape as SearchRecipes: a list of
+--- { recipeName, recipeKey, profName, source, reagents, crafters }.
+--- Locale-independent: the key is numeric so the DR's language is irrelevant.
+function Data:SearchRecipesByKey(key)
+    if not key or key == 0 then return {} end
+
+    local gdb = self:GetGuildDB()
+    if not gdb then return {} end
+
+    -- resultMap keyed by profName so the same recipe in one profession is
+    -- collected once even if multiple guild members know it.
+    local resultMap = {}
+
+    for memberKey, entry in pairs(gdb) do
+        if type(entry) == "table" and entry.professions then
+            for profName, profData in pairs(entry.professions) do
+                if profData.recipes and profData.recipes[key] then
+                    local recipeData = profData.recipes[key]
+                    local localName = self:GetLocalizedRecipeName(key, recipeData.name)
+                    local mapKey = profName
+                    if not resultMap[mapKey] then
+                        resultMap[mapKey] = {
+                            recipeName = localName,
+                            recipeKey = key,
+                            profName = profName,
+                            source = recipeData.source,
+                            reagents = recipeData.reagents or self:GetRecipeReagents(key),
+                            crafters = {},
+                        }
+                    elseif localName ~= "Unknown" then
+                        resultMap[mapKey].recipeName = localName
+                    end
+                    resultMap[mapKey].crafters[#resultMap[mapKey].crafters + 1] = {
+                        key = memberKey,
+                    }
+                end
+            end
+        end
+    end
+
+    -- Deduplicate crafters by display name
+    for _, v in pairs(resultMap) do
+        local seenCrafters   = {}
+        local uniqueCrafters = {}
+        for _, c in ipairs(v.crafters) do
+            local displayName = c.key:match("^(.+)-") or c.key
+            if not seenCrafters[displayName] then
+                seenCrafters[displayName] = true
+                uniqueCrafters[#uniqueCrafters + 1] = c
+            end
+        end
+        v.crafters = uniqueCrafters
+    end
+
+    local results = {}
+    for _, v in pairs(resultMap) do
+        results[#results + 1] = v
+    end
+    table.sort(results, function(a, b) return a.recipeName < b.recipeName end)
+    return results
 end
 
 function Data:SearchRecipes(query, fuzzy)
