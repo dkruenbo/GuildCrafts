@@ -141,8 +141,26 @@ function GuildCrafts:OnLoginReady()
         self.Comms:OnLoginReady()
     end
 
-    -- Remind the player to open profession windows so recipes get scanned
-    self:Print("Open each profession window once so GuildCrafts can scan your recipes.")
+    -- Warn about unscanned professions (excluding Herbalism/Skinning — no recipes)
+    local SCAN_EXEMPT = { Herbalism = true, Skinning = true }
+    if self.Data and self.Data._currentProfs then
+        local unscanned = {}
+        local entry = self.Data:GetMemberEntry(self.Data:GetPlayerKey(), false)
+        for profName in pairs(self.Data._currentProfs) do
+            if not SCAN_EXEMPT[profName] then
+                local profData = entry and entry.professions and entry.professions[profName]
+                local hasRecipes = profData and profData.recipes and next(profData.recipes)
+                if not hasRecipes then
+                    unscanned[#unscanned + 1] = profName
+                end
+            end
+        end
+        if #unscanned > 0 then
+            table.sort(unscanned)
+            self:Print("|cffff9900Open these profession windows to sync your recipes: " ..
+                table.concat(unscanned, ", ") .. ".|r")
+        end
+    end
 end
 
 function GuildCrafts:OnTradeSkillShow()
