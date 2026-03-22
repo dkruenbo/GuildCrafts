@@ -444,13 +444,6 @@ function GuildCrafts:SlashHandler(input)
         self:Print("Wiping all SavedVariables and reloading...")
         GuildCraftsDB = nil
         ReloadUI()
-    elseif input:sub(1, 3) == "sim" then
-        local simArg = input:sub(5):trim()
-        if self.Data then
-            self.Data:HandleSimCommand(simArg)
-        else
-            self:Print("Data module not loaded.")
-        end
     elseif input == "minimap" then
         if self.MinimapButton then
             self.MinimapButton:Toggle()
@@ -458,7 +451,7 @@ function GuildCrafts:SlashHandler(input)
             self:Print("MinimapButton module not loaded.")
         end
     else
-        self:Print("Commands: /gc, /gc debug, /gc dump, /gc comms, /gc mem, /gc sim <N>, /gc minimap, /gc reset")
+        self:Print("Commands: /gc, /gc debug, /gc dump, /gc comms, /gc mem, /gc minimap, /gc reset")
     end
 end
 
