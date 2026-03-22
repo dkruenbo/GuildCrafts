@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.3.0"
+GuildCrafts.DISPLAY_VERSION = "1.3.1"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -293,12 +293,17 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
     if not query then return end
     -- Strip item/spell hyperlink markup so shift-clicking an item works.
     -- "|cff...|Hitem:...|h[Name]|h|r"  →  "Name"
+    -- "|cff...|Henchant:...|h[Enchanting: Name]|h|r"  →  "Name"
     query = query:gsub("|c%x%x%x%x%x%x%x%x", "")
                  :gsub("|r", "")
                  :gsub("|H[^|]+|h(%[?[^%]|]*%]?)|h", function(s)
                      return s:match("^%[(.-)%]$") or s
                  end)
                  :trim()
+    -- Enchant spell links embed a "Profession: " prefix in the display text
+    -- (e.g. "Enchanting: Enchant Bracer - Spellpower"). Strip it so the query
+    -- matches the bare recipe name stored in the DB.
+    query = query:gsub("^[^:]+:%s+", "")
     if query == "" then return end
 
     if not self._gcQueryCooldowns then self._gcQueryCooldowns = {} end
