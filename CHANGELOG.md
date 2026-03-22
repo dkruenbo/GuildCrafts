@@ -6,6 +6,10 @@
 
     - **`!gc` enchant link lookup** — shift-clicking an enchant spell link into guild chat (e.g. `!gc [Enchanting: Enchant Bracer - Spellpower]`) now correctly strips the leading `Profession: ` prefix before searching. Previously the prefix caused a false "No guild crafter found" even when crafters existed
 
+    ### Improvements
+
+    - **Locale-independent link lookup** — when a `!gc` query contains a shift-clicked hyperlink, the numeric item/spell ID is extracted and used for an exact key-based DB lookup before falling back to text search. A German DR can now answer an English player's shift-clicked link (and vice-versa) regardless of client language
+
     ---
 
     ## 1.3.0 — 2026-03-22

@@ -291,6 +291,19 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
 
     local query = msg:match("^!gc%s+(.+)$")
     if not query then return end
+
+    -- Extract a numeric recipe key from a hyperlink before stripping markup.
+    -- |Hitem:12345:...|h  →  recipeKey = 12345  (positive itemID)
+    -- |Henchant:9876|h    →  recipeKey = -9876   (negative spellID, matches DB convention)
+    local linkRecipeKey = nil
+    local itemID = query:match("|Hitem:(%d+)")
+    if itemID then
+        linkRecipeKey = tonumber(itemID)
+    else
+        local spellID = query:match("|Henchant:(%d+)")
+        if spellID then linkRecipeKey = -tonumber(spellID) end
+    end
+
     -- Strip item/spell hyperlink markup so shift-clicking an item works.
     -- "|cff...|Hitem:...|h[Name]|h|r"  →  "Name"
     -- "|cff...|Henchant:...|h[Enchanting: Name]|h|r"  →  "Name"
@@ -304,7 +317,7 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
     -- (e.g. "Enchanting: Enchant Bracer - Spellpower"). Strip it so the query
     -- matches the bare recipe name stored in the DB.
     query = query:gsub("^[^:]+:%s+", "")
-    if query == "" then return end
+    if query == "" and not linkRecipeKey then return end
 
     if not self._gcQueryCooldowns then self._gcQueryCooldowns = {} end
     local cooldownKey = query:lower()
@@ -331,9 +344,10 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
         delay = 12 + math.random(0, 8)
     end
 
-    local capturedQuery     = query
-    local capturedCooldown  = cooldownKey
-    local capturedScheduled = GetTime()  -- sub-second precision for dedup
+    local capturedQuery      = query
+    local capturedCooldown   = cooldownKey
+    local capturedScheduled  = GetTime()  -- sub-second precision for dedup
+    local capturedRecipeKey  = linkRecipeKey
 
     self:ScheduleTimer(function()
         -- If any [GuildCrafts] message arrived after we scheduled, someone
@@ -346,7 +360,17 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
         -- heartbeat watchdog handles true DR failures independently.
 
         if not self.Data then return end
-        local results = self.Data:SearchRecipes(capturedQuery)
+
+        -- Prefer exact key-based lookup (locale-independent) when the query
+        -- came from a shift-clicked hyperlink.  Fall back to text search for
+        -- plain typed queries or if the key isn't in the DB.
+        local results
+        if capturedRecipeKey then
+            results = self.Data:SearchRecipesByKey(capturedRecipeKey)
+        end
+        if not results or #results == 0 then
+            results = self.Data:SearchRecipes(capturedQuery)
+        end
         if not results or #results == 0 then
             results = self.Data:SearchRecipes(capturedQuery, true)
         end

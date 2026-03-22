@@ -1932,6 +1932,69 @@ local function StripVowels(s)
     return s:lower():gsub("[aeiouAEIOU]", "")
 end
 
+--- Exact-match search by numeric recipe key (itemID or negative spellID).
+--- Returns the same result shape as SearchRecipes: a list of
+--- { recipeName, recipeKey, profName, source, reagents, crafters }.
+--- Locale-independent: the key is numeric so the DR's language is irrelevant.
+function Data:SearchRecipesByKey(key)
+    if not key or key == 0 then return {} end
+
+    local gdb = self:GetGuildDB()
+    if not gdb then return {} end
+
+    -- resultMap keyed by profName so the same recipe in one profession is
+    -- collected once even if multiple guild members know it.
+    local resultMap = {}
+
+    for memberKey, entry in pairs(gdb) do
+        if type(entry) == "table" and entry.professions then
+            for profName, profData in pairs(entry.professions) do
+                if profData.recipes and profData.recipes[key] then
+                    local recipeData = profData.recipes[key]
+                    local localName = self:GetLocalizedRecipeName(key, recipeData.name)
+                    local mapKey = profName
+                    if not resultMap[mapKey] then
+                        resultMap[mapKey] = {
+                            recipeName = localName,
+                            recipeKey = key,
+                            profName = profName,
+                            source = recipeData.source,
+                            reagents = recipeData.reagents or self:GetRecipeReagents(key),
+                            crafters = {},
+                        }
+                    elseif localName ~= "Unknown" then
+                        resultMap[mapKey].recipeName = localName
+                    end
+                    resultMap[mapKey].crafters[#resultMap[mapKey].crafters + 1] = {
+                        key = memberKey,
+                    }
+                end
+            end
+        end
+    end
+
+    -- Deduplicate crafters by display name
+    for _, v in pairs(resultMap) do
+        local seenCrafters   = {}
+        local uniqueCrafters = {}
+        for _, c in ipairs(v.crafters) do
+            local displayName = c.key:match("^(.+)-") or c.key
+            if not seenCrafters[displayName] then
+                seenCrafters[displayName] = true
+                uniqueCrafters[#uniqueCrafters + 1] = c
+            end
+        end
+        v.crafters = uniqueCrafters
+    end
+
+    local results = {}
+    for _, v in pairs(resultMap) do
+        results[#results + 1] = v
+    end
+    table.sort(results, function(a, b) return a.recipeName < b.recipeName end)
+    return results
+end
+
 function Data:SearchRecipes(query, fuzzy)
     if not query or query == "" then return {} end
     query = query:lower()
