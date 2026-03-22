@@ -38,8 +38,6 @@ function GuildCrafts:OnInitialize()
     -- Called when the addon is loaded (before PLAYER_LOGIN).
     -- Set up database, register slash commands.
     self:RegisterChatCommand("gc", "SlashHandler")
-    local clientInterface = select(4, GetBuildInfo()) or "unknown"
-    self:Print("v" .. self.DISPLAY_VERSION .. " loaded (client Interface: " .. clientInterface .. "). Type /gc to open.")
 end
 
 function GuildCrafts:OnEnable()
