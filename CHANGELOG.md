@@ -1,4 +1,17 @@
-# Changelog
+    # Changelog
+
+## 1.3.0 — 2026-03-22
+
+### Improvements
+
+- **Ghost member auto-prune** — members who are still in the guild but haven't scanned their professions in 45 days are now automatically removed from the guild database. Previously only ex-guild members were pruned; a still-in-guild member who uninstalled GuildCrafts would accumulate an ever-staler entry indefinitely
+- **Ex-guild grace period reduced: 30d → 7d** — someone who leaves the guild is immediately irrelevant; their entry is now gone within a week instead of a month
+- **Login stale-data warning** — if your own profession data is more than 30 days old, a one-time amber message appears in chat on login reminding you to open your profession windows to resync. Fires once per session only
+- **Smarter login prompt** — the blanket "open profession windows" message is replaced with a targeted warning that lists only the specific professions you have but haven't scanned yet. Herbalism and Skinning are excluded (no recipes to scan). No message is shown if all professions are already synced
+- **Legacy entry cleanup** — entries from early addon versions that were never assigned a scan timestamp (`lastUpdate` nil or 0) are now pruned on the next roster cycle. Active members who open a profession window get a fresh entry immediately
+- **Silent load** — the startup chat message ("v1.x loaded…") has been removed. The addon only speaks when there is something actionable to say
+
+---
 
 ## 1.2.5 — 2026-03-20
 

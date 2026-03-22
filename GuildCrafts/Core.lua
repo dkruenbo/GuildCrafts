@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.2.5"
+GuildCrafts.DISPLAY_VERSION = "1.3.0"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -38,8 +38,6 @@ function GuildCrafts:OnInitialize()
     -- Called when the addon is loaded (before PLAYER_LOGIN).
     -- Set up database, register slash commands.
     self:RegisterChatCommand("gc", "SlashHandler")
-    local clientInterface = select(4, GetBuildInfo()) or "unknown"
-    self:Print("v" .. self.DISPLAY_VERSION .. " loaded (client Interface: " .. clientInterface .. "). Type /gc to open.")
 end
 
 function GuildCrafts:OnEnable()
@@ -81,6 +79,25 @@ end
 ----------------------------------------------------------------------
 
 function GuildCrafts:OnPlayerEnteringWorld(_event, isLogin, isReload)
+    -- One-time stale-data warning for the local player's own entry
+    if not self._staleWarnShown then
+        C_Timer.After(3, function()
+            if self._staleWarnShown then return end
+            self._staleWarnShown = true
+            local playerKey = GuildCrafts.Data:GetPlayerKey()
+            local db = GuildCrafts.Data:GetGuildDB()
+            local entry = db and db[playerKey]
+            if entry and entry.lastUpdate and entry.lastUpdate > 0 then
+                local age = time() - entry.lastUpdate
+                if age > 30 * 86400 then
+                    local days = math.floor(age / 86400)
+                    GuildCrafts:Print("|cffff9900Your profession data is " .. days ..
+                        " days old and will be pruned soon. Open your profession windows to resync.|r")
+                end
+            end
+        end)
+    end
+
     if not IsInGuild() then
         self:Debug("Not in a guild — sync disabled.")
         return
@@ -122,8 +139,26 @@ function GuildCrafts:OnLoginReady()
         self.Comms:OnLoginReady()
     end
 
-    -- Remind the player to open profession windows so recipes get scanned
-    self:Print("Open each profession window once so GuildCrafts can scan your recipes.")
+    -- Warn about unscanned professions (excluding Herbalism/Skinning — no recipes)
+    local SCAN_EXEMPT = { Herbalism = true, Skinning = true }
+    if self.Data and self.Data._currentProfs then
+        local unscanned = {}
+        local entry = self.Data:GetMemberEntry(self.Data:GetPlayerKey(), false)
+        for profName in pairs(self.Data._currentProfs) do
+            if not SCAN_EXEMPT[profName] then
+                local profData = entry and entry.professions and entry.professions[profName]
+                local hasRecipes = profData and profData.recipes and next(profData.recipes)
+                if not hasRecipes then
+                    unscanned[#unscanned + 1] = profName
+                end
+            end
+        end
+        if #unscanned > 0 then
+            table.sort(unscanned)
+            self:Print("|cffff9900Open these profession windows to sync your recipes: " ..
+                table.concat(unscanned, ", ") .. ".|r")
+        end
+    end
 end
 
 function GuildCrafts:OnTradeSkillShow()

@@ -39,8 +39,10 @@ local time = time
 local pairs = pairs
 local tonumber = tonumber
 
--- Data staleness threshold (seconds) — 30 days
-local STALE_THRESHOLD = 30 * 24 * 3600
+-- Staleness thresholds (seconds)
+local STALE_DISPLAY_THRESHOLD   = 30 * 24 * 3600  -- show [Nd ago] tag; CountStaleMembers baseline
+local EX_GUILD_GRACE_PERIOD     =  7 * 24 * 3600  -- prune ex-members after 7 days absent
+local INACTIVE_MEMBER_THRESHOLD = 45 * 24 * 3600  -- prune still-in-guild members with no scan in 45 days
 
 -- TBC crafting professions we track (canonical English keys)
 local TRACKED_PROFESSIONS = {
@@ -843,7 +845,7 @@ end
 function Data:GetStalenessTag(lastUpdate)
     if not lastUpdate or lastUpdate == 0 then return nil end
     local age = time() - lastUpdate
-    if age < STALE_THRESHOLD then return nil end
+    if age < STALE_DISPLAY_THRESHOLD then return nil end
 
     local days = math.floor(age / 86400)
     if days < 60 then
@@ -1389,7 +1391,7 @@ function Data:PruneRoster()
         return
     end
 
-    -- Prune entries not in the roster (with 30-day grace period)
+    -- Prune entries not in the roster (with 7-day grace period)
     local pruned = 0
     local marked = 0
     local restored = 0
@@ -1404,7 +1406,7 @@ function Data:PruneRoster()
                     -- First time absent — mark with timestamp
                     entry._absentSince = now
                     marked = marked + 1
-                elseif now - entry._absentSince > STALE_THRESHOLD then
+                elseif now - entry._absentSince > EX_GUILD_GRACE_PERIOD then
                     -- Grace period expired — prune
                     gdb[memberKey] = nil
                     pruned = pruned + 1
@@ -1424,7 +1426,41 @@ function Data:PruneRoster()
         GuildCrafts:Debug("Restored", restored, "member(s) — back in guild.")
     end
     if pruned > 0 then
-        GuildCrafts:Debug("Pruned", pruned, "ex-guild member(s) after 30-day grace period.")
+        GuildCrafts:Debug("Pruned", pruned, "ex-guild member(s) after 7-day grace period.")
+    end
+
+    -- Prune still-in-guild members who haven't scanned in 45 days
+    local inactivePruned = 0
+    for memberKey, entry in pairs(gdb) do
+        if type(memberKey) == "string"
+        and type(entry) == "table"
+        and entry.lastUpdate and entry.lastUpdate > 0
+        and (now - entry.lastUpdate) > INACTIVE_MEMBER_THRESHOLD
+        and rosterKeys[memberKey] then
+            gdb[memberKey] = nil
+            inactivePruned = inactivePruned + 1
+        end
+    end
+    if inactivePruned > 0 then
+        GuildCrafts:Debug("Auto-pruned", inactivePruned, "inactive guild member(s) (45d+ no scan).")
+    end
+
+    -- Prune legacy entries with no scan timestamp (lastUpdate nil or 0)
+    -- Skip the local player — we're always authoritative for our own data
+    local legacyPruned = 0
+    local localPlayerKey = self:GetPlayerKey()
+    for memberKey, entry in pairs(gdb) do
+        if type(memberKey) == "string"
+        and memberKey ~= localPlayerKey
+        and type(entry) == "table"
+        and (not entry.lastUpdate or entry.lastUpdate == 0)
+        and not entry._simulated then
+            gdb[memberKey] = nil
+            legacyPruned = legacyPruned + 1
+        end
+    end
+    if legacyPruned > 0 then
+        GuildCrafts:Debug("Pruned", legacyPruned, "legacy entry/entries with no scan timestamp.")
     end
 end
 
