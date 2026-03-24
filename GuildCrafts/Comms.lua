@@ -1018,16 +1018,6 @@ end
 -- Accessor for other modules
 ----------------------------------------------------------------------
 
---- Check if a player is a known addon user.
-function Comms:IsAddonUser(memberKey)
-    return self.addonUsers[memberKey] ~= nil
-end
-
---- Get list of online addon users.
-function Comms:GetAddonUsers()
-    return self.addonUsers
-end
-
 --- Get count of addon users who are currently online according to the guild
 --- roster cache. This filters out zombie entries (users who logged off but
 --- haven't yet timed out of addonUsers via the heartbeat watchdog).

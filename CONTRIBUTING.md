@@ -29,7 +29,7 @@ To test locally:
    World of Warcraft/_classic_/Interface/AddOns/GuildCrafts
    ```
 2. Reload the game UI with `/reload`
-3. Use `/gc sim 5` to generate simulated data for testing without a full guild
+3. Join a guild and open a profession window to populate local data
 
 ## Project Structure
 
@@ -60,7 +60,7 @@ If you have an idea for a larger feature, open an issue to discuss it first — 
 
 - Keep PRs focused on a single change
 - Describe what the PR does and why
-- Test in-game before submitting (use `/gc sim` if you don't have guild data)
+- Test in-game before submitting
 - Update documentation if your change affects user-facing behavior
 
 ## Bug Reports
