@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.3.1"
+GuildCrafts.DISPLAY_VERSION = "1.3.2"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -203,7 +203,9 @@ local CHAT_POST_COOLDOWN = 30  -- seconds
 --- Online crafters appear first; list is capped to stay within 255-byte
 --- guild chat limit.  Builds incrementally and stops when adding another
 --- name would exceed the budget.
-function GuildCrafts:FormatCraftersLine(crafters, prefix, maxNames)
+--- @param extraReserve number|nil  Additional bytes to reserve for a suffix
+---                                 appended by the caller after this string.
+function GuildCrafts:FormatCraftersLine(crafters, prefix, maxNames, extraReserve)
     local myKey = self.Data:GetPlayerKey()
     local sorted = {}
     for _, c in ipairs(crafters) do sorted[#sorted + 1] = c end
@@ -217,9 +219,10 @@ function GuildCrafts:FormatCraftersLine(crafters, prefix, maxNames)
     end)
 
     -- Reserve space for the prefix (e.g. "[GuildCrafts] Recipe (Prof): ")
-    -- plus a generous overflow suffix like ", +99 more".
+    -- plus a generous overflow suffix like ", +99 more",
+    -- plus any caller-supplied suffix (e.g. " — /gc to browse").
     local prefixLen = prefix and #prefix or 0
-    local budget    = 255 - prefixLen - 15  -- 15 chars for overflow suffix
+    local budget    = 255 - prefixLen - 15 - (extraReserve or 0)
     local cap       = maxNames or #sorted   -- 0 = no cap beyond budget
     local parts     = {}
     local totalLen  = 0
@@ -264,9 +267,10 @@ function GuildCrafts:PostCraftersToGuildChat(recipeName, recipeKey, crafters)
         return
     end
     self._chatPostCooldowns[recipeKey] = now
+    local BROWSE_SUFFIX = " \226\128\148 /gc to browse"  -- em dash: 3 bytes
     local prefix = "[GuildCrafts] " .. recipeName .. ": "
-    local line = self:FormatCraftersLine(crafters, prefix)
-    SendChatMessage(prefix .. line .. " \226\128\148 /gc to browse", "GUILD")
+    local line = self:FormatCraftersLine(crafters, prefix, nil, #BROWSE_SUFFIX)
+    SendChatMessage(prefix .. line .. BROWSE_SUFFIX, "GUILD")
 end
 
 -- Epoch of the last [GuildCrafts] message seen in guild chat.
@@ -393,7 +397,7 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
             posted = posted + 1
         end
         if #results > 3 then
-            msgQueue[#msgQueue + 1] = "[GuildCrafts] ..." .. (#results - 3) .. " more result(s) \226\128\148 type /gc to browse"
+            msgQueue[#msgQueue + 1] = "[GuildCrafts] +" .. (#results - 3) .. " more result(s) \226\128\148 /gc to browse"
         end
         for i, chatMsg in ipairs(msgQueue) do
             if i == 1 then
