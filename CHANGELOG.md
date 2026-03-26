@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.2 — 2026-03-26
+
+### Fixes
+
+- **Guild chat message truncation** — when clicking the `[>]` post button for a recipe with many crafters, the crafter list plus the ` — /gc to browse` trailer could exceed WoW's 255-byte message limit by up to 3 bytes, silently cutting off the end of the line. `FormatCraftersLine` now accepts an optional `extraReserve` parameter so callers can account for any suffix they append; `PostCraftersToGuildChat` passes the exact byte-length of its trailer
+
+- **`!gc` overflow line display** — when a `!gc` query matched more than 3 recipes, the overflow notice rendered as `[GuildCrafts] ...3 more result(s)` (number ran directly into the ellipsis). Changed to `[GuildCrafts] +3 more result(s) — /gc to browse`
+
+---
+
 ## 1.3.1 — 2026-03-22
 
 ### Fixes
