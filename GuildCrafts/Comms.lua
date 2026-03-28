@@ -32,13 +32,13 @@ local PREFIX = "GuildCrafts"
 
 -- Timing (seconds)
 local HELLO_DELAY          = 3       -- delay after login before sending HELLO
-local SYNC_DELAY           = 15      -- delay after HELLO before SYNC_REQUEST (was 5)
+local SYNC_DELAY           = 15      -- delay after HELLO before SYNC_REQUEST
 local HEARTBEAT_INTERVAL   = 60      -- DR heartbeat broadcast interval
 local HEARTBEAT_TIMEOUT    = 180     -- 3 missed heartbeats → DR presumed dead
-local SYNC_TIMEOUT         = 120     -- wait for SYNC_RESPONSE before retry (was 30)
+local SYNC_TIMEOUT         = 120     -- wait for SYNC_RESPONSE before retry
 local SYNC_RETRY_TIMEOUT   = 15      -- wait for retry response before open round
-local SYNC_CHUNK_SIZE      = 3       -- max members per sync chunk (was 10)
-local SYNC_CHUNK_DELAY     = 1.0     -- seconds between sync chunks
+local SYNC_CHUNK_SIZE      = 5       -- max members per sync chunk
+local SYNC_CHUNK_DELAY     = 1.0     -- seconds between chunks (avoids burst lag)
 
 -- ChatThrottleLib priorities
 local PRIO_BULK   = "BULK"
@@ -85,6 +85,9 @@ function Comms:OnInitialize()
     -- DR request queue (when we are DR)
     self.syncQueue         = {}
     self.syncProcessing    = false
+
+    -- Pending re-sync debounce timer (shared across HandleHello / TouchAddonUser / RecomputeElection)
+    self._pendingSyncTimer = nil
 
     -- Registered flag
     self._prefixRegistered = false
