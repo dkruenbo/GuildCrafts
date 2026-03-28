@@ -32,12 +32,13 @@ local PREFIX = "GuildCrafts"
 
 -- Timing (seconds)
 local HELLO_DELAY          = 3       -- delay after login before sending HELLO
-local SYNC_DELAY           = 5       -- delay after HELLO before SYNC_REQUEST
+local SYNC_DELAY           = 15      -- delay after HELLO before SYNC_REQUEST
 local HEARTBEAT_INTERVAL   = 60      -- DR heartbeat broadcast interval
 local HEARTBEAT_TIMEOUT    = 180     -- 3 missed heartbeats → DR presumed dead
-local SYNC_TIMEOUT         = 30      -- wait for SYNC_RESPONSE before retry
+local SYNC_TIMEOUT         = 120     -- wait for SYNC_RESPONSE before retry
 local SYNC_RETRY_TIMEOUT   = 15      -- wait for retry response before open round
-local SYNC_CHUNK_SIZE      = 10      -- max members per sync chunk
+local SYNC_CHUNK_SIZE      = 5       -- max members per sync chunk
+local SYNC_CHUNK_DELAY     = 1.0     -- seconds between chunks (avoids burst lag)
 
 -- ChatThrottleLib priorities
 local PRIO_BULK   = "BULK"
@@ -84,6 +85,9 @@ function Comms:OnInitialize()
     -- DR request queue (when we are DR)
     self.syncQueue         = {}
     self.syncProcessing    = false
+
+    -- Pending re-sync debounce timer (shared across HandleHello / TouchAddonUser / RecomputeElection)
+    self._pendingSyncTimer = nil
 
     -- Registered flag
     self._prefixRegistered = false
@@ -183,9 +187,17 @@ function Comms:HandleHello(payload, sender)
     -- Trigger a sync whenever we discover a new addon user.
     -- This handles late logins, reconnects, and the initial race where
     -- the first SYNC_REQUEST fires before any HELLO replies arrive.
+    -- Debounced: cancels any pending re-sync timer before scheduling a new one
+    -- so multiple discoveries in quick succession collapse into a single sync.
     if isNew and not self.syncPending then
         self.syncRetryCount = 0
-        self:ScheduleTimer("SendSyncRequest", 2)
+        if self._pendingSyncTimer then
+            self:CancelTimer(self._pendingSyncTimer)
+        end
+        self._pendingSyncTimer = self:ScheduleTimer(function()
+            self._pendingSyncTimer = nil
+            self:SendSyncRequest()
+        end, 10)
         GuildCrafts:Debug("Scheduling re-sync after discovering", memberKey)
     end
 end
@@ -209,9 +221,16 @@ function Comms:TouchAddonUser(key, version)
         -- If this demoted us from a false-DR election, RecomputeElection
         -- already scheduled a sync. If we're still non-DR and haven't synced,
         -- schedule one now (covers SYNC_REQUEST / SYNC_RESPONSE discovery paths).
+        -- Debounced: collapses multiple rapid discoveries into a single sync.
         if self.myRole ~= "DR" and not self.syncPending then
             self.syncRetryCount = 0
-            self:ScheduleTimer("SendSyncRequest", 2)
+            if self._pendingSyncTimer then
+                self:CancelTimer(self._pendingSyncTimer)
+            end
+            self._pendingSyncTimer = self:ScheduleTimer(function()
+                self._pendingSyncTimer = nil
+                self:SendSyncRequest()
+            end, 10)
         end
     else
         self.addonUsers[key].lastSeen = time()
@@ -266,9 +285,16 @@ function Comms:RecomputeElection()
         -- If we were falsely elected DR (only self was known when SendSyncRequest
         -- fired) and have now been demoted by discovering the real DR, schedule
         -- a fresh sync so we get the guild data we skipped earlier.
+        -- Debounced for consistency with other re-sync scheduling points.
         if oldRole == "DR" and self.myRole ~= "DR" and not self.syncPending then
             self.syncRetryCount = 0
-            self:ScheduleTimer("SendSyncRequest", 2)
+            if self._pendingSyncTimer then
+                self:CancelTimer(self._pendingSyncTimer)
+            end
+            self._pendingSyncTimer = self:ScheduleTimer(function()
+                self._pendingSyncTimer = nil
+                self:SendSyncRequest()
+            end, 10)
             GuildCrafts:Debug("Was false-DR, now demoted — scheduling sync with real DR")
         end
     end
@@ -804,9 +830,8 @@ end
 ----------------------------------------------------------------------
 
 --- Send a member data table in chunks of SYNC_CHUNK_SIZE.
---- Each chunk is a separate message with chunkIndex/chunkTotal metadata.
+--- Each chunk is sent after a SYNC_CHUNK_DELAY to avoid burst lag.
 function Comms:SendChunked(msgType, memberData, target, totalCount)
-    -- Collect keys into a list for deterministic ordering
     local keys = {}
     for k in pairs(memberData) do
         keys[#keys + 1] = k
@@ -814,22 +839,33 @@ function Comms:SendChunked(msgType, memberData, target, totalCount)
     table_sort(keys)
 
     local totalChunks = math.ceil(totalCount / SYNC_CHUNK_SIZE)
-    local chunkIndex = 0
 
-    for i = 1, #keys, SYNC_CHUNK_SIZE do
-        chunkIndex = chunkIndex + 1
+    local function sendChunk(chunkIndex, startIdx)
+        if startIdx > #keys then return end
+
         local chunk = {}
-        for j = i, math.min(i + SYNC_CHUNK_SIZE - 1, #keys) do
+        for j = startIdx, math.min(startIdx + SYNC_CHUNK_SIZE - 1, #keys) do
             chunk[keys[j]] = memberData[keys[j]]
         end
+
         self:SendMessage(msgType, {
             data       = chunk,
             chunkIndex = chunkIndex,
             chunkTotal = totalChunks,
         }, "WHISPER", target, PRIO_BULK)
+
+        GuildCrafts:Debug("Sent chunk", chunkIndex, "/", totalChunks, "to", target)
+
+        local nextStart = startIdx + SYNC_CHUNK_SIZE
+        if nextStart <= #keys then
+            self:ScheduleTimer(function()
+                sendChunk(chunkIndex + 1, nextStart)
+            end, SYNC_CHUNK_DELAY)
+        end
     end
 
-    GuildCrafts:Debug("Sent", msgType, "to", target, "in", totalChunks, "chunk(s),", totalCount, "members")
+    sendChunk(1, 1)
+    GuildCrafts:Debug("SendChunked started:", msgType, "→", target, totalChunks, "chunk(s)")
 end
 
 --- Serialize, optionally compress, and send a message.
