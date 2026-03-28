@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.3 — 2026-03-28
+
+### Improvements
+
+- **Sync burst reduction in large guilds** — contributed by [@shockedarmor](https://github.com/shockedarmor) (PR #72). When multiple guild members log in or are discovered within a short window, the old code fired one `SYNC_REQUEST` per discovery almost simultaneously. All three re-sync scheduling sites (`HandleHello`, `TouchAddonUser`, `RecomputeElection`) now share a single debounce timer: each new discovery cancels and reschedules a sync 10 seconds after the *last* event, collapsing a burst of discoveries into one request. Tested by the contributor in a live 25-man raid with 30 addon users syncing simultaneously — no lag spikes and full convergence within a couple of minutes
+
+- **Chunked sync is now paced** — `SendChunked` previously sent all chunks in a tight synchronous loop. It now sends one chunk per second using a timer, preventing a burst of whisper messages from hitting all clients at once during a large sync
+
+- **Sync timing adjustments** — `SYNC_DELAY` raised from 5 s to 15 s (pushes the initial sync past the worst of login lag); `SYNC_TIMEOUT` raised from 30 s to 120 s (accommodates the slower paced chunk cadence)
+
+---
+
 ## 1.3.2 — 2026-03-26
 
 ### Fixes
