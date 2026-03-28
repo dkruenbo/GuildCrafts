@@ -58,8 +58,21 @@ If you have an idea for a larger feature, open an issue to discuss it first — 
 
 ## Pull Request Guidelines
 
+Pull requests should be easy to review. If the intent and impact are unclear, the PR may be sent back for clarification before review.
+
+Please include:
+
+- **Problem** — what issue does this solve? (bug, inefficiency, edge case)
+- **Root cause** — why does the issue occur? (if known)
+- **Change summary** — what did you change and how does it fix the problem?
+- **Scope** — what parts of the codebase are affected?
+- **Validation** — how did you test this in-game?
+
+Additional expectations:
+
 - Keep PRs focused on a single change
-- Describe what the PR does and why
+- Changes should stay within the existing scope of the addon (no feature expansion)
+- Avoid introducing external dependencies or complexity outside the current design
 - Test in-game before submitting
 - Update documentation if your change affects user-facing behavior
 
