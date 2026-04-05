@@ -207,9 +207,15 @@ local DB_DEFAULTS = {
         --     lastUpdate = timestamp,
         -- }
     },
+    global = {
+        minimap = {
+            hide        = false,
+            minimapPos  = 45,  -- degrees, top-right
+        },
+    },
     profile = {
-        showOnlineOnly     = false,
-        expansionFilter    = { ORIG = true, TBC = true },
+        showOnlineOnly      = false,
+        expansionFilter     = { ORIG = true, TBC = true },
         showTooltipCrafters = true,
     },
 }
@@ -360,7 +366,8 @@ end
 ----------------------------------------------------------------------
 -- Per-guild database partitioning
 -- Each guild's member data lives under db.global["GuildName-Realm"].
--- UI preferences (_minimapAngle, _minimapHide) remain at db.global.
+-- UI preferences (minimap position/visibility) are stored at db.global.minimap
+-- and managed by LibDBIcon-1.0.
 ----------------------------------------------------------------------
 
 --- Return the partition key for the current character's guild, or nil.

@@ -48,7 +48,7 @@ function Tooltip:RebuildIndex()
             for profName, profData in pairs(entry.professions) do
                 if profData.recipes then
                     for recipeKey, recipeData in pairs(profData.recipes) do
-                        local crafterEntry = { key = memberKey, profName = profName }
+                        local crafterEntry = { key = memberKey, profName = profName, spec = profData.specialisation }
 
                         -- Index by recipeKey (itemID for items, negative spellID for enchants)
                         if type(recipeKey) == "number" and recipeKey > 0 then
@@ -143,16 +143,17 @@ function Tooltip:OnTooltipSetItem(tooltip)
 
         local name = crafter.key:match("^(.+)-") or crafter.key
         local isOnline = GuildCrafts.Data:IsMemberOnline(crafter.key)
+        local specSuffix = crafter.spec and (" [" .. crafter.spec .. "]") or ""
 
         if isOnline then
             tooltip:AddDoubleLine(
                 "  |cff00ff00" .. name .. "|r",
-                "|cff888888" .. crafter.profName .. "|r"
+                "|cff888888" .. crafter.profName .. "|r" .. (crafter.spec and (" |cffffcc00[" .. crafter.spec .. "]|r") or "")
             )
         else
             tooltip:AddDoubleLine(
                 "  |cff666666" .. name .. "|r",
-                "|cff666666" .. crafter.profName .. "|r"
+                "|cff666666" .. crafter.profName .. specSuffix .. "|r"
             )
         end
         shown = shown + 1

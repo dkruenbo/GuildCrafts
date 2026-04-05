@@ -2511,7 +2511,7 @@ end
 --- Update the [Minimap] button visual to match the current setting.
 function UI:_UpdateMinimapBtnVisuals()
     if not self._minimapBtn then return end
-    local hidden = GuildCrafts.db and GuildCrafts.db.global._minimapHide
+    local hidden = GuildCrafts.db and GuildCrafts.db.global.minimap and GuildCrafts.db.global.minimap.hide
     if not hidden then
         self._minimapBtn:SetBackdropColor(0.12, 0.12, 0.12, 1)
         self._minimapBtn:SetBackdropBorderColor(1, 0.82, 0, 1)

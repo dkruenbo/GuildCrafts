@@ -24,4 +24,8 @@
     <!-- LibDeflate -->
     <Include file="LibDeflate\lib.xml"/>
 
+    <!-- LibDataBroker + LibDBIcon (minimap button) -->
+    <Script file="LibDataBroker-1.1\LibDataBroker-1.1.lua"/>
+    <Script file="LibDBIcon-1.0\LibDBIcon-1.0.lua"/>
+
 </Ui>
