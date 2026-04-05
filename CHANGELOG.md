@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.4 — 2026-04-05
+
+### Improvements
+
+- **Specialisation tags in item tooltips** — when hovering an item that guild members can craft, any crafter with a profession specialisation now shows it inline: e.g. `PlayerA — Alchemy [Elixir Master]`. Applies to all TBC specs: Alchemy (Potion/Elixir/Transmutation Master), Blacksmithing, Engineering, Leatherworking, and Tailoring. Offline crafters show the spec in grey
+
+### Fixes
+
+- **LibDBIcon-1.0 minimap button** — replaced the custom minimap button implementation with the standard LibDBIcon-1.0 library. Leatrix Plus no longer warns about a non-standard minimap button; the button also works correctly with SexyMap and any other minimap manager automatically. Drag-to-position and `/gc minimap` toggle are unchanged
+
+---
+
 ## 1.3.3 — 2026-03-28
 
 ### Improvements
