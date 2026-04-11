@@ -1,5 +1,7 @@
 # GuildCrafts
 
+> **This addon is no longer actively maintained.** It is stable at v1.3.5 and will not receive new features or bug fixes. The code is MIT licensed — feel free to fork it.
+
 A World of Warcraft TBC Anniversary addon that tracks **all learned recipes** across guild members' professions. Open a profession window, and the addon scans and stores every recipe — then syncs it across the entire guild automatically.
 
 ## Features
