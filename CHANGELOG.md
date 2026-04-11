@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.5 — 2026-04-11
+
+### Fixes
+
+- **GuildCrafts window no longer covers other windows** — the main frame was set to `HIGH` strata, which placed it on top of Blizzard UI panels including the tradeskill window, bags, and character sheet. Changed to `MEDIUM` so it behaves like a normal addon window and yields to game UI frames
+
+---
+
 ## 1.3.4 — 2026-04-05
 
 ### Improvements

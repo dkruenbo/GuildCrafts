@@ -104,7 +104,7 @@ function UI:CreateMainFrame()
     f:SetMovable(true)
     f:SetResizable(true)
     f:SetClampedToScreen(true)
-    f:SetFrameStrata("HIGH")
+    f:SetFrameStrata("MEDIUM")
     f:SetToplevel(true)
     f:EnableMouse(true)
 
