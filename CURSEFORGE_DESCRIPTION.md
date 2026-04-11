@@ -1,3 +1,5 @@
+> **GuildCrafts is now considered feature-complete. Only critical fixes may be addressed going forward.**
+
 # GuildCrafts
 
 **Find guild crafters instantly.**
@@ -243,5 +245,7 @@ GuildCrafts is built to solve a real problem, and I'm thrilled to see so many gu
 If it's saved you time or helped your guild coordinate better, consider buying me a coffee — it's genuinely appreciated.
 
 [Support me on Ko-fi ☕](https://ko-fi.com/lektor)
+
+_A huge thank you to everyone using the addon, reporting bugs, and sharing it with their guilds._
 
 _A huge thank you to everyone using the addon, reporting bugs, and sharing it with their guilds._
