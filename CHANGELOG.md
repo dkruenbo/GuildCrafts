@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.6 — 2026-04-15
+
+### Fixes
+
+- **Recipe name overlap with crafter column** — long recipe names (most visible in Enchanting) could overlap the crafter text on the right side of recipe rows. Increased the right margin reserved for the crafter column from 175 px to 205 px to give the full button + crafter text area proper clearance
+
+---
+
 ## 1.3.5 — 2026-04-11
 
 ### Fixes
