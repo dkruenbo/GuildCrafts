@@ -1,5 +1,15 @@
     # Changelog
 
+## 1.3.7 — 2026-04-21
+
+### Fixes
+
+- **Stale-data warning never resolved when all recipes were already learned** — opening a profession window only updated your sync timestamp when new recipes or a skill level change were detected. Players who had learned everything would keep aging toward the prune threshold even while actively playing. The addon now always refreshes the timestamp when a profession window is opened, regardless of whether anything changed.
+
+- **Peers and the Designated Requester could prune an active player** — because the timestamp update was local-only, other guild members' clients (and the DR) still saw the old timestamp and would eventually prune the entry at 45 days. The addon now broadcasts a lightweight `DELTA_UPDATE (touch)` message to the guild when data is 25–45 days old, so all peers stay in sync. To avoid unnecessary traffic the broadcast is rate-limited to once per hour per profession.
+
+---
+
 ## 1.3.6a — 2026-04-15
 
 ### Fixes

@@ -780,6 +780,31 @@ function Comms:BroadcastProfessionRemoval(memberKey, profName)
     GuildCrafts:Debug("Broadcast DELTA_UPDATE (remove) for", memberKey, profName)
 end
 
+--- Broadcast a lightweight timestamp-only update. Called when a profession window
+--- is opened but no new recipes are found and the data is 25+ days old. This
+--- prevents peers (including the DR) from pruning a player who is simply up to
+--- date and has nothing new to learn.
+function Comms:BroadcastTimestampTouch(memberKey, profName)
+    -- Rate limit: only broadcast once per hour per profession to avoid spamming
+    -- the DR when the player opens a profession window repeatedly.
+    self._lastTouchBroadcast = self._lastTouchBroadcast or {}
+    local last = self._lastTouchBroadcast[profName]
+    if last and (time() - last) < 3600 then
+        GuildCrafts:Debug("DELTA_UPDATE (touch) rate-limited for", profName)
+        return
+    end
+    self._lastTouchBroadcast[profName] = time()
+    local gdb = GuildCrafts.Data:GetGuildDB()
+    local entry = gdb and gdb[memberKey]
+    self:SendMessage(MSG_DELTA_UPDATE, {
+        type       = "touch",
+        member     = memberKey,
+        profession = profName,
+        lastUpdate = entry and entry.lastUpdate or time(),
+    }, "GUILD", nil, PRIO_NORMAL)
+    GuildCrafts:Debug("Broadcast DELTA_UPDATE (touch) for", memberKey, profName)
+end
+
 function Comms:HandleDeltaUpdate(payload, sender)
     if not payload.member then return end
     local playerKey = GuildCrafts.Data:GetPlayerKey()
@@ -796,6 +821,18 @@ function Comms:HandleDeltaUpdate(payload, sender)
                 recipeKey, recipeData, payload.lastUpdate)
         end
         GuildCrafts:Debug("DELTA_UPDATE (add) from", sender, "for", payload.member)
+
+    elseif payload.type == "touch" and payload.lastUpdate then
+        -- Lightweight timestamp bump — the sender has no new recipes but is still
+        -- active. Update lastUpdate so local pruning logic doesn't evict them.
+        local gdb = GuildCrafts.Data:GetGuildDB()
+        local entry = gdb and gdb[payload.member]
+        if entry and payload.lastUpdate > (entry.lastUpdate or 0) then
+            entry.lastUpdate = payload.lastUpdate
+        end
+        GuildCrafts:Debug("DELTA_UPDATE (touch) from", sender, "for", payload.member)
+        -- No recipe data changed; skip UI refresh.
+        return
 
     elseif payload.type == "remove_profession" then
         -- Remove entire profession
