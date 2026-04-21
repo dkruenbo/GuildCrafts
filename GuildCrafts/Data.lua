@@ -43,6 +43,7 @@ local tonumber = tonumber
 local STALE_DISPLAY_THRESHOLD   = 30 * 24 * 3600  -- show [Nd ago] tag; CountStaleMembers baseline
 local EX_GUILD_GRACE_PERIOD     =  7 * 24 * 3600  -- prune ex-members after 7 days absent
 local INACTIVE_MEMBER_THRESHOLD = 45 * 24 * 3600  -- prune still-in-guild members with no scan in 45 days
+local TOUCH_BROADCAST_THRESHOLD = 25 * 24 * 3600  -- broadcast timestamp touch only when data is 25+ days old
 
 -- TBC crafting professions we track (canonical English keys)
 local TRACKED_PROFESSIONS = {
@@ -899,6 +900,8 @@ function Data:ScanTradeSkill()
     local playerKey = self:GetPlayerKey()
     local entry = self:GetMemberEntry(playerKey, true)
     if not entry then return end
+    -- Capture age before any processing so backfill cannot poison the threshold check.
+    local ageAtScanStart = entry.lastUpdate and (time() - entry.lastUpdate) or math.huge
     if not entry.professions[profName] then
         entry.professions[profName] = { recipes = {} }
     end
@@ -984,6 +987,16 @@ function Data:ScanTradeSkill()
             GuildCrafts.Tooltip:InvalidateIndex()
         end
     else
+        -- Always refresh lastUpdate when a profession window is opened, even if
+        -- nothing changed. Without this, users who have learned all recipes will
+        -- never advance their timestamp and will hit the stale-data warning.
+        entry.lastUpdate = time()
+        -- Only broadcast the timestamp bump when data is approaching the prune
+        -- threshold (25–45 days). Avoids spamming the DR on every profession open.
+        -- Use ageAtScanStart (captured before backfill) so backfill cannot reset the age.
+        if ageAtScanStart >= TOUCH_BROADCAST_THRESHOLD and GuildCrafts.Comms and GuildCrafts.Comms.BroadcastTimestampTouch then
+            GuildCrafts.Comms:BroadcastTimestampTouch(playerKey, profName)
+        end
         GuildCrafts:Debug("Scanned " .. profName .. ": no new recipes.")
     end
 
@@ -1071,6 +1084,8 @@ function Data:ScanCraft()
     local playerKey = self:GetPlayerKey()
     local entry = self:GetMemberEntry(playerKey, true)
     if not entry then return end
+    -- Capture age before any processing so backfill cannot poison the threshold check.
+    local ageAtScanStart = entry.lastUpdate and (time() - entry.lastUpdate) or math.huge
     if not entry.professions[profName] then
         entry.professions[profName] = { recipes = {} }
     end
@@ -1158,6 +1173,16 @@ function Data:ScanCraft()
             GuildCrafts.Tooltip:InvalidateIndex()
         end
     else
+        -- Always refresh lastUpdate when a profession window is opened, even if
+        -- nothing changed. Without this, users who have learned all recipes will
+        -- never advance their timestamp and will hit the stale-data warning.
+        entry.lastUpdate = time()
+        -- Only broadcast the timestamp bump when data is approaching the prune
+        -- threshold (25–45 days). Avoids spamming the DR on every profession open.
+        -- Use ageAtScanStart (captured before backfill) so backfill cannot reset the age.
+        if ageAtScanStart >= TOUCH_BROADCAST_THRESHOLD and GuildCrafts.Comms and GuildCrafts.Comms.BroadcastTimestampTouch then
+            GuildCrafts.Comms:BroadcastTimestampTouch(playerKey, profName)
+        end
         GuildCrafts:Debug("Scanned " .. profName .. ": no new recipes.")
     end
 
