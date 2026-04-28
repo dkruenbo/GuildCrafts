@@ -582,8 +582,19 @@ function Comms:ProcessSyncRequest(requester, incomingVector)
     local sendCount = 0
     for _ in pairs(toSend) do sendCount = sendCount + 1 end
 
+    -- Callback fired once all chunks have been sent (or immediately if no chunks).
+    -- Clears syncProcessing so the queue can proceed. Defined before SendChunked so
+    -- the closure is available regardless of the code path taken below.
+    local function onSendComplete()
+        self.syncProcessing = false
+        self:ProcessNextSyncQueue()
+    end
+
     if sendCount > 0 then
-        self:SendChunked(MSG_SYNC_RESPONSE, toSend, requester, sendCount)
+        -- Pass onComplete so syncProcessing is cleared only after the last chunk
+        -- fires, not immediately after SendChunked returns. Without this, a queued
+        -- SYNC_REQUEST could start while previous chunks are still in-flight.
+        self:SendChunked(MSG_SYNC_RESPONSE, toSend, requester, sendCount, onSendComplete)
     else
         -- Always send at least an empty SYNC_RESPONSE so the requester
         -- knows we heard them and can stop waiting (otherwise they time out).
@@ -606,9 +617,11 @@ function Comms:ProcessSyncRequest(requester, incomingVector)
         GuildCrafts:Debug("Sync with", requester, "— already converged.")
     end
 
-    -- Mark processing complete and check queue
-    self.syncProcessing = false
-    self:ProcessNextSyncQueue()
+    -- If there were no chunks to send, mark complete immediately.
+    -- Otherwise onSendComplete will fire after the last chunk.
+    if sendCount == 0 then
+        onSendComplete()
+    end
 end
 
 function Comms:ProcessNextSyncQueue()
@@ -868,7 +881,8 @@ end
 
 --- Send a member data table in chunks of SYNC_CHUNK_SIZE.
 --- Each chunk is sent after a SYNC_CHUNK_DELAY to avoid burst lag.
-function Comms:SendChunked(msgType, memberData, target, totalCount)
+--- onComplete is an optional callback fired after the last chunk is sent.
+function Comms:SendChunked(msgType, memberData, target, totalCount, onComplete)
     local keys = {}
     for k in pairs(memberData) do
         keys[#keys + 1] = k
@@ -898,6 +912,9 @@ function Comms:SendChunked(msgType, memberData, target, totalCount)
             self:ScheduleTimer(function()
                 sendChunk(chunkIndex + 1, nextStart)
             end, SYNC_CHUNK_DELAY)
+        elseif onComplete then
+            -- Last chunk sent — notify caller
+            onComplete()
         end
     end
 
