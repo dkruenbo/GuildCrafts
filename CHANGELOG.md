@@ -1,34 +1,42 @@
-    # Changelog
+        # Changelog
 
-## 1.3.7 — 2026-04-21
+    ## 1.3.8 — 2026-04-28
 
-### Fixes
+    ### Fixes
 
-- **Stale-data warning never resolved when all recipes were already learned** — opening a profession window only updated your sync timestamp when new recipes or a skill level change were detected. Players who had learned everything would keep aging toward the prune threshold even while actively playing. The addon now always refreshes the timestamp when a profession window is opened, regardless of whether anything changed.
+    - **Sync queue could fire while previous sync chunks were still in-flight** — the DR marks itself as "processing" while sending a chunked `SYNC_RESPONSE`, but because chunk delivery is timer-based (1 chunk/second), the processing flag was cleared immediately after the first chunk was sent rather than after the last. In guilds with burst logins this allowed a queued `SYNC_REQUEST` to start a new sync before the previous one finished, potentially launching multiple interleaved chunk timer chains and hitting chat throttle limits. The processing flag is now cleared in the last chunk's timer callback via an `onComplete` hook on `SendChunked`.
 
-- **Peers and the Designated Requester could prune an active player** — because the timestamp update was local-only, other guild members' clients (and the DR) still saw the old timestamp and would eventually prune the entry at 45 days. The addon now broadcasts a lightweight `DELTA_UPDATE (touch)` message to the guild when data is 25–45 days old, so all peers stay in sync. To avoid unnecessary traffic the broadcast is rate-limited to once per hour per profession.
+    ---
 
----
+    ## 1.3.7 — 2026-04-21
 
-## 1.3.6a — 2026-04-15
+    ### Fixes
 
-### Fixes
+    - **Stale-data warning never resolved when all recipes were already learned** — opening a profession window only updated your sync timestamp when new recipes or a skill level change were detected. Players who had learned everything would keep aging toward the prune threshold even while actively playing. The addon now always refreshes the timestamp when a profession window is opened, regardless of whether anything changed.
 
-- **Recipe name overlap in Recipes view** — the 1.3.6 fix only applied to search results; the Recipes tab (browsing all guild recipes for a profession) used a separate render path with the same undersized margin. Applied the same 205 px right margin to `ShowRecipesView` so long Enchanting recipe names no longer overlap the crafter column in either view
+    - **Peers and the Designated Requester could prune an active player** — because the timestamp update was local-only, other guild members' clients (and the DR) still saw the old timestamp and would eventually prune the entry at 45 days. The addon now broadcasts a lightweight `DELTA_UPDATE (touch)` message to the guild when data is 25–45 days old, so all peers stay in sync. To avoid unnecessary traffic the broadcast is rate-limited to once per hour per profession.
 
----
+    ---
 
-## 1.3.6 — 2026-04-15
+    ## 1.3.6a — 2026-04-15
 
-### Fixes
+    ### Fixes
 
-- **Recipe name overlap with crafter column** — long recipe names (most visible in Enchanting) could overlap the crafter text on the right side of recipe rows. Increased the right margin reserved for the crafter column from 175 px to 205 px to give the full button + crafter text area proper clearance
+    - **Recipe name overlap in Recipes view** — the 1.3.6 fix only applied to search results; the Recipes tab (browsing all guild recipes for a profession) used a separate render path with the same undersized margin. Applied the same 205 px right margin to `ShowRecipesView` so long Enchanting recipe names no longer overlap the crafter column in either view
 
----
+    ---
 
-## 1.3.5 — 2026-04-11
+    ## 1.3.6 — 2026-04-15
 
-### Fixes
+    ### Fixes
+
+    - **Recipe name overlap with crafter column** — long recipe names (most visible in Enchanting) could overlap the crafter text on the right side of recipe rows. Increased the right margin reserved for the crafter column from 175 px to 205 px to give the full button + crafter text area proper clearance
+
+    ---
+
+    ## 1.3.5 — 2026-04-11
+
+    ### Fixes
 
     - **GuildCrafts window no longer covers other windows** — the main frame was set to `HIGH` strata, which placed it on top of Blizzard UI panels including the tradeskill window, bags, and character sheet. Changed to `MEDIUM` so it behaves like a normal addon window and yields to game UI frames
 
