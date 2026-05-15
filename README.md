@@ -13,6 +13,7 @@ The addon itself. This is the folder you drop into `World of Warcraft/_classic_/
 | `Core.lua` | Entry point — addon initialisation, event routing, slash commands |
 | `Data.lua` | Recipe scanning, profession detection, expansion classification, data storage, merge logic |
 | `Data_TBC.lua` | Pre-generated TBC recipe lookup table (`TBC_ITEM_IDS`) used by the expansion filter |
+| `SyncPausePolicy.lua` | Pause gate — suppresses outgoing sync during combat, instances, and zone transitions |
 | `Comms.lua` | Network layer — DR/BDR election, sync protocol, delta updates, craft messages |
 | `Tooltip.lua` | Item tooltip hook — shows guild crafters on hover |
 | `MinimapButton.lua` | Draggable minimap icon toggle |

@@ -7,7 +7,7 @@ local _, _ns = ... -- luacheck: ignore (WoW addon bootstrap)
 local GuildCrafts = _G.GuildCrafts
 
 -- Create the Data module
-local Data = GuildCrafts:NewModule("Data")
+local Data = GuildCrafts:NewModule("Data", "AceTimer-3.0")
 GuildCrafts.Data = Data
 
 -- Local references for performance
@@ -931,6 +931,22 @@ function Data:ScanTradeSkill()
     numSkills = GetNumTradeSkills()
 
     local recipes = entry.professions[profName].recipes
+
+    -- Partial-scan protection (pre-loop): if the window returned fewer total entries
+    -- than half of what we have stored, the frame hasn't finished loading. Skip the
+    -- scan and reschedule so we don't write partial data. Must run before the loop
+    -- so nothing is written to `recipes` before we can bail.
+    do
+        local existingCount = 0
+        for _ in pairs(recipes) do existingCount = existingCount + 1 end
+        if existingCount > 0 and numSkills > 0 and numSkills < (existingCount * 0.5) then
+            GuildCrafts:Debug("ScanTradeSkill: partial-scan guard triggered for", profName,
+                "(numSkills", numSkills, "< 50% of existing", existingCount, ") — deferring 2s")
+            self:ScheduleTimer("ScanTradeSkill", 2)
+            return
+        end
+    end
+
     local newCount = 0
     local newRecipes = {}
     local currentCategory = nil
@@ -1116,6 +1132,19 @@ function Data:ScanCraft()
     end
 
     local recipes = entry.professions[profName].recipes
+
+    -- Partial-scan protection (pre-loop): same logic as ScanTradeSkill.
+    do
+        local existingCount = 0
+        for _ in pairs(recipes) do existingCount = existingCount + 1 end
+        if existingCount > 0 and numCrafts > 0 and numCrafts < (existingCount * 0.5) then
+            GuildCrafts:Debug("ScanCraft: partial-scan guard triggered for", profName,
+                "(numCrafts", numCrafts, "< 50% of existing", existingCount, ") — deferring 2s")
+            self:ScheduleTimer("ScanCraft", 2)
+            return
+        end
+    end
+
     local newCount = 0
     local newRecipes = {}
     local currentCategory = nil
@@ -1328,10 +1357,35 @@ function Data:MergeIncoming(incomingData)
                     or (incomingEntry.lastUpdate == localEntry.lastUpdate
                         and (incomingEntry.dataFormat or 0) > (localEntry.dataFormat or 0))
                 if dominated then
-                    gdb[memberKey] = incomingEntry
-                    self:ExtractToRecipeDB(incomingEntry)
-                    changed = true
-                    GuildCrafts:Debug("Merged data for:", memberKey)
+                    -- Partial-scan protection: if the incoming entry has a profession
+                    -- with suspiciously few recipes compared to what we already store
+                    -- for that member, skip the merge to avoid overwriting good data.
+                    local suspicious = false
+                    if localEntry then
+                        for profName, incomingProf in pairs(incomingEntry.professions or {}) do
+                            local incomingCount = 0
+                            for _ in pairs(incomingProf.recipes or {}) do incomingCount = incomingCount + 1 end
+                            local localProf = localEntry.professions and localEntry.professions[profName]
+                            local existingCount = 0
+                            if localProf then
+                                for _ in pairs(localProf.recipes or {}) do existingCount = existingCount + 1 end
+                            end
+                            if incomingCount > 0 and existingCount > 0
+                                    and incomingCount < (existingCount * 0.5) then
+                                GuildCrafts:Debug("MergeIncoming: partial-scan guard blocked",
+                                    memberKey, profName,
+                                    "(incoming", incomingCount, "< 50% of existing", existingCount, ")")
+                                suspicious = true
+                                break
+                            end
+                        end
+                    end
+                    if not suspicious then
+                        gdb[memberKey] = incomingEntry
+                        self:ExtractToRecipeDB(incomingEntry)
+                        changed = true
+                        GuildCrafts:Debug("Merged data for:", memberKey)
+                    end
                 end
             end
         end
