@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 — 2026-05-15
+
+### New features
+
+- **Immediate advertise broadcast (`DELTA_AD`)** — when a profession scan finds new recipes, a tiny advertisement message is now broadcast to the guild immediately, carrying only a revision timestamp and per-profession recipe counts (no recipe data). Any peer who sees a `DELTA_AD` with a newer revision than what they already hold queues a sync pull with a short random jitter (1–5 s) to retrieve the data. This closes the propagation gap where a freshly scanned player's new recipes would not reach peers until the next full sync cycle. The Designated Router forwards received advertisements to the rest of the guild so nodes that missed the original broadcast are also notified.
+
+---
+
 ## 1.4.0 — 2026-05-15
 
 ### New features

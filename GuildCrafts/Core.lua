@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.4.0"
+GuildCrafts.DISPLAY_VERSION = "1.5.0"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -162,7 +162,8 @@ function GuildCrafts:OnLoginReady()
 end
 
 function GuildCrafts:OnTradeSkillShow()
-    -- Profession window was opened — scan recipes
+    -- Profession window was opened — scan recipes (DELTA_UPDATE + DELTA_AD
+    -- are broadcast from within ScanTradeSkill when new recipes are found)
     if self.Data then
         self.Data:ScanTradeSkill()
     end
@@ -170,6 +171,7 @@ end
 
 function GuildCrafts:OnCraftShow()
     -- Enchanting window was opened (Classic TBC uses separate Craft API)
+    -- DELTA_UPDATE + DELTA_AD are broadcast from within ScanCraft
     if self.Data then
         self.Data:ScanCraft()
     end
