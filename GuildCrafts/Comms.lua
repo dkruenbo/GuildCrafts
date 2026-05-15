@@ -89,6 +89,9 @@ function Comms:OnInitialize()
     -- Pending re-sync debounce timer (shared across HandleHello / TouchAddonUser / RecomputeElection)
     self._pendingSyncTimer = nil
 
+    -- BroadcastHello pause-reschedule timer (tracked so we never accumulate duplicates)
+    self._helloRescheduleTimer = nil
+
     -- Registered flag
     self._prefixRegistered = false
 end
@@ -128,6 +131,17 @@ end
 ----------------------------------------------------------------------
 
 function Comms:BroadcastHello()
+    if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
+        GuildCrafts:Debug("BroadcastHello delayed (SyncPausePolicy) — rescheduling in 5s")
+        -- Cancel any existing reschedule timer before creating a new one so that
+        -- a long pause doesn't accumulate N timers that all fire on unpause.
+        if self._helloRescheduleTimer then
+            self:CancelTimer(self._helloRescheduleTimer)
+        end
+        self._helloRescheduleTimer = self:ScheduleTimer("BroadcastHello", 5)
+        return
+    end
+    self._helloRescheduleTimer = nil
     local playerKey = GuildCrafts.Data:GetPlayerKey()
     self:SendMessage(MSG_HELLO, {
         sender  = playerKey,
@@ -427,6 +441,13 @@ end
 
 function Comms:SendSyncRequest()
     if not IsInGuild() then return end
+    if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
+        GuildCrafts:Debug("SendSyncRequest delayed (SyncPausePolicy) — rescheduling in 10s")
+        if self.syncTimer then self:CancelTimer(self.syncTimer) end
+        self.syncTimer = self:ScheduleTimer("SendSyncRequest", 10)
+        self.syncPending = true  -- prevent duplicate sync chains while deferred
+        return
+    end
 
     local playerKey = GuildCrafts.Data:GetPlayerKey()
 
@@ -769,6 +790,10 @@ end
 ----------------------------------------------------------------------
 
 function Comms:BroadcastNewRecipes(memberKey, profName, recipes)
+    if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
+        GuildCrafts:Debug("BroadcastNewRecipes suppressed (SyncPausePolicy) for", profName)
+        return
+    end
     local gdb = GuildCrafts.Data:GetGuildDB()
     local entry = gdb and gdb[memberKey]
     self:SendMessage(MSG_DELTA_UPDATE, {
@@ -782,6 +807,10 @@ function Comms:BroadcastNewRecipes(memberKey, profName, recipes)
 end
 
 function Comms:BroadcastProfessionRemoval(memberKey, profName)
+    if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
+        GuildCrafts:Debug("BroadcastProfessionRemoval suppressed (SyncPausePolicy) for", profName)
+        return
+    end
     local gdb = GuildCrafts.Data:GetGuildDB()
     local entry = gdb and gdb[memberKey]
     self:SendMessage(MSG_DELTA_UPDATE, {
@@ -798,6 +827,10 @@ end
 --- prevents peers (including the DR) from pruning a player who is simply up to
 --- date and has nothing new to learn.
 function Comms:BroadcastTimestampTouch(memberKey, profName)
+    if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
+        GuildCrafts:Debug("BroadcastTimestampTouch suppressed (SyncPausePolicy) for", profName)
+        return
+    end
     -- Rate limit: only broadcast once per hour per profession to avoid spamming
     -- the DR when the player opens a profession window repeatedly.
     self._lastTouchBroadcast = self._lastTouchBroadcast or {}
@@ -883,6 +916,14 @@ end
 --- Each chunk is sent after a SYNC_CHUNK_DELAY to avoid burst lag.
 --- onComplete is an optional callback fired after the last chunk is sent.
 function Comms:SendChunked(msgType, memberData, target, totalCount, onComplete)
+    if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
+        GuildCrafts:Debug("SendChunked suppressed (SyncPausePolicy):", msgType)
+        -- We must still call onComplete so syncProcessing is cleared and the
+        -- DR's queue doesn't deadlock permanently. Affected requesters will not
+        -- receive their SYNC_RESPONSE and will retry via SYNC_TIMEOUT (120 s).
+        if onComplete then onComplete() end
+        return
+    end
     local keys = {}
     for k in pairs(memberData) do
         keys[#keys + 1] = k
@@ -924,6 +965,10 @@ end
 
 --- Serialize, optionally compress, and send a message.
 function Comms:SendMessage(msgType, payload, distribution, target, priority)
+    if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
+        GuildCrafts:Debug("SendMessage suppressed (SyncPausePolicy):", msgType)
+        return
+    end
     local envelope = {
         t    = msgType,           -- type
         v    = GuildCrafts.VERSION,
