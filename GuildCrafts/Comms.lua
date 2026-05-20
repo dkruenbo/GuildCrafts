@@ -103,6 +103,12 @@ function Comms:OnInitialize()
     -- BroadcastHello pause-reschedule timer (tracked so we never accumulate duplicates)
     self._helloRescheduleTimer = nil
 
+    -- Per-peer failure tracking for sync backoff.
+    -- Incremented on each SYNC_TIMEOUT; cleared on a successful SYNC_RESPONSE.
+    -- Prevents premature DR eviction during transient unresponsiveness.
+    -- { ["Name-Realm"] = { count = N, lastFailedAt = timestamp } }
+    self.peerFailures = {}
+
     -- Chunk RESUME: outbound sessions keyed by sessionId (sender side)
     -- Each entry: { chunks = {[idx] = chunkPayload}, target = "Name-Realm" }
     self._outboundSessions = {}
@@ -493,20 +499,31 @@ function Comms:SendSyncRequest()
 
     local vector = GuildCrafts.Data:GetVersionVector()
 
+    -- If the DR is in backoff (≥2 recent failures within 45 s), promote the
+    -- effective retry to 1 so the BDR responds immediately rather than waiting
+    -- for a full SYNC_TIMEOUT before escalating.
+    local effectiveRetry = self.syncRetryCount
+    if effectiveRetry == 0 and self.currentDR and self:IsPeerBackedOff(self.currentDR) then
+        effectiveRetry = 1
+        GuildCrafts:Debug("DR", self.currentDR, "is in backoff — SYNC_REQUEST retry=1 (targeting BDR)")
+    end
+
     self:SendMessage(MSG_SYNC_REQUEST, {
         sender = playerKey,
         vector = vector,
-        retry  = self.syncRetryCount,
+        retry  = effectiveRetry,
     }, "GUILD")
 
     self.syncPending = true
-    GuildCrafts:Debug("Sent SYNC_REQUEST (retry=" .. self.syncRetryCount .. ")")
+    GuildCrafts:Debug("Sent SYNC_REQUEST (retry=" .. effectiveRetry .. ")")
 
-    -- Set timeout for response
+    -- Use effectiveRetry (not syncRetryCount) for the timeout so that a
+    -- DR-backoff-promoted retry=1 gets SYNC_RETRY_TIMEOUT (15 s) rather than
+    -- the full 120 s SYNC_TIMEOUT that would otherwise apply at syncRetryCount=0.
     if self.syncTimer then
         self:CancelTimer(self.syncTimer)
     end
-    local timeout = (self.syncRetryCount == 0) and SYNC_TIMEOUT or SYNC_RETRY_TIMEOUT
+    local timeout = (effectiveRetry == 0) and SYNC_TIMEOUT or SYNC_RETRY_TIMEOUT
     self.syncTimer = self:ScheduleTimer("OnSyncTimeout", timeout)
 end
 
@@ -519,17 +536,30 @@ function Comms:OnSyncTimeout()
     self.syncRetryCount = self.syncRetryCount + 1
 
     if self.syncRetryCount == 1 then
+        -- DR did not respond — record the failure. If count reaches the backoff
+        -- threshold, the next SendSyncRequest will target BDR directly.
+        if self.currentDR then self:MarkPeerFailure(self.currentDR) end
         GuildCrafts:Debug("SYNC_REQUEST timeout — retrying (BDR should respond)")
         self:SendSyncRequest()
     elseif self.syncRetryCount == 2 then
-        -- Neither DR nor BDR responded — evict both and re-elect so the
-        -- new DR (sorted[1] of remaining nodes) handles the request.
-        -- Never evict ourselves — we know we're online.
+        -- BDR also did not respond — record the failure.
+        if self.currentBDR then self:MarkPeerFailure(self.currentBDR) end
         local playerKey = GuildCrafts.Data:GetPlayerKey()
-        if self.currentDR  and self.currentDR  ~= playerKey then self.addonUsers[self.currentDR]  = nil end
-        if self.currentBDR and self.currentBDR ~= playerKey then self.addonUsers[self.currentBDR] = nil end
+        -- Evict only peers NOT in an active backoff window. A peer in backoff
+        -- (≥2 failures within 45 s) may be transiently unresponsive; preserve its
+        -- addonUsers entry and skip it this round rather than forcing re-election.
+        local function shouldEvict(key)
+            return key and key ~= playerKey and not self:IsPeerBackedOff(key)
+        end
+        local evicted = false
+        if shouldEvict(self.currentDR)  then self.addonUsers[self.currentDR]  = nil; evicted = true end
+        if shouldEvict(self.currentBDR) then self.addonUsers[self.currentBDR] = nil; evicted = true end
         self:RecomputeElection()
-        GuildCrafts:Debug("SYNC_REQUEST retry timeout — evicted DR/BDR, re-elected. New DR:", self.currentDR or "none")
+        if evicted then
+            GuildCrafts:Debug("SYNC_REQUEST retry timeout — evicted unresponsive peers, re-elected. New DR:", self.currentDR or "none")
+        else
+            GuildCrafts:Debug("SYNC_REQUEST retry timeout — DR/BDR in backoff (not evicted), trying open round")
+        end
         self:SendSyncRequest()
     else
         GuildCrafts:Debug("SYNC_REQUEST all retries exhausted. No responder available.")
@@ -556,11 +586,16 @@ function Comms:HandleSyncRequest(payload, sender)
     elseif retryCount == 1 and (self.myRole == "DR" or self.myRole == "BDR") then
         shouldRespond = true
     elseif retryCount >= 2 then
-        -- DR and BDR both failed to respond — evict them and re-elect.
+        -- DR and BDR both failed to respond — evict and re-elect.
         -- Only the newly elected DR responds, preventing a flood.
-        -- Never evict ourselves — we know we're online.
-        if self.currentDR  and self.currentDR  ~= playerKey then self.addonUsers[self.currentDR]  = nil end
-        if self.currentBDR and self.currentBDR ~= playerKey then self.addonUsers[self.currentBDR] = nil end
+        -- Skip eviction for peers still inside the backoff window — they may be
+        -- transiently slow. Peers with count < 2 (not yet in backoff) are evicted
+        -- as before.
+        local function shouldEvict(key)
+            return key and key ~= playerKey and not self:IsPeerBackedOff(key)
+        end
+        if shouldEvict(self.currentDR)  then self.addonUsers[self.currentDR]  = nil end
+        if shouldEvict(self.currentBDR) then self.addonUsers[self.currentBDR] = nil end
         self:RecomputeElection()
         if self.myRole == "DR" then
             shouldRespond = true
@@ -676,6 +711,38 @@ function Comms:ProcessNextSyncQueue()
 end
 
 ----------------------------------------------------------------------
+-- Per-Peer Backoff
+----------------------------------------------------------------------
+
+--- Record a sync failure for a peer (called on SYNC_TIMEOUT).
+function Comms:MarkPeerFailure(key)
+    if not key then return end
+    local pf = self.peerFailures[key] or { count = 0, lastFailedAt = 0 }
+    pf.count = pf.count + 1
+    pf.lastFailedAt = time()
+    self.peerFailures[key] = pf
+    GuildCrafts:Debug("Peer failure recorded for", key, "(count:", pf.count, ")")
+end
+
+--- Clear the failure record after a successful sync interaction.
+function Comms:MarkPeerSuccess(key)
+    if not key then return end
+    if self.peerFailures[key] then
+        GuildCrafts:Debug("Peer success — cleared backoff for", key)
+        self.peerFailures[key] = nil
+    end
+end
+
+--- Returns true if a peer should be bypassed this cycle.
+--- Threshold: ≥2 failures with the most recent one within the last 45 s.
+function Comms:IsPeerBackedOff(key)
+    if not key then return false end
+    local pf = self.peerFailures[key]
+    if not pf then return false end
+    return pf.count >= 2 and (time() - pf.lastFailedAt) < 45
+end
+
+----------------------------------------------------------------------
 -- SYNC_RESPONSE (received by requester)
 ----------------------------------------------------------------------
 
@@ -739,8 +806,9 @@ function Comms:HandleSyncResponse(payload, sender)
 
         if receivedCount >= pr.total then
             -- All chunks in — finalize.
+            local successSender = pr.sender
             self._partialReceive[sessionId] = nil
-            self:_FinalizeSyncResponse()
+            self:_FinalizeSyncResponse(successSender)
         else
             -- More chunks expected — arm the progress timeout.
             pr.progressTimer = self:ScheduleTimer(function()
@@ -761,11 +829,13 @@ function Comms:HandleSyncResponse(payload, sender)
     end
 
     -- Single chunk or last chunk of a legacy multi-chunk transfer — finalize.
-    self:_FinalizeSyncResponse()
+    self:_FinalizeSyncResponse(sender)
 end
 
 --- Shared finalization for both RESUME and legacy sync completion.
-function Comms:_FinalizeSyncResponse()
+--- successSender: the peer whose response completed this sync (cleared from backoff).
+function Comms:_FinalizeSyncResponse(successSender)
+    if successSender then self:MarkPeerSuccess(successSender) end
     self.syncPending         = false
     self.syncRetryCount      = 0
     self.lastSyncCompletedAt = time()
@@ -799,8 +869,9 @@ function Comms:_OnProgressTimeout(sessionId)
     local receivedCount = 0
     for _ in pairs(pr.seen) do receivedCount = receivedCount + 1 end
     if receivedCount >= pr.total then
+        local successSender = pr.sender
         self._partialReceive[sessionId] = nil
-        self:_FinalizeSyncResponse()
+        self:_FinalizeSyncResponse(successSender)
         return
     end
 
@@ -905,6 +976,9 @@ end
 
 function Comms:HandleSyncPush(payload, sender)
     if not payload.data then return end
+
+    -- The requester fulfilled a SYNC_PULL — clear any failure record for this peer.
+    self:MarkPeerSuccess(sender)
 
     local merged = GuildCrafts.Data:MergeIncoming(payload.data)
     GuildCrafts:Debug("Received SYNC_PUSH chunk", (payload.chunkIndex or 1),
