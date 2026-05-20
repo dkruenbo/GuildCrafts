@@ -53,6 +53,12 @@ local MSG_SYNC_REQUEST       = "SYNC_REQUEST"
 local MSG_SYNC_RESPONSE      = "SYNC_RESPONSE"
 local MSG_SYNC_PULL          = "SYNC_PULL"
 local MSG_SYNC_PUSH          = "SYNC_PUSH"
+local MSG_SYNC_RESUME        = "SYNC_RESUME"
+
+-- Chunk RESUME
+local PROGRESS_TIMEOUT     = 4    -- seconds without chunk progress before sending RESUME
+local SESSION_TTL          = 35   -- seconds to keep an outbound session for RESUME requests
+local MAX_RESUME_ATTEMPTS  = 3    -- max RESUME requests per transfer before falling back
 
 -- AD: jitter range for targeted sync pull triggered by DELTA_AD receipt
 local AD_JITTER_MIN = 1
@@ -96,6 +102,14 @@ function Comms:OnInitialize()
 
     -- BroadcastHello pause-reschedule timer (tracked so we never accumulate duplicates)
     self._helloRescheduleTimer = nil
+
+    -- Chunk RESUME: outbound sessions keyed by sessionId (sender side)
+    -- Each entry: { chunks = {[idx] = chunkPayload}, target = "Name-Realm" }
+    self._outboundSessions = {}
+
+    -- Chunk RESUME: partial receive state keyed by sessionId (receiver side)
+    -- Each entry: { seen = {[idx]=true}, total = N, resumeAttempts = N, sender, progressTimer }
+    self._partialReceive = {}
 
     -- Registered flag
     self._prefixRegistered = false
@@ -499,6 +513,9 @@ end
 function Comms:OnSyncTimeout()
     if not self.syncPending then return end
 
+    -- Clear any pending RESUME state — the full retry will start fresh.
+    self._partialReceive = {}
+
     self.syncRetryCount = self.syncRetryCount + 1
 
     if self.syncRetryCount == 1 then
@@ -681,13 +698,61 @@ function Comms:HandleSyncResponse(payload, sender)
     -- The node that responded is definitely online with the addon.
     self:TouchAddonUser(sender)
 
+    -- Merge this chunk's data immediately (each chunk contains distinct member keys).
     local merged = GuildCrafts.Data:MergeIncoming(payload.data)
     GuildCrafts:Debug("Received SYNC_RESPONSE chunk", (payload.chunkIndex or 1),
         "/", (payload.chunkTotal or 1), "from", sender, "— merged:", tostring(merged))
 
-    -- If more chunks expected, reset the sync timeout but stay pending
+    -- RESUME path: sender included a sessionId so we can recover dropped chunks.
+    local sessionId = payload.sessionId
+    if sessionId then
+        local pr = self._partialReceive[sessionId]
+        if not pr then
+            -- Guard: if sync is no longer pending (session already finalized), this
+            -- is a late/duplicate chunk arriving after we already completed the
+            -- transfer. Drop it to prevent recreating a stale _partialReceive entry
+            -- that would arm new progress timers and send spurious RESUME messages.
+            if not self.syncPending then return end
+            pr = {
+                seen           = {},
+                total          = payload.chunkTotal or 1,
+                resumeAttempts = 0,
+                sender         = sender,
+                progressTimer  = nil,
+            }
+            self._partialReceive[sessionId] = pr
+        end
+        -- Cancel existing progress timer — we just received a chunk.
+        if pr.progressTimer then
+            self:CancelTimer(pr.progressTimer)
+            pr.progressTimer = nil
+        end
+        pr.seen[payload.chunkIndex or 1] = true
+
+        -- Also reset the main sync timeout to give the RESUME process room to work.
+        if self.syncTimer then self:CancelTimer(self.syncTimer) end
+        self.syncTimer = self:ScheduleTimer("OnSyncTimeout", SYNC_TIMEOUT)
+
+        -- Count received chunks.
+        local receivedCount = 0
+        for _ in pairs(pr.seen) do receivedCount = receivedCount + 1 end
+
+        if receivedCount >= pr.total then
+            -- All chunks in — finalize.
+            self._partialReceive[sessionId] = nil
+            self:_FinalizeSyncResponse()
+        else
+            -- More chunks expected — arm the progress timeout.
+            pr.progressTimer = self:ScheduleTimer(function()
+                self:_OnProgressTimeout(sessionId)
+            end, PROGRESS_TIMEOUT)
+        end
+        return
+    end
+
+    -- Legacy path (sender pre-dates Patch 3, no sessionId): original behaviour.
     if payload.chunkIndex and payload.chunkTotal and payload.chunkIndex < payload.chunkTotal then
-        -- Reset timeout — more chunks coming
+        -- Reset timeout — more chunks coming.
         if self.syncTimer then
             self:CancelTimer(self.syncTimer)
         end
@@ -695,7 +760,12 @@ function Comms:HandleSyncResponse(payload, sender)
         return
     end
 
-    -- All chunks received (or single un-chunked response) — sync complete
+    -- Single chunk or last chunk of a legacy multi-chunk transfer — finalize.
+    self:_FinalizeSyncResponse()
+end
+
+--- Shared finalization for both RESUME and legacy sync completion.
+function Comms:_FinalizeSyncResponse()
     self.syncPending         = false
     self.syncRetryCount      = 0
     self.lastSyncCompletedAt = time()
@@ -716,6 +786,75 @@ function Comms:HandleSyncResponse(payload, sender)
     if not self._postSyncHelloDone then
         self._postSyncHelloDone = true
         self:ScheduleTimer("BroadcastPostSyncHello", 5)
+    end
+end
+
+--- Called when no chunk progress is seen within PROGRESS_TIMEOUT seconds.
+--- Sends a SYNC_RESUME whisper listing missing sequence numbers.
+function Comms:_OnProgressTimeout(sessionId)
+    local pr = self._partialReceive[sessionId]
+    if not pr then return end
+
+    -- Race: check if all chunks arrived between timer scheduling and firing.
+    local receivedCount = 0
+    for _ in pairs(pr.seen) do receivedCount = receivedCount + 1 end
+    if receivedCount >= pr.total then
+        self._partialReceive[sessionId] = nil
+        self:_FinalizeSyncResponse()
+        return
+    end
+
+    if pr.resumeAttempts >= MAX_RESUME_ATTEMPTS then
+        GuildCrafts:Debug("RESUME: max attempts reached for session", sessionId,
+            "— falling back to full retry")
+        self._partialReceive[sessionId] = nil
+        -- Main syncTimer (SYNC_TIMEOUT) will fire and call OnSyncTimeout.
+        return
+    end
+
+    -- Build the missing seq list.
+    local missing = {}
+    for i = 1, pr.total do
+        if not pr.seen[i] then
+            missing[#missing + 1] = i
+        end
+    end
+
+    pr.resumeAttempts = pr.resumeAttempts + 1
+    GuildCrafts:Debug("RESUME: requesting", #missing, "chunk(s) for session", sessionId,
+        "(attempt", pr.resumeAttempts, "/", MAX_RESUME_ATTEMPTS, ")")
+
+    self:SendMessage(MSG_SYNC_RESUME, {
+        sessionId = sessionId,
+        missing   = missing,
+    }, "WHISPER", pr.sender, PRIO_NORMAL)
+
+    -- Restart the progress timer for this attempt.
+    pr.progressTimer = self:ScheduleTimer(function()
+        self:_OnProgressTimeout(sessionId)
+    end, PROGRESS_TIMEOUT)
+end
+
+--- Received by the sender when the requester reports missing chunks.
+function Comms:HandleSyncResume(payload, sender)
+    if not payload.sessionId or not payload.missing or #payload.missing == 0 then return end
+
+    local session = self._outboundSessions[payload.sessionId]
+    if not session then
+        GuildCrafts:Debug("RESUME: session", payload.sessionId, "not found (expired) — requester will retry on timeout")
+        return
+    end
+
+    -- Always reply to the original requester (session.target), not the message
+    -- sender. For legitimate traffic they match, but using session.target ensures
+    -- a spoofed SYNC_RESUME can't redirect chunks to an unintended recipient.
+    GuildCrafts:Debug("RESUME: resending", #payload.missing, "chunk(s) for session",
+        payload.sessionId, "to", session.target)
+    for _, seqNum in ipairs(payload.missing) do
+        local chunkPayload = session.chunks[seqNum]
+        if chunkPayload then
+            self:SendMessage(MSG_SYNC_RESPONSE, chunkPayload, "WHISPER", session.target, PRIO_BULK)
+        end
     end
 end
 
@@ -1013,6 +1152,10 @@ function Comms:SendChunked(msgType, memberData, target, totalCount, onComplete)
 
     local totalChunks = math.ceil(totalCount / SYNC_CHUNK_SIZE)
 
+    -- Generate a unique session ID so the receiver can request missing chunks.
+    local sessionId = string.format("%s:%d:%04d", target, time(), math.random(1000, 9999))
+    self._outboundSessions[sessionId] = { chunks = {}, target = target }
+
     local function sendChunk(chunkIndex, startIdx)
         if startIdx > #keys then return end
 
@@ -1021,11 +1164,16 @@ function Comms:SendChunked(msgType, memberData, target, totalCount, onComplete)
             chunk[keys[j]] = memberData[keys[j]]
         end
 
-        self:SendMessage(msgType, {
+        local chunkPayload = {
             data       = chunk,
             chunkIndex = chunkIndex,
             chunkTotal = totalChunks,
-        }, "WHISPER", target, PRIO_BULK)
+            sessionId  = sessionId,
+        }
+        -- Keep a copy for potential RESUME re-sends.
+        self._outboundSessions[sessionId].chunks[chunkIndex] = chunkPayload
+
+        self:SendMessage(msgType, chunkPayload, "WHISPER", target, PRIO_BULK)
 
         GuildCrafts:Debug("Sent chunk", chunkIndex, "/", totalChunks, "to", target)
 
@@ -1034,9 +1182,15 @@ function Comms:SendChunked(msgType, memberData, target, totalCount, onComplete)
             self:ScheduleTimer(function()
                 sendChunk(chunkIndex + 1, nextStart)
             end, SYNC_CHUNK_DELAY)
-        elseif onComplete then
-            -- Last chunk sent — notify caller
-            onComplete()
+        else
+            -- Last chunk sent — expire session after TTL and notify caller.
+            self:ScheduleTimer(function()
+                self._outboundSessions[sessionId] = nil
+                GuildCrafts:Debug("RESUME: outbound session expired:", sessionId)
+            end, SESSION_TTL)
+            if onComplete then
+                onComplete()
+            end
         end
     end
 
@@ -1206,6 +1360,8 @@ function Comms:ProcessIncoming(message, _distribution, sender)
         self:HandleDeltaUpdate(payload, sender)
     elseif msgType == MSG_DELTA_AD then
         self:HandleDeltaAd(payload, sender)
+    elseif msgType == MSG_SYNC_RESUME then
+        self:HandleSyncResume(payload, sender)
     else
         GuildCrafts:Debug("Unknown message type:", msgType, "from", sender)
     end

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.0 — 2026-05-20
+
+### New features
+
+- **Chunk RESUME recovery** — chunked `SYNC_RESPONSE` transfers are now resilient to dropped messages. The sender tags each transfer with a unique session ID and keeps a short-lived copy of every chunk for up to 35 seconds. If the receiver stops seeing new chunks for more than 4 seconds it whispers a `SYNC_RESUME` message back to the sender listing only the missing sequence numbers; the sender re-sends exactly those chunks. Recovery completes in roughly one `PROGRESS_TIMEOUT` (4 s) instead of waiting for the full 120 s `SYNC_TIMEOUT` before retrying the entire transfer. Up to three RESUME attempts are made before falling back to a full retry. Nodes running older versions of the addon are unaffected — transfers without a session ID continue to use the original code path.
+
+---
+
 ## 1.5.0 — 2026-05-20
 
 ### New features
