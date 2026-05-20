@@ -989,6 +989,7 @@ function Data:ScanTradeSkill()
         GuildCrafts:Printf("Scanned %s: backfilled reagent/category data.", profName)
     end
 
+    local changed = newCount > 0
     if newCount > 0 then
         entry.lastUpdate = time()
         GuildCrafts:Printf("Scanned %s: %d new recipe(s) found.", profName, newCount)
@@ -996,6 +997,11 @@ function Data:ScanTradeSkill()
         -- Only broadcast the newly discovered recipes, not the entire set
         if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastNewRecipes then
             GuildCrafts.Comms:BroadcastNewRecipes(playerKey, profName, newRecipes)
+        end
+        -- Advertise the new revision to peers who may have missed DELTA_UPDATE
+        if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastLocalAdvertise then
+            GuildCrafts.Comms:BroadcastLocalAdvertise(
+                playerKey, entry.lastUpdate, self:GetPlayerProfCounts())
         end
 
         -- Invalidate tooltip index so new recipes appear in tooltips
@@ -1018,6 +1024,7 @@ function Data:ScanTradeSkill()
 
     -- Scan cooldowns while the window is open
     self:ScanTradeSkillCooldowns(profName, numSkills)
+    return changed
 end
 
 --- Get the recipe key (itemID or spellID) for a given trade skill index.
@@ -1189,12 +1196,18 @@ function Data:ScanCraft()
         GuildCrafts:Printf("Scanned %s: backfilled reagent/category data.", profName)
     end
 
+    local changed = newCount > 0
     if newCount > 0 then
         entry.lastUpdate = time()
         GuildCrafts:Printf("Scanned %s: %d new recipe(s) found.", profName, newCount)
 
         if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastNewRecipes then
             GuildCrafts.Comms:BroadcastNewRecipes(playerKey, profName, newRecipes)
+        end
+        -- Advertise the new revision to peers who may have missed DELTA_UPDATE
+        if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastLocalAdvertise then
+            GuildCrafts.Comms:BroadcastLocalAdvertise(
+                playerKey, entry.lastUpdate, self:GetPlayerProfCounts())
         end
 
         -- Invalidate tooltip index so new recipes appear in tooltips
@@ -1217,6 +1230,7 @@ function Data:ScanCraft()
 
     -- Scan cooldowns while the window is open
     self:ScanCraftCooldowns(profName, numCrafts)
+    return changed
 end
 
 function Data:GetCraftRecipeKey(index)
@@ -1329,6 +1343,21 @@ function Data:GetVersionVector()
         end
     end
     return vector
+end
+
+--- Return a table of { [profName] = recipeCount } for the local player.
+--- Used by BroadcastLocalAdvertise to populate the DELTA_AD profCounts field.
+function Data:GetPlayerProfCounts()
+    local playerKey = self:GetPlayerKey()
+    local entry = self:GetMemberEntry(playerKey, false)
+    if not entry or not entry.professions then return {} end
+    local counts = {}
+    for profName, profData in pairs(entry.professions) do
+        local count = 0
+        for _ in pairs(profData.recipes or {}) do count = count + 1 end
+        counts[profName] = count
+    end
+    return counts
 end
 
 ----------------------------------------------------------------------

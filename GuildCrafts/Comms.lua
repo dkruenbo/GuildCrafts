@@ -48,10 +48,15 @@ local PRIO_NORMAL = "NORMAL"
 local MSG_HELLO              = "HELLO"
 local MSG_HEARTBEAT          = "HEARTBEAT"
 local MSG_DELTA_UPDATE       = "DELTA_UPDATE"
+local MSG_DELTA_AD           = "DELTA_AD"
 local MSG_SYNC_REQUEST       = "SYNC_REQUEST"
 local MSG_SYNC_RESPONSE      = "SYNC_RESPONSE"
 local MSG_SYNC_PULL          = "SYNC_PULL"
 local MSG_SYNC_PUSH          = "SYNC_PUSH"
+
+-- AD: jitter range for targeted sync pull triggered by DELTA_AD receipt
+local AD_JITTER_MIN = 1
+local AD_JITTER_MAX = 5
 
 ----------------------------------------------------------------------
 -- State
@@ -907,6 +912,82 @@ function Comms:HandleDeltaUpdate(payload, sender)
     end
 end
 
+----------------------------------------------------------------------
+-- DELTA_AD  (lightweight "I have new data" advertisement)
+----------------------------------------------------------------------
+
+--- Broadcast a tiny advertisement after a local scan produces new recipes.
+--- Peers who are behind queue a targeted sync pull with jitter.
+--- Carries no recipe data — just a revision timestamp and per-profession counts.
+function Comms:BroadcastLocalAdvertise(memberKey, rev, profCounts)
+    if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
+        GuildCrafts:Debug("BroadcastLocalAdvertise suppressed (SyncPausePolicy)")
+        return
+    end
+    if not IsInGuild() then return end
+    local playerKey = GuildCrafts.Data:GetPlayerKey()
+    self:SendMessage(MSG_DELTA_AD, {
+        sender     = playerKey,
+        memberKey  = memberKey,
+        rev        = rev,
+        profCounts = profCounts,
+    }, "GUILD", nil, PRIO_NORMAL)
+    GuildCrafts:Debug("Broadcast DELTA_AD for", memberKey, "rev", rev)
+end
+
+function Comms:HandleDeltaAd(payload, sender)
+    if not payload.memberKey or not payload.rev then return end
+
+    -- Register the sender in addonUsers so they appear in the DR election.
+    self:TouchAddonUser(sender)
+
+    local playerKey = GuildCrafts.Data:GetPlayerKey()
+    -- Ignore advertisements about ourselves.
+    if payload.memberKey == playerKey then return end
+
+    -- Check if the advertised revision is actually newer than what we hold.
+    local gdb = GuildCrafts.Data:GetGuildDB()
+    local localEntry = gdb and gdb[payload.memberKey]
+    local localTs = localEntry and localEntry.lastUpdate or 0
+    if payload.rev <= localTs then
+        GuildCrafts:Debug("DELTA_AD from", sender, "for", payload.memberKey, "— already current")
+        return
+    end
+
+    GuildCrafts:Debug("DELTA_AD from", sender, "for", payload.memberKey,
+        "rev", payload.rev, "— local", localTs)
+
+    -- DR forwards to guild so non-DR nodes that missed the original also get
+    -- the hint. The 'forwarded' flag prevents re-forwarding loops.
+    if self.myRole == "DR" and not payload.forwarded then
+        self:SendMessage(MSG_DELTA_AD, {
+            sender     = payload.sender or sender,
+            memberKey  = payload.memberKey,
+            rev        = payload.rev,
+            profCounts = payload.profCounts,
+            forwarded  = true,
+        }, "GUILD", nil, PRIO_NORMAL)
+        GuildCrafts:Debug("DR forwarded DELTA_AD for", payload.memberKey)
+        -- DR accumulates data through SYNC_PUSH; scheduling a sync pull via
+        -- SendSyncRequest would immediately no-op and could cancel a legitimate
+        -- pending timer from HELLO discovery. Return now.
+        return
+    end
+
+    -- Non-DR nodes queue a sync pull with jitter to avoid a thundering-herd burst.
+    if not self.syncPending then
+        local jitter = AD_JITTER_MIN + math.random() * (AD_JITTER_MAX - AD_JITTER_MIN)
+        if self._pendingSyncTimer then
+            self:CancelTimer(self._pendingSyncTimer)
+        end
+        self._pendingSyncTimer = self:ScheduleTimer(function()
+            self._pendingSyncTimer = nil
+            self:SendSyncRequest()
+        end, jitter)
+        GuildCrafts:Debug("DELTA_AD: queued sync pull in",
+            string.format("%.1fs", jitter))
+    end
+end
 
 ----------------------------------------------------------------------
 -- Message Send / Receive Infrastructure
@@ -1123,6 +1204,8 @@ function Comms:ProcessIncoming(message, _distribution, sender)
         self:HandleSyncPush(payload, sender)
     elseif msgType == MSG_DELTA_UPDATE then
         self:HandleDeltaUpdate(payload, sender)
+    elseif msgType == MSG_DELTA_AD then
+        self:HandleDeltaAd(payload, sender)
     else
         GuildCrafts:Debug("Unknown message type:", msgType, "from", sender)
     end
