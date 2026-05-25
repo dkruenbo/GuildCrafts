@@ -1,10 +1,22 @@
 # Changelog
 
+## 1.6.0 — 2026-05-25
+
+### New features
+
+- **Chunk RESUME recovery** — chunked `SYNC_RESPONSE` transfers are now resilient to dropped messages. The sender tags each transfer with a unique session ID and keeps a short-lived copy of every chunk for up to 35 seconds. If the receiver stops seeing new chunks for more than 4 seconds it whispers a `SYNC_RESUME` message back to the sender listing only the missing sequence numbers; the sender re-sends exactly those chunks. Recovery completes in roughly one `PROGRESS_TIMEOUT` (4 s) instead of waiting for the full 120 s `SYNC_TIMEOUT` before retrying the entire transfer. Up to three RESUME attempts are made before falling back to a full retry. Nodes running older versions of the addon are unaffected — transfers without a session ID continue to use the original code path.
+
+_Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/addons/recipe-registry)._
+
+---
+
 ## 1.5.0 — 2026-05-20
 
 ### New features
 
 - **Immediate advertise broadcast (`DELTA_AD`)** — when a profession scan finds new recipes, a tiny advertisement message is now broadcast to the guild immediately, carrying only a revision timestamp and per-profession recipe counts (no recipe data). Any peer who sees a `DELTA_AD` with a newer revision than what they already hold queues a sync pull with a short random jitter (1–5 s) to retrieve the data. This closes the propagation gap where a freshly scanned player's new recipes would not reach peers until the next full sync cycle. The Designated Router forwards received advertisements to the rest of the guild so nodes that missed the original broadcast are also notified.
+
+_Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/addons/recipe-registry)._
 
 ---
 
@@ -15,6 +27,8 @@
 - **SyncPausePolicy** — all outgoing sync traffic is now automatically suspended during combat, inside instances, and for a short grace period after zone transitions. This prevents addon messages from being dropped or contributing to chat throttle at exactly the moments when the client is busiest. Grace periods: 6 s after leaving combat, 12 s after a zone transition, 15 s after leaving an instance.
 
 - **Partial scan protection** — opening a profession window that the API hasn't fully loaded yet can return far fewer recipes than you actually know. The addon now compares the scanned count against the stored count before writing; if the new data accounts for less than 50 % of what's already recorded, the write is skipped and a rescan is scheduled 2 s later. The same guard is applied to incoming sync data, preventing a peer's partial scan from overwriting your complete local copy.
+
+_Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/addons/recipe-registry)._
 
 ---
 
