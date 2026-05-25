@@ -186,38 +186,39 @@ Full DR eviction (removing from `addonUsers`) is kept as a last resort after bac
 
 ---
 
-## 6 — Offline Peer Replication
+## 6 — Tombstone Pruning (Zombie Fix)
 
-**Priority: Low–Medium | Effort: High**
+**Priority: Medium | Effort: Low**
 
-**The core problem:** If the only guild member who has crafter X's data is offline when a new player joins, that data is simply unavailable until crafter X logs in. In large guilds where raiders play at varied times, this creates a permanently patchy database.
+**The core problem:** When `PruneRoster()` removes a former guild member after the 7-day grace period, it does a hard delete: `gdb[memberKey] = nil`. Any peer who was offline during the grace window still carries a live entry for that member. When they come back online and sync, `MergeIncoming()` sees `localEntry = nil` and unconditionally accepts the stale data — resurrecting the ex-member as a zombie. The zombie then propagates to everyone that peer syncs with.
 
-**The solution:** Any online peer who *has* a copy of crafter X's data can serve it to a new requester on behalf of the offline owner. The data is clearly marked as `sourceType = "replica"` so the receiver knows it's a second-hand copy.
+**The solution:** Replace hard deletes with tombstones so the fact of deletion outlives the data itself.
 
-### Design
+### How it works
 
-**Who can replicate?**
-Any addon user who has a stored entry for a member and that member is currently offline (not in `addonUsers`).
+**On pruning:** instead of `gdb[memberKey] = nil`, write:
+```lua
+gdb[memberKey] = { _tombstone = true, lastUpdate = time() }
+```
 
-**When does replication trigger?**
-- DR receives a `SYNC_REQUEST` from a new peer
-- DR checks which requested members are offline
-- For each offline member, DR nominates an online peer known to have that data (based on last SYNC_PUSH received) and sends them a `REPLICA_REQUEST` whisper
-- Nominated peer responds with the data in a `REPLICA_PUSH` — same chunked format as `SYNC_RESPONSE` but with an extra `replica = true` flag
+**In `MergeIncoming()`:** before applying an incoming entry, check for a local tombstone:
+```lua
+if localEntry and localEntry._tombstone then
+    if localEntry.lastUpdate >= incomingEntry.lastUpdate then
+        -- Our tombstone is newer — reject the resurrection
+        return
+    end
+    -- Incoming data is newer than our tombstone — accept it
+    -- (member rejoined the guild and re-scanned)
+end
+```
 
-**Safety guards:**
-- Receiver must never write replica data that is *older* than what they already have for that member
-- Replica entries get a `replicatedAt` timestamp. They are used for display but treated as lower priority in any future merge conflict
-- A later direct sync from the actual owner always wins
+**Tombstone propagation:** `GetVersionVector()` includes tombstone entries with their `lastUpdate` timestamp. When a peer with a tombstone syncs, `StripSyncFields()` returns a lightweight tombstone payload `{ _tombstone = true, lastUpdate = ts }`. The receiver's `MergeIncoming()` writes the tombstone if it is newer than what they hold, replacing any zombie live entry.
 
-**Wire messages:**
-- `REPLICA_REQUEST` (DR → online peer, whisper): `{ memberKeys = { "X-Realm", "Y-Realm" } }`
-- `REPLICA_PUSH` (online peer → requester, whisper): same structure as `SYNC_RESPONSE` chunks with `replica = true`
+**Tombstone expiry:** Clean up tombstones that are older than 30 days in `PruneRoster()`. By that point every online peer will have received the tombstone through at least one sync cycle.
 
 ### File changes
-- `Comms.lua`: add `MSG_REPLICA_REQUEST`, `MSG_REPLICA_PUSH`, `HandleReplicaRequest`, `HandleReplicaPush`, logic in `ProcessSyncRequest` to identify offline members and nominate replicators
-- `Data.lua`: add `replica = true` flag handling in `MergeIncoming` — skip write if existing entry is newer; add `replicaSourceKey` field to stored entries for diagnostics
-- This is the largest change in this plan. Recommended to implement after items 1–4 are stable.
+- `Data.lua`: modify `PruneRoster()` — replace `gdb[memberKey] = nil` with tombstone write; add tombstone expiry (30 days); modify `MergeIncoming()` — add tombstone check before write and tombstone propagation on receive; modify `StripSyncFields()` — return `{ _tombstone = true, lastUpdate = ts }` for tombstone entries; modify `GetVersionVector()` — include tombstone entries
 
 ---
 
@@ -254,7 +255,7 @@ Verification: scan a new recipe, confirm guildmates receive it within seconds ra
 ### Patch 3 — Reliable Transfers (Week 3)
 **Item: Chunk RESUME**
 
-Most invasive change to the existing sync path. Needs to stand alone so any regression in chunked transfer can be attributed unambiguously.
+Most invasive change to the existing sync path. Needs to stand alone so any regression in chunked transfer can be attributed unambiguously.we sh
 
 - `sessionId` on all chunks
 - `partialReceive` tracking on the receiver
@@ -278,16 +279,18 @@ Verification: take the DR offline mid-sync, confirm it is bypassed cleanly rathe
 
 ---
 
-### Patch 5 — Offline Replication (Week 5)
-**Item: Offline Peer Replication**
+### Patch 5 — Zombie Fix + UI Polish (Week 5)
+**Items: Tombstone Pruning + `[>]` → `[G]` button rename**
 
-Largest change. Ships last when the rest of the sync layer is proven stable under real guild conditions.
+Pure `Data.lua` and `UI/MainFrame.lua` changes. No new wire messages, no protocol version bump. Ships last because the tombstone change modifies the prune path and merge path simultaneously — both should be tested against a live guild with users who have been offline for varying lengths of time.
 
-- `REPLICA_REQUEST` / `REPLICA_PUSH` wire messages
-- DR nominates online peers to serve offline member data
-- `replica = true` flag in merge — direct owner data always wins
+- Replace hard-delete in `PruneRoster()` with tombstone write
+- `MergeIncoming()` rejects incoming data that is older than a local tombstone
+- Tombstones propagate via version vector and `StripSyncFields()` so all peers converge
+- Tombstone expiry after 30 days keeps the database from accumulating stale markers
+- Rename `[>]` button to `[G]` in the recipe browser — reduces confusion with expand-row chevrons
 
-Verification: have crafter X log off, have a new guild member join and sync — confirm X's recipes are visible immediately via replica, and that X's own next login overwrites with authoritative data.
+Verification: prune a member locally, take a peer offline before the prune runs on their client, have that peer come back online and sync — confirm the ex-member does not reappear. Confirm `[G]` button tooltip still reads correctly and posts to guild chat.
 
 ---
 
@@ -297,3 +300,4 @@ Verification: have crafter X log off, have a new guild member join and sync — 
 - **Manifest layer** — GuildCrafts' per-member timestamp model is simpler than per-block fingerprinting and sufficient for guild scale
 - **Bootstrap sync** — the existing DR → SYNC_REQUEST flow already handles first login correctly
 - **Performance scheduler** — GuildCrafts' scan/render workload is light enough that `AceTimer` debouncing is adequate
+- **Offline peer replication** — DR accumulates all member data via `SYNC_PUSH` and serves it in `SYNC_RESPONSE`; a new peer receives the full guild picture from the DR without needing separate replica routing
