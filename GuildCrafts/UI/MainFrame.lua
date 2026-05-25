@@ -1437,7 +1437,8 @@ function UI:FilterMemberList(query)
     if not db then return end
     local members = {}
     for memberKey, entry in pairs(db) do
-        if type(entry) == "table" and entry.lastUpdate and memberKey:lower():find(query, 1, true) then
+        if type(entry) == "table" and entry.lastUpdate and not entry._tombstone
+                and memberKey:lower():find(query, 1, true) then
             local totalRecipes = 0
             for _, profData in pairs(entry.professions or {}) do
                 for _ in pairs(profData.recipes or {}) do totalRecipes = totalRecipes + 1 end
@@ -1876,11 +1877,11 @@ function UI:CreatePostButton(parent, onClick)
     btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 0)
     local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     label:SetPoint("CENTER")
-    label:SetText("|cff666666[>]|r")
+    label:SetText("|cff666666[G]|r")
     btn:SetScript("OnEnter", function()
         btn:SetBackdropColor(0.15, 0.15, 0.15, 0.9)
         btn:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
-        label:SetText("|cffdddddd[>]|r")
+        label:SetText("|cffdddddd[G]|r")
         GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
         GameTooltip:AddLine("Post crafters to guild chat", 1, 0.82, 0)
         GameTooltip:Show()
@@ -1888,7 +1889,7 @@ function UI:CreatePostButton(parent, onClick)
     btn:SetScript("OnLeave", function()
         btn:SetBackdropColor(0.1, 0.1, 0.1, 0)
         btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 0)
-        label:SetText("|cff666666[>]|r")
+        label:SetText("|cff666666[G]|r")
         GameTooltip:Hide()
     end)
     btn:SetScript("OnClick", function()
