@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0 — 2026-05-30
+
+### New features
+
+- **Per-peer backoff** — nodes now track sync failures per peer instead of immediately evicting unresponsive DRs. After two consecutive timeouts from the same peer within 45 seconds the node enters backoff: the DR is skipped and the BDR is targeted directly on the next sync attempt, without waiting for another full 120-second timeout. Peers whose backoff window has expired are still eligible for eviction under the existing re-election logic. This prevents a briefly unresponsive DR (loading screen, instance transition, chat throttle) from triggering a disruptive re-election cascade every time it hiccups. Failure records are cleared automatically when a successful `SYNC_RESPONSE` or `SYNC_PUSH` is received from that peer. No wire-protocol changes — all tracking is local state.
+
+_Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/addons/recipe-registry)._
+
+---
+
 ## 1.6.0 — 2026-05-25
 
 ### New features
