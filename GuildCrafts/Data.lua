@@ -521,6 +521,14 @@ function Data:GetMemberEntry(memberKey, create)
     local gdb = self:GetGuildDB()
     if not gdb then return nil end
     local entry = gdb[memberKey]
+    -- Treat a tombstone as absent when the caller needs a live entry.
+    -- Without this guard any code that accesses entry.professions after
+    -- calling GetMemberEntry(key, true) would crash on a tombstone entry
+    -- because tombstones carry no professions table.
+    if entry and entry._tombstone and create then
+        gdb[memberKey] = nil
+        entry = nil
+    end
     if not entry and create then
         entry = {
             professions = {},
@@ -1403,11 +1411,27 @@ function Data:MergeIncoming(incomingData)
                         GuildCrafts:Debug("MergeIncoming: tombstone blocked resurrection of", memberKey)
                     else
                         -- Incoming data post-dates the tombstone — member re-scanned
-                        -- after rejoining the guild.  Fall through to normal merge.
-                        gdb[memberKey] = incomingEntry
-                        self:ExtractToRecipeDB(incomingEntry)
-                        changed = true
-                        GuildCrafts:Debug("Merged data for:", memberKey)
+                        -- after rejoining the guild.  Apply partial-scan protection
+                        -- before accepting, consistent with the normal merge path.
+                        local suspicious = false
+                        for profName, incomingProf in pairs(incomingEntry.professions or {}) do
+                            local incomingCount = 0
+                            for _ in pairs(incomingProf.recipes or {}) do incomingCount = incomingCount + 1 end
+                            -- No prior live data to compare against (we only have a
+                            -- tombstone), so only reject an obviously empty scan.
+                            if incomingCount == 0 then
+                                suspicious = true
+                                GuildCrafts:Debug("MergeIncoming: resurrection partial-scan guard blocked",
+                                    memberKey, profName, "(0 recipes)")
+                                break
+                            end
+                        end
+                        if not suspicious then
+                            gdb[memberKey] = incomingEntry
+                            self:ExtractToRecipeDB(incomingEntry)
+                            changed = true
+                            GuildCrafts:Debug("Merged data for:", memberKey)
+                        end
                     end
                 else
 
@@ -1581,6 +1605,13 @@ function Data:PruneRoster()
             -- Back in guild — clear absent flag
             entry._absentSince = nil
             restored = restored + 1
+        elseif type(entry) == "table" and entry._tombstone and rosterKeys[memberKey] then
+            -- Tombstone exists but the member is still (or again) in the guild.
+            -- This can happen when a peer with a transient roster-API gap wrongly
+            -- tombstoned the member and the marker propagated via sync.  Clear it
+            -- so that incoming live data for this member is no longer blocked.
+            gdb[memberKey] = nil
+            GuildCrafts:Debug("PruneRoster: cleared stale tombstone for active guild member", memberKey)
         end
     end
 
