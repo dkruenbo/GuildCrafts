@@ -4,6 +4,8 @@
 
 ### Fixes
 
+- **Missing Mining recipes** — 6 TBC Mining profession recipes (Fel Iron Bar, Adamantite Bar, Eternium Bar, Felsteel Bar, Khorium Bar, Hardened Adamantite Bar) were absent from the recipe key table and would never be recognised as known recipes. Mining is fully tracked by the addon — opening the Mining/Smelting window scans and syncs those recipes the same as any other profession.
+
 - **Zombie member fix** — former guild members can no longer be resurrected by a peer who was offline during the 7-day grace window. `PruneRoster()` now writes a lightweight tombstone (`{ _tombstone = true }`) instead of hard-deleting the entry. Tombstones propagate through the normal version-vector sync, so any peer who still carries a live entry for the ex-member will overwrite it with the tombstone on their next sync. Tombstones expire after 30 days and are excluded from the absent-since tracking loop to avoid double-processing. `MergeIncoming()` rejects any incoming live data that is older than a local tombstone; if the incoming data is strictly newer (the player rejoined the guild and re-scanned) it is accepted normally.
 
 ### Improvements
