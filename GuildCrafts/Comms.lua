@@ -109,6 +109,14 @@ function Comms:OnInitialize()
     -- { ["Name-Realm"] = { count = N, lastFailedAt = timestamp } }
     self.peerFailures = {}
 
+    -- Snapshots of DR/BDR captured at the moment each SYNC_REQUEST is sent.
+    -- OnSyncTimeout uses these instead of self.currentDR/BDR so that a
+    -- mid-flight RecomputeElection (e.g. from CheckDRAlive) does not cause
+    -- failure marks or evictions to land on a newly elected, untested peer.
+    self._syncTargetedDR          = nil
+    self._syncTargetedBDR         = nil
+    self._syncLastEffectiveRetry  = 0
+
     -- Chunk RESUME: outbound sessions keyed by sessionId (sender side)
     -- Each entry: { chunks = {[idx] = chunkPayload}, target = "Name-Realm" }
     self._outboundSessions = {}
@@ -508,6 +516,12 @@ function Comms:SendSyncRequest()
         GuildCrafts:Debug("DR", self.currentDR, "is in backoff — SYNC_REQUEST retry=1 (targeting BDR)")
     end
 
+    -- Snapshot who we are targeting so OnSyncTimeout can attribute a failure
+    -- to the correct peer even if currentDR/BDR change before the timer fires.
+    self._syncTargetedDR          = self.currentDR
+    self._syncTargetedBDR         = self.currentBDR
+    self._syncLastEffectiveRetry  = effectiveRetry
+
     self:SendMessage(MSG_SYNC_REQUEST, {
         sender = playerKey,
         vector = vector,
@@ -536,24 +550,30 @@ function Comms:OnSyncTimeout()
     self.syncRetryCount = self.syncRetryCount + 1
 
     if self.syncRetryCount == 1 then
-        -- DR did not respond — record the failure. If count reaches the backoff
-        -- threshold, the next SendSyncRequest will target BDR directly.
-        if self.currentDR then self:MarkPeerFailure(self.currentDR) end
+        -- Attribute the failure to the peer that was actually targeted.
+        -- If the DR was in backoff (effectiveRetry was promoted to 1), the BDR
+        -- was the expected responder and should receive the failure mark.
+        -- Use the captured snapshot to avoid marking a newly elected peer that
+        -- replaced the real non-responder mid-flight.
+        local failedPeer = (self._syncLastEffectiveRetry == 1)
+            and self._syncTargetedBDR or self._syncTargetedDR
+        if failedPeer then self:MarkPeerFailure(failedPeer) end
         GuildCrafts:Debug("SYNC_REQUEST timeout — retrying (BDR should respond)")
         self:SendSyncRequest()
     elseif self.syncRetryCount == 2 then
-        -- BDR also did not respond — record the failure.
-        if self.currentBDR then self:MarkPeerFailure(self.currentBDR) end
+        -- The retry=1 request targeted the BDR — record its failure.
+        -- Use the snapshot captured when that request was sent.
+        if self._syncTargetedBDR then self:MarkPeerFailure(self._syncTargetedBDR) end
         local playerKey = GuildCrafts.Data:GetPlayerKey()
-        -- Evict only peers NOT in an active backoff window. A peer in backoff
-        -- (≥2 failures within 45 s) may be transiently unresponsive; preserve its
-        -- addonUsers entry and skip it this round rather than forcing re-election.
+        -- Use snapshot peers for eviction so a mid-flight RecomputeElection
+        -- does not cause us to evict a newly elected DR that was never tested.
+        -- Also skip peers still inside the backoff window.
         local function shouldEvict(key)
             return key and key ~= playerKey and not self:IsPeerBackedOff(key)
         end
         local evicted = false
-        if shouldEvict(self.currentDR)  then self.addonUsers[self.currentDR]  = nil; evicted = true end
-        if shouldEvict(self.currentBDR) then self.addonUsers[self.currentBDR] = nil; evicted = true end
+        if shouldEvict(self._syncTargetedDR)  then self.addonUsers[self._syncTargetedDR]  = nil; evicted = true end
+        if shouldEvict(self._syncTargetedBDR) then self.addonUsers[self._syncTargetedBDR] = nil; evicted = true end
         self:RecomputeElection()
         if evicted then
             GuildCrafts:Debug("SYNC_REQUEST retry timeout — evicted unresponsive peers, re-elected. New DR:", self.currentDR or "none")
@@ -735,11 +755,21 @@ end
 
 --- Returns true if a peer should be bypassed this cycle.
 --- Threshold: ≥2 failures with the most recent one within the last 45 s.
+--- Also prunes entries whose backoff window has fully decayed to keep the
+--- peerFailures table bounded across long sessions.
 function Comms:IsPeerBackedOff(key)
     if not key then return false end
     local pf = self.peerFailures[key]
     if not pf then return false end
-    return pf.count >= 2 and (time() - pf.lastFailedAt) < 45
+    if pf.count >= 2 and (time() - pf.lastFailedAt) < 45 then
+        return true
+    end
+    -- Backoff window has expired — remove the entry so the table doesn't
+    -- grow indefinitely as guild members come and go over a long session.
+    if pf.count >= 2 then
+        self.peerFailures[key] = nil
+    end
+    return false
 end
 
 ----------------------------------------------------------------------
@@ -836,6 +866,15 @@ end
 --- successSender: the peer whose response completed this sync (cleared from backoff).
 function Comms:_FinalizeSyncResponse(successSender)
     if successSender then self:MarkPeerSuccess(successSender) end
+    -- Cancel progress timers on any in-flight partial sessions before clearing
+    -- syncPending. This prevents the second session's timer from firing spurious
+    -- SYNC_RESUME whispers when both DR and BDR both respond to a retry=1 request.
+    for _, pr in pairs(self._partialReceive) do
+        if pr.progressTimer then
+            self:CancelTimer(pr.progressTimer)
+        end
+    end
+    self._partialReceive = {}
     self.syncPending         = false
     self.syncRetryCount      = 0
     self.lastSyncCompletedAt = time()
@@ -862,6 +901,13 @@ end
 --- Called when no chunk progress is seen within PROGRESS_TIMEOUT seconds.
 --- Sends a SYNC_RESUME whisper listing missing sequence numbers.
 function Comms:_OnProgressTimeout(sessionId)
+    -- Guard: sync may have been finalized by a concurrent session (e.g., both
+    -- DR and BDR responded to a retry=1 request). _FinalizeSyncResponse already
+    -- cleared _partialReceive, so there is nothing left to do.
+    if not self.syncPending then
+        self._partialReceive[sessionId] = nil
+        return
+    end
     local pr = self._partialReceive[sessionId]
     if not pr then return end
 
