@@ -12,7 +12,6 @@
 
 - **`[G]` button** — the "post crafters to guild chat" button on recipe rows was renamed from `[>]` to `[G]` to reduce confusion with the expand-row chevron used elsewhere in the UI. (Thanks to the user gabbsmo for bringing this to our attention.)
 
-_Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/addons/recipe-registry)._
 
 ---
 
