@@ -1137,9 +1137,13 @@ function Comms:HandleDeltaUpdate(payload, sender)
     elseif payload.type == "touch" and payload.lastUpdate then
         -- Lightweight timestamp bump — the sender has no new recipes but is still
         -- active. Update lastUpdate so local pruning logic doesn't evict them.
+        -- Guard: never advance a tombstone's lastUpdate. A touch from a re-joining
+        -- member carries the same timestamp as their live entry. If we updated the
+        -- tombstone here, MergeIncoming would see equal timestamps and block the
+        -- subsequent resurrection.
         local gdb = GuildCrafts.Data:GetGuildDB()
         local entry = gdb and gdb[payload.member]
-        if entry and payload.lastUpdate > (entry.lastUpdate or 0) then
+        if entry and not entry._tombstone and payload.lastUpdate > (entry.lastUpdate or 0) then
             entry.lastUpdate = payload.lastUpdate
         end
         GuildCrafts:Debug("DELTA_UPDATE (touch) from", sender, "for", payload.member)
