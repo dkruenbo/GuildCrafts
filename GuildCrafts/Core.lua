@@ -181,7 +181,12 @@ function GuildCrafts:OnGuildRosterUpdate()
     -- Rebuild online cache first so all downstream handlers see fresh data
     if self.Data then
         self.Data:RebuildOnlineCache()
-        self.Data:PruneRoster()
+        -- PruneRoster iterates the entire roster + DB; skip during combat so we
+        -- don't add sync work to an already-busy frame.  It will run on the next
+        -- GUILD_ROSTER_UPDATE after combat ends.
+        if not InCombatLockdown() then
+            self.Data:PruneRoster()
+        end
     end
     if self.Comms then
         self.Comms:OnGuildRosterUpdate()

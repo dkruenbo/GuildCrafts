@@ -1032,23 +1032,10 @@ function Comms:HandleSyncPush(payload, sender)
     GuildCrafts:Debug("Received SYNC_PUSH chunk", (payload.chunkIndex or 1),
         "/", (payload.chunkTotal or 1), "from", sender, "— merged:", tostring(merged))
 
-    -- DR rebroadcasts new data as DELTA_UPDATEs so all online nodes converge
-    if merged and self.myRole == "DR" then
-        for memberKey, entry in pairs(payload.data) do
-            if type(entry) == "table" then
-                for profName, profData in pairs(entry.professions or {}) do
-                    self:SendMessage(MSG_DELTA_UPDATE, {
-                        type       = "add",
-                        member     = memberKey,
-                        profession = profName,
-                        recipes    = GuildCrafts.Data:StripRecipeReagents(profData.recipes),
-                        lastUpdate = entry.lastUpdate,
-                    }, "GUILD", nil, PRIO_NORMAL)
-                end
-            end
-        end
-        GuildCrafts:Debug("Rebroadcast DELTA_UPDATEs from SYNC_PUSH data")
-    end
+    -- Do NOT rebroadcast as DELTA_UPDATEs here.  DELTA_AD already advertises
+    -- new data guild-wide; peers that need it will pull via SYNC_REQUEST with
+    -- jitter.  Rebroadcasting full recipe payloads to GUILD would cause large
+    -- LibDeflate/AceSerializer work for every in-combat recipient.
 end
 
 ----------------------------------------------------------------------

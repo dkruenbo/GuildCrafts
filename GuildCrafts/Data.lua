@@ -1314,10 +1314,11 @@ function Data:StripSyncFields(entry)
         }
         for recipeKey, recipeData in pairs(profData.recipes or {}) do
             profCopy.recipes[recipeKey] = {
-                name = recipeData.name,
-                source = recipeData.source,
+                name     = recipeData.name,
+                source   = recipeData.source,
                 category = recipeData.category or self:GetRecipeCategory(recipeKey),
-                reagents = recipeData.reagents or self:GetRecipeReagents(recipeKey),
+                -- reagents intentionally omitted: too large for sync payload.
+                -- Shared via DELTA_UPDATE on first discovery; stored in RecipeDB.
             }
         end
         copy.professions[profName] = profCopy
