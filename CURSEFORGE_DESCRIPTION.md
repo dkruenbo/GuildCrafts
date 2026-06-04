@@ -148,12 +148,6 @@ So you always know **who can craft which variant**.
 
 Hover the specialization label in a member's detail panel to see a plain-English description of what it unlocks.
 
-*   collapsible reagent lists
-*   profession icons
-*   favorites system
-*   crafter preview on recipe rows
-*   minimap button
-
 Everything is built to stay **fast and easy to scan**.
 
 ***
@@ -224,17 +218,7 @@ Works best when multiple guild members use the addon — the more players sync, 
 
 ## Project Status
 
-GuildCrafts is now considered **feature complete** for its original scope.
-
-The core problem the addon was created to solve — helping guild members quickly discover who can craft an item — has been solved, and the addon has reached a stable state.
-
-From this point on, GuildCrafts will move into **maintenance mode** and the developer is taking some well earned vacation (Project not abandoned)
-
-This means:
-
-• No new features are currently planned  
-• Critical bug fixes may still be addressed  
-• Contributions and new maintainers are welcome if the community wants to build on it further
+GuildCrafts has reached its original scope and is stable. Critical fixes will still be addressed. The project is not abandoned — contributions and new maintainers are welcome.
 
 ***
 
@@ -245,7 +229,5 @@ GuildCrafts is built to solve a real problem, and I'm thrilled to see so many gu
 If it's saved you time or helped your guild coordinate better, consider buying me a coffee — it's genuinely appreciated.
 
 [Support me on Ko-fi ☕](https://ko-fi.com/lektor)
-
-_A huge thank you to everyone using the addon, reporting bugs, and sharing it with their guilds._
 
 _A huge thank you to everyone using the addon, reporting bugs, and sharing it with their guilds._

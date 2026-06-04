@@ -521,6 +521,14 @@ function Data:GetMemberEntry(memberKey, create)
     local gdb = self:GetGuildDB()
     if not gdb then return nil end
     local entry = gdb[memberKey]
+    -- Treat a tombstone as absent when the caller needs a live entry.
+    -- Without this guard any code that accesses entry.professions after
+    -- calling GetMemberEntry(key, true) would crash on a tombstone entry
+    -- because tombstones carry no professions table.
+    if entry and entry._tombstone and create then
+        gdb[memberKey] = nil
+        entry = nil
+    end
     if not entry and create then
         entry = {
             professions = {},
@@ -871,7 +879,8 @@ function Data:CountStaleMembers(thresholdDays)
     local db = self:GetGuildDB()
     if not db then return 0 end
     for _, entry in pairs(db) do
-        if type(entry) == "table" and entry.lastUpdate and entry.lastUpdate > 0 then
+        if type(entry) == "table" and not entry._tombstone
+                and entry.lastUpdate and entry.lastUpdate > 0 then
             if (now - entry.lastUpdate) > threshold then
                 count = count + 1
             end
@@ -1284,6 +1293,11 @@ end
 function Data:StripSyncFields(entry)
     if type(entry) ~= "table" then return entry end
 
+    -- Tombstones propagate as a lightweight marker — no professions to strip.
+    if entry._tombstone then
+        return { _tombstone = true, lastUpdate = entry.lastUpdate }
+    end
+
     local copy = {
         lastUpdate = entry.lastUpdate,
         dataFormat = GuildCrafts.DATA_FORMAT_VERSION,
@@ -1381,6 +1395,46 @@ function Data:MergeIncoming(incomingData)
                 GuildCrafts:Debug("Skipped merge for own data:", memberKey)
             else
                 local localEntry = gdb[memberKey]
+
+                -- Incoming tombstone: write it if it is newer than what we have.
+                -- Tombstones propagate the fact of deletion across all peers.
+                if incomingEntry._tombstone then
+                    if not localEntry or incomingEntry.lastUpdate > (localEntry.lastUpdate or 0) then
+                        gdb[memberKey] = incomingEntry
+                        changed = true
+                        GuildCrafts:Debug("MergeIncoming: tombstone accepted for", memberKey)
+                    end
+                -- Local tombstone vs incoming live data: reject resurrection unless
+                -- the incoming data is strictly newer (member rejoined and re-scanned).
+                elseif localEntry and localEntry._tombstone then
+                    if incomingEntry.lastUpdate <= localEntry.lastUpdate then
+                        GuildCrafts:Debug("MergeIncoming: tombstone blocked resurrection of", memberKey)
+                    else
+                        -- Incoming data post-dates the tombstone — member re-scanned
+                        -- after rejoining the guild.  Apply partial-scan protection
+                        -- before accepting, consistent with the normal merge path.
+                        local suspicious = false
+                        for profName, incomingProf in pairs(incomingEntry.professions or {}) do
+                            local incomingCount = 0
+                            for _ in pairs(incomingProf.recipes or {}) do incomingCount = incomingCount + 1 end
+                            -- No prior live data to compare against (we only have a
+                            -- tombstone), so only reject an obviously empty scan.
+                            if incomingCount == 0 then
+                                suspicious = true
+                                GuildCrafts:Debug("MergeIncoming: resurrection partial-scan guard blocked",
+                                    memberKey, profName, "(0 recipes)")
+                                break
+                            end
+                        end
+                        if not suspicious then
+                            gdb[memberKey] = incomingEntry
+                            self:ExtractToRecipeDB(incomingEntry)
+                            changed = true
+                            GuildCrafts:Debug("Merged data for:", memberKey)
+                        end
+                    end
+                else
+
                 local dominated = not localEntry
                     or incomingEntry.lastUpdate > localEntry.lastUpdate
                     or (incomingEntry.lastUpdate == localEntry.lastUpdate
@@ -1416,6 +1470,7 @@ function Data:MergeIncoming(incomingData)
                         GuildCrafts:Debug("Merged data for:", memberKey)
                     end
                 end
+                end -- else (no tombstone involved)
             end
         end
     end
@@ -1427,6 +1482,22 @@ end
 
 --- Merge a single delta (one recipe added to a member's profession).
 function Data:MergeDelta(memberKey, profName, recipeKey, recipeData, newLastUpdate)
+    local gdb = self:GetGuildDB()
+    if not gdb then return end
+
+    -- Reject delta if we have a tombstone that is at least as new.
+    -- If the delta is strictly newer, the member re-joined and re-scanned —
+    -- clear the tombstone so GetMemberEntry can create a fresh live entry.
+    local existing = gdb[memberKey]
+    if existing and existing._tombstone then
+        if not newLastUpdate or newLastUpdate <= existing.lastUpdate then
+            GuildCrafts:Debug("MergeDelta: tombstone blocked delta for", memberKey)
+            return
+        end
+        -- Delta post-dates tombstone — member re-joined; clear tombstone first.
+        gdb[memberKey] = nil
+    end
+
     local entry = self:GetMemberEntry(memberKey, true)
     if not entry then return end
     if not entry.professions[profName] then
@@ -1453,6 +1524,11 @@ function Data:MergeProfessionRemoval(memberKey, profName, newLastUpdate)
     local gdb = self:GetGuildDB()
     if not gdb then return end
     local entry = gdb[memberKey]
+    -- Tombstone entries have no professions; removal is a no-op for them.
+    if entry and entry._tombstone then
+        GuildCrafts:Debug("MergeProfessionRemoval: tombstone present for", memberKey, "— skipping")
+        return
+    end
     if entry and entry.professions[profName] then
         entry.professions[profName] = nil
         if newLastUpdate and newLastUpdate > (entry.lastUpdate or 0) then
@@ -1512,20 +1588,30 @@ function Data:PruneRoster()
     local gdb = self:GetGuildDB()
     if not gdb then return end
     for memberKey, entry in pairs(gdb) do
-        if type(entry) == "table" and entry.lastUpdate and not rosterKeys[memberKey] then
+        if type(entry) == "table" and entry.lastUpdate and not rosterKeys[memberKey]
+                and not entry._tombstone then
             if not entry._absentSince then
                 -- First time absent — mark with timestamp
                 entry._absentSince = now
                 marked = marked + 1
             elseif now - entry._absentSince > EX_GUILD_GRACE_PERIOD then
-                -- Grace period expired — prune
-                gdb[memberKey] = nil
+                -- Grace period expired — write tombstone instead of hard-deleting.
+                -- Tombstones propagate the deletion to peers who were offline during
+                -- the grace window, preventing zombie resurrection.
+                gdb[memberKey] = { _tombstone = true, lastUpdate = now }
                 pruned = pruned + 1
             end
         elseif type(entry) == "table" and entry._absentSince and rosterKeys[memberKey] then
             -- Back in guild — clear absent flag
             entry._absentSince = nil
             restored = restored + 1
+        elseif type(entry) == "table" and entry._tombstone and rosterKeys[memberKey] then
+            -- Tombstone exists but the member is still (or again) in the guild.
+            -- This can happen when a peer with a transient roster-API gap wrongly
+            -- tombstoned the member and the marker propagated via sync.  Clear it
+            -- so that incoming live data for this member is no longer blocked.
+            gdb[memberKey] = nil
+            GuildCrafts:Debug("PruneRoster: cleared stale tombstone for active guild member", memberKey)
         end
     end
 
@@ -1544,6 +1630,7 @@ function Data:PruneRoster()
     for memberKey, entry in pairs(gdb) do
         if type(memberKey) == "string"
         and type(entry) == "table"
+        and not entry._tombstone
         and entry.lastUpdate and entry.lastUpdate > 0
         and (now - entry.lastUpdate) > INACTIVE_MEMBER_THRESHOLD
         and rosterKeys[memberKey] then
@@ -1553,6 +1640,21 @@ function Data:PruneRoster()
     end
     if inactivePruned > 0 then
         GuildCrafts:Debug("Auto-pruned", inactivePruned, "inactive guild member(s) (45d+ no scan).")
+    end
+
+    -- Expire tombstones older than 30 days.  By this point every peer will have
+    -- received the tombstone through at least one sync cycle.
+    local TOMBSTONE_EXPIRY = 30 * 24 * 3600
+    local tombstonesExpired = 0
+    for memberKey, entry in pairs(gdb) do
+        if type(entry) == "table" and entry._tombstone
+                and (now - (entry.lastUpdate or 0)) > TOMBSTONE_EXPIRY then
+            gdb[memberKey] = nil
+            tombstonesExpired = tombstonesExpired + 1
+        end
+    end
+    if tombstonesExpired > 0 then
+        GuildCrafts:Debug("Expired", tombstonesExpired, "tombstone(s) older than 30 days.")
     end
 
     -- Prune legacy entries with no scan timestamp (lastUpdate nil or 0)
