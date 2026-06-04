@@ -111,7 +111,8 @@ function Tooltip:OnEnable()
         self:SecureHookScript(ItemRefTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
     end
 
-    -- Rebuild immediately on enable — no user interaction yet, safe to block.
+    -- Rebuild on enable. RebuildIndex will defer automatically if the client
+    -- is somehow in combat (e.g. world PvP on login); otherwise runs immediately.
     self:RebuildIndex()
 end
 

@@ -56,10 +56,6 @@ zip -r GuildCrafts-X.Y.Z.zip GuildCrafts/ -x "*.DS_Store"
 ## CHANGELOG Conventions
 
 - Date format: `YYYY-MM-DD`
-- Hat tip line (add to every release entry):
-  ```
-  _Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/addons/recipe-registry)._
-  ```
 - Sections: `### New features`, `### Improvements`, `### Fixes`
 
 ---

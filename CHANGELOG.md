@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.9.0 — 2026-06-04
+
+### Fixes
+
+- **Combat lag eliminated** — four sources of in-combat frame spikes have been identified and resolved, addressing the 1–2 s lag spikes reported by guild members during pull phase:
+
+  1. **`HandleSyncPush` guild broadcast removed.** When the DR received profession data from a member via `SYNC_PUSH` it was re-broadcasting the entire recipe set as `DELTA_UPDATE` messages to the guild channel. Every in-combat guild member had to decompress and deserialize each message. This was the primary cause of combat spikes. Data now converges through the normal `DELTA_AD` → `SYNC_REQUEST` → `SYNC_RESPONSE` path instead.
+
+  2. **`Tooltip:RebuildIndex` deferred during combat.** The reverse-lookup index (itemID → crafters) iterates the entire guild database and calls `GetItemInfo`/`GetSpellInfo` for every tracked recipe. A data merge completing ~2 s before pull phase would schedule the rebuild to fire right into combat. The rebuild now checks `InCombatLockdown()` and re-arms a 2 s retry until combat ends.
+
+  3. **`PruneRoster` skipped during combat.** `GUILD_ROSTER_UPDATE` fires on every guild member transition (login, logout, zone change). Each event triggered a full roster scan and database iteration. The prune is now skipped while `InCombatLockdown()` is true and runs on the next event after combat ends.
+
+  4. **`StripSyncFields` section comment corrected.** The comment incorrectly stated that reagents were stripped from `SYNC_RESPONSE` payloads; they were and must remain included — reagents for existing recipes propagate *only* through the full sync path, since `DELTA_UPDATE` carries reagents only for newly-discovered recipes. Removing them would cause freshly-synced members to see `~` (no reagent data) on every recipe indefinitely.
+
+
+---
+
 ## 1.8.0 — 2026-06-04
 
 ### Fixes
@@ -21,7 +38,6 @@
 
 - **Per-peer backoff** — nodes now track sync failures per peer instead of immediately evicting unresponsive DRs. After two consecutive timeouts from the same peer within 45 seconds the node enters backoff: the DR is skipped and the BDR is targeted directly on the next sync attempt, without waiting for another full 120-second timeout. Peers whose backoff window has expired are still eligible for eviction under the existing re-election logic. This prevents a briefly unresponsive DR (loading screen, instance transition, chat throttle) from triggering a disruptive re-election cascade every time it hiccups. Failure records are cleared automatically when a successful `SYNC_RESPONSE` or `SYNC_PUSH` is received from that peer. No wire-protocol changes — all tracking is local state.
 
-_Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/addons/recipe-registry)._
 
 ---
 
@@ -31,7 +47,6 @@ _Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/
 
 - **Chunk RESUME recovery** — chunked `SYNC_RESPONSE` transfers are now resilient to dropped messages. The sender tags each transfer with a unique session ID and keeps a short-lived copy of every chunk for up to 35 seconds. If the receiver stops seeing new chunks for more than 4 seconds it whispers a `SYNC_RESUME` message back to the sender listing only the missing sequence numbers; the sender re-sends exactly those chunks. Recovery completes in roughly one `PROGRESS_TIMEOUT` (4 s) instead of waiting for the full 120 s `SYNC_TIMEOUT` before retrying the entire transfer. Up to three RESUME attempts are made before falling back to a full retry. Nodes running older versions of the addon are unaffected — transfers without a session ID continue to use the original code path.
 
-_Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/addons/recipe-registry)._
 
 ---
 
@@ -41,7 +56,6 @@ _Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/
 
 - **Immediate advertise broadcast (`DELTA_AD`)** — when a profession scan finds new recipes, a tiny advertisement message is now broadcast to the guild immediately, carrying only a revision timestamp and per-profession recipe counts (no recipe data). Any peer who sees a `DELTA_AD` with a newer revision than what they already hold queues a sync pull with a short random jitter (1–5 s) to retrieve the data. This closes the propagation gap where a freshly scanned player's new recipes would not reach peers until the next full sync cycle. The Designated Router forwards received advertisements to the rest of the guild so nodes that missed the original broadcast are also notified.
 
-_Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/addons/recipe-registry)._
 
 ---
 
@@ -53,7 +67,6 @@ _Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/
 
 - **Partial scan protection** — opening a profession window that the API hasn't fully loaded yet can return far fewer recipes than you actually know. The addon now compares the scanned count against the stored count before writing; if the new data accounts for less than 50 % of what's already recorded, the write is skipped and a rescan is scheduled 2 s later. The same guard is applied to incoming sync data, preventing a peer's partial scan from overwriting your complete local copy.
 
-_Hat tip: Mattia (Kaedros) — [Recipe Registry](https://www.curseforge.com/wow/addons/recipe-registry)._
 
 ---
 
