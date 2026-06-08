@@ -1,18 +1,16 @@
 # Changelog
 
-## 1.9.0 — 2026-06-04
+## 1.9.0 — 2026-06-08
 
 ### Fixes
 
-- **Combat lag eliminated** — four sources of in-combat frame spikes have been identified and resolved, addressing the 1–2 s lag spikes reported by guild members during pull phase:
+- **Reduced combat frame spikes** — multiple sources of unnecessary in-combat processing have been removed or deferred, addressing the lag spikes reported by users during pull phases and combat:
 
   1. **`HandleSyncPush` guild broadcast removed.** When the DR received profession data from a member via `SYNC_PUSH` it was re-broadcasting the entire recipe set as `DELTA_UPDATE` messages to the guild channel. Every in-combat guild member had to decompress and deserialize each message. This was the primary cause of combat spikes. Data now converges through the normal `DELTA_AD` → `SYNC_REQUEST` → `SYNC_RESPONSE` path instead.
 
   2. **`Tooltip:RebuildIndex` deferred during combat.** The reverse-lookup index (itemID → crafters) iterates the entire guild database and calls `GetItemInfo`/`GetSpellInfo` for every tracked recipe. A data merge completing ~2 s before pull phase would schedule the rebuild to fire right into combat. The rebuild now checks `InCombatLockdown()` and re-arms a 2 s retry until combat ends.
 
   3. **`PruneRoster` skipped during combat.** `GUILD_ROSTER_UPDATE` fires on every guild member transition (login, logout, zone change). Each event triggered a full roster scan and database iteration. The prune is now skipped while `InCombatLockdown()` is true and runs on the next event after combat ends.
-
-  4. **`StripSyncFields` section comment corrected.** The comment incorrectly stated that reagents were stripped from `SYNC_RESPONSE` payloads; they were and must remain included — reagents for existing recipes propagate *only* through the full sync path, since `DELTA_UPDATE` carries reagents only for newly-discovered recipes. Removing them would cause freshly-synced members to see `~` (no reagent data) on every recipe indefinitely.
 
 
 ---
