@@ -1286,8 +1286,10 @@ end
 
 ----------------------------------------------------------------------
 -- Sync Payload Stripping
--- Removes fields that are only meaningful locally (cooldowns, reagents)
--- from outgoing sync data to reduce payload size and avoid clock issues.
+-- Strips fields that are local-only (cooldowns) from outgoing SYNC_RESPONSE
+-- payloads.  Reagents and category ARE included — they are the only path
+-- by which a freshly-synced peer gets reagent data for existing recipes
+-- (DELTA_UPDATE only carries reagents for newly-discovered recipes).
 ----------------------------------------------------------------------
 
 function Data:StripSyncFields(entry)
@@ -1314,8 +1316,8 @@ function Data:StripSyncFields(entry)
         }
         for recipeKey, recipeData in pairs(profData.recipes or {}) do
             profCopy.recipes[recipeKey] = {
-                name = recipeData.name,
-                source = recipeData.source,
+                name     = recipeData.name,
+                source   = recipeData.source,
                 category = recipeData.category or self:GetRecipeCategory(recipeKey),
                 reagents = recipeData.reagents or self:GetRecipeReagents(recipeKey),
             }

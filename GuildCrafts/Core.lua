@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.8.0"
+GuildCrafts.DISPLAY_VERSION = "1.9.0"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -181,7 +181,12 @@ function GuildCrafts:OnGuildRosterUpdate()
     -- Rebuild online cache first so all downstream handlers see fresh data
     if self.Data then
         self.Data:RebuildOnlineCache()
-        self.Data:PruneRoster()
+        -- PruneRoster iterates the entire roster + DB; skip during combat so we
+        -- don't add sync work to an already-busy frame.  It will run on the next
+        -- GUILD_ROSTER_UPDATE after combat ends.
+        if not InCombatLockdown() then
+            self.Data:PruneRoster()
+        end
     end
     if self.Comms then
         self.Comms:OnGuildRosterUpdate()

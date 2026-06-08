@@ -37,6 +37,19 @@ end
 
 --- Rebuild the reverse lookup index from the full database.
 function Tooltip:RebuildIndex()
+    -- Building this index allocates thousands of Lua tables and calls GetItemInfo
+    -- for every tracked recipe.  Running during combat can spike frame time and
+    -- cause the lag players report.  Defer until the player leaves combat.
+    if InCombatLockdown() then
+        if not self._rebuildTimer then
+            self._rebuildTimer = C_Timer.After(2, function()
+                self._rebuildTimer = nil
+                if indexDirty then self:RebuildIndex() end
+            end)
+        end
+        return
+    end
+
     indexByID   = {}
     indexByName = {}
 
@@ -98,7 +111,8 @@ function Tooltip:OnEnable()
         self:SecureHookScript(ItemRefTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
     end
 
-    -- Rebuild immediately on enable — no user interaction yet, safe to block.
+    -- Rebuild on enable. RebuildIndex will defer automatically if the client
+    -- is somehow in combat (e.g. world PvP on login); otherwise runs immediately.
     self:RebuildIndex()
 end
 
