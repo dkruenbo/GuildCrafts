@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.10.0 — 2026-06-23
+
+### Fixes
+
+- **`!gc` spam — all addon users responding simultaneously** — when the DR/BDR election had not yet converged (e.g. start of a raid session, mass login, or reconnect), every online addon user computed `myRole = "DR"` and scheduled their `!gc` response at `delay = 0`. All responses fired in the same WoW frame before any guild-chat echo could arrive to trigger the deduplication check, causing every addon user to post a reply simultaneously. Fixed by detecting the unconverged state (`addonUsers` contains only self) and applying a 2–6 s random jitter in that case. The first node to fire sends `[GuildCrafts]` to guild chat; its echo updates `_gcLastGuildCraftsMsg` on all other clients, and their later-firing timers see the timestamp and cancel. When the election is properly converged, the real DR keeps `delay = 0` for an immediate response — no regression for normal operation.
+
+---
+
 ## 1.9.0 — 2026-06-08
 
 ### Fixes

@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.9.0"
+GuildCrafts.DISPLAY_VERSION = "1.10.0"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -353,6 +353,21 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
         -- time. The first to post emits [GuildCrafts] in guild chat, causing
         -- all others to cancel when their timer fires.
         delay = 12 + math.random(0, 8)
+    elseif effectiveRole == "DR" then
+        -- Guard against "false DR" spam: when the election has not yet converged
+        -- (addonUsers contains only self — HELLO messages not yet exchanged,
+        -- fresh session, or entries evicted), every node computes myRole = "DR"
+        -- and fires at delay = 0 simultaneously.  All responses go out in the
+        -- same frame before any guild-chat echo can update _gcLastGuildCraftsMsg
+        -- and trigger the dedup check on the other nodes.
+        -- Fix: apply jitter so the first responder's echo suppresses the rest.
+        -- When the election is properly converged (addonUsers has multiple
+        -- entries) the real DR keeps delay = 0 for an immediate response.
+        local count = 0
+        for _ in pairs(self.Comms.addonUsers) do count = count + 1 end
+        if count <= 1 then
+            delay = 2 + math.random(0, 4)  -- 2–6 s jitter for unconverged election
+        end
     end
 
     local capturedQuery      = query
