@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.10.1 — 2026-07-20
+
+### Fixes
+
+- **Tooltip crafter rows compatible with TBC Anniversary 2.5.6 PTR** — the 2.5.6 client introduces the modern tooltip pipeline (`TooltipDataProcessor`), which replaces the old `OnTooltipSetItem` script event. GuildCrafts now detects which pipeline is available and uses `TooltipDataProcessor.AddTooltipPostCall` on 2.5.6+ while keeping the legacy hook on the current 2.5.5 live client. No tooltip breakage on either client.
+
+---
+
 ## 1.10.0 — 2026-06-23
 
 ### Fixes
