@@ -103,12 +103,19 @@ end
 ----------------------------------------------------------------------
 
 function Tooltip:OnEnable()
-    -- Hook GameTooltip's OnTooltipSetItem to inject crafter info
-    self:SecureHookScript(GameTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
-
-    -- Also hook ItemRefTooltip (shift-clicked links in chat)
-    if ItemRefTooltip then
-        self:SecureHookScript(ItemRefTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
+    if TooltipDataProcessor then
+        -- 2.5.6+ modern tooltip pipeline (aligned with Classic Era 1.15.9).
+        -- AddTooltipPostCall fires for all tooltips showing items, including
+        -- ItemRefTooltip, so no separate hook is needed.
+        TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
+            self:OnTooltipSetItem(tooltip)
+        end)
+    else
+        -- Legacy path: 2.5.5 and earlier.
+        self:SecureHookScript(GameTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
+        if ItemRefTooltip then
+            self:SecureHookScript(ItemRefTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
+        end
     end
 
     -- Rebuild on enable. RebuildIndex will defer automatically if the client
