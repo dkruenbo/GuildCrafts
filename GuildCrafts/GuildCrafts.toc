@@ -1,8 +1,8 @@
-## Interface: 20505
+## Interface: 20506
 ## Title: GuildCrafts
 ## Notes: Track all learned recipes across guild members' professions
 ## Author: GuildCrafts Team
-## Version: 1.10.1
+## Version: 1.11.0
 ## SavedVariables: GuildCraftsDB
 ## SavedVariablesPerCharacter: GuildCraftsCharDB
 ## X-Category: Guild

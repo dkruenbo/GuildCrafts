@@ -1074,6 +1074,11 @@ function UI:ShowMemberRecipes(memberKey, profName)
             UI:ShowRecipeTooltip(self, capturedKey)
         end)
         nameHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        nameHit:SetScript("OnMouseDown", function(_, button)
+            if button == "LeftButton" and IsShiftKeyDown() then
+                UI:LinkRecipeToChat(capturedKey)
+            end
+        end)
 
         -- Click recipe row to toggle reagents (only when has reagents)
         if hasReagents then
@@ -1250,6 +1255,11 @@ function UI:ShowSearchResults(results)
             UI:ShowRecipeTooltip(self, capturedRecipeKey)
         end)
         nameHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        nameHit:SetScript("OnMouseDown", function(_, button)
+            if button == "LeftButton" and IsShiftKeyDown() then
+                UI:LinkRecipeToChat(capturedRecipeKey)
+            end
+        end)
 
         -- Inline crafter preview (right section, max 2 + overflow count)
         table.sort(result.crafters, function(a, b)
@@ -1740,6 +1750,11 @@ function UI:ShowFavRecipesDetail(grouped, filterProf)
                 UI:ShowRecipeTooltip(self, capturedKey)
             end)
             nameHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            nameHit:SetScript("OnMouseDown", function(_, button)
+                if button == "LeftButton" and IsShiftKeyDown() then
+                    UI:LinkRecipeToChat(capturedKey)
+                end
+            end)
             yOffset = yOffset - 18
 
             -- Crafters list
@@ -2310,6 +2325,25 @@ end
 
 --- Show the native WoW item or spell tooltip for a recipe key.
 --- Positive key = itemID, negative key = spellID (Enchanting / spell-based).
+--- Shift-click a recipe name to insert its item or spell link into the active chat input.
+function UI:LinkRecipeToChat(recipeKey)
+    local k = tonumber(recipeKey)
+    if not k then return end
+    local link
+    if k > 0 then
+        link = select(2, GetItemInfo(k))
+    elseif k < 0 then
+        if C_Spell and C_Spell.GetSpellLink then
+            link = C_Spell.GetSpellLink(-k)
+        elseif GetSpellLink then
+            link = GetSpellLink(-k)
+        end
+    end
+    if link then
+        ChatEdit_InsertLink(link)
+    end
+end
+
 function UI:ShowRecipeTooltip(owner, recipeKey)
     local k = tonumber(recipeKey)
     if not k then return end
@@ -2735,6 +2769,11 @@ function UI:ShowRecipesView(profName)
             UI:ShowRecipeTooltip(self, capturedNameKey)
         end)
         nameHit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        nameHit:SetScript("OnMouseDown", function(_, button)
+            if button == "LeftButton" and IsShiftKeyDown() then
+                UI:LinkRecipeToChat(capturedNameKey)
+            end
+        end)
 
         -- Sort crafters: self first, then online, then alphabetical
         table.sort(recipe.crafters, function(a, b)
