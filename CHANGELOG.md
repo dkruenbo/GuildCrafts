@@ -4,11 +4,11 @@
 
 ### New features
 
-- **Shift-click a recipe name to link it to chat** — shift-clicking any recipe name in the member detail, recipes, favorites, or search results view inserts the item or spell hyperlink directly into the active chat input, exactly like shift-clicking items in bags or tooltips. Works for all professions including Enchanting (spell links).
+- **Shift-click a recipe name to link it to chat** — shift-clicking any recipe name in the member detail, recipes, favorites, or search results view inserts the item or spell hyperlink directly into the active chat input, exactly like shift-clicking items in bags or tooltips. Works for all professions including Enchanting (spell links). (Thanks to Cha0sx for the inspiration.)
 
 ### Changes
 
-- **Interface version bumped to 20506** — TBC Anniversary 2.5.6 is now live. The tooltip crafter pipeline introduced in 1.10.1 (`TooltipDataProcessor` guard) continues to work correctly on the new client.
+- **Interface version bumped to 20506** — TBC Anniversary 2.5.6 is live. The tooltip crafter pipeline introduced in 1.10.1 (`TooltipDataProcessor` guard) continues to work correctly on the new client.
 
 ---
 
