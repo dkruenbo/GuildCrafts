@@ -426,11 +426,11 @@ function UI:CreateSearchBar(parent)
         btn._textFS = fs
         return btn
     end
-    local tbcBtn  = makeExpBtn("TBC",     -84, 40)
-    local origBtn = makeExpBtn("Vanilla", -128, 56)
-    local wotlkBtn, mopBtn
+    local tbcBtn  = makeExpBtn("TBC",     -124, 38)
+    local origBtn = makeExpBtn("Vanilla", -166, 52)
+    local wotlkBtn, cataBtn, mopBtn
     if GuildCrafts.MOP_ITEM_IDS then
-        mopBtn = makeExpBtn("MoP", 8, 38)
+        mopBtn = makeExpBtn("MoP", 8, 36)
         mopBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("MOP") end)
         mopBtn:SetScript("OnEnter", function(btn)
             GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
@@ -440,8 +440,19 @@ function UI:CreateSearchBar(parent)
         end)
         mopBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
+    if GuildCrafts.CATA_ITEM_IDS then
+        cataBtn = makeExpBtn("Cata", -32, 38)
+        cataBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("CATA") end)
+        cataBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine("Cata Recipes", 1, 1, 1)
+            GameTooltip:AddLine("Show Cataclysm recipes.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        cataBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
     if GuildCrafts.WOTLK_ITEM_IDS then
-        wotlkBtn = makeExpBtn("WotLK", -36, 48)
+        wotlkBtn = makeExpBtn("WotLK", -74, 46)
         wotlkBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("WOTLK") end)
         wotlkBtn:SetScript("OnEnter", function(btn)
             GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
@@ -474,6 +485,7 @@ function UI:CreateSearchBar(parent)
     self._expFilterTBCBtn   = tbcBtn
     self._expFilterOrigBtn  = origBtn
     self._expFilterWotlkBtn = wotlkBtn
+    self._expFilterCataBtn  = cataBtn
     self._expFilterMopBtn   = mopBtn
 
     self.searchBox = search
@@ -2614,6 +2626,9 @@ function UI:_UpdateExpansionFilterVisuals()
     }
     if self._expFilterWotlkBtn then
         buttons[#buttons + 1] = { btn = self._expFilterWotlkBtn, tag = "WOTLK" }
+    end
+    if self._expFilterCataBtn then
+        buttons[#buttons + 1] = { btn = self._expFilterCataBtn, tag = "CATA" }
     end
     if self._expFilterMopBtn then
         buttons[#buttons + 1] = { btn = self._expFilterMopBtn, tag = "MOP" }
