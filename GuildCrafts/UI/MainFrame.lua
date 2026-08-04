@@ -407,7 +407,7 @@ function UI:CreateSearchBar(parent)
         end
     end)
 
-    -- Expansion filter buttons: [Orig] and [TBC]
+    -- Expansion filter buttons: [Orig] and [TBC] — only shown when Data_TBC.lua is loaded
     local function makeExpBtn(label, rightOffset, width)
         local btn = CreateFrame("Button", nil, container, "BackdropTemplate")
         btn:SetSize(width, 24)
@@ -428,6 +428,10 @@ function UI:CreateSearchBar(parent)
     end
     local tbcBtn  = makeExpBtn("TBC",     -84, 40)
     local origBtn = makeExpBtn("Vanilla", -128, 56)
+    if not GuildCrafts.TBC_ITEM_IDS then
+        tbcBtn:Hide()
+        origBtn:Hide()
+    end
     tbcBtn:SetScript("OnClick",  function() UI:ToggleExpansionFilter("TBC")  end)
     origBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("ORIG") end)
     tbcBtn:SetScript("OnEnter",  function(btn)

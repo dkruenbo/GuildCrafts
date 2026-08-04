@@ -46,8 +46,10 @@ function GuildCrafts:OnEnable()
     self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerEnteringWorld")
     self:RegisterEvent("TRADE_SKILL_SHOW", "OnTradeSkillShow")
     self:RegisterEvent("GUILD_ROSTER_UPDATE", "OnGuildRosterUpdate")
-    -- Enchanting in Classic TBC uses CRAFT_SHOW, not TRADE_SKILL_SHOW
-    self:RegisterEvent("CRAFT_SHOW", "OnCraftShow")
+    -- Enchanting in Classic/TBC uses CRAFT_SHOW, not TRADE_SKILL_SHOW
+    if GetNumCrafts then
+        self:RegisterEvent("CRAFT_SHOW", "OnCraftShow")
+    end
     -- Fired when the client loads an item into memory (e.g. after GetItemInfo)
     -- Used to retry quality-color lookups that returned nil on first render
     self:RegisterEvent("GET_ITEM_INFO_RECEIVED", "OnItemInfoReceived")

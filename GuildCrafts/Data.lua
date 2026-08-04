@@ -190,7 +190,7 @@ end
 --- Looks up directly in TBC_ITEM_IDS — no scan required.
 function Data:GetExpansionTag(_profName, recipeKey)
     local ids = GuildCrafts.TBC_ITEM_IDS
-    if not ids then return nil end
+    if not ids then return "ORIG" end
     return ids[recipeKey] and "TBC" or "ORIG"
 end
 
@@ -216,7 +216,9 @@ local DB_DEFAULTS = {
     },
     profile = {
         showOnlineOnly      = false,
-        expansionFilter     = { ORIG = true, TBC = true },
+        expansionFilter     = GuildCrafts.TBC_ITEM_IDS
+            and { ORIG = true, TBC = true }
+            or  { ORIG = true },
         showTooltipCrafters = true,
     },
 }
@@ -1730,6 +1732,19 @@ end
 
 local PRIMARY_PROF_NAMES   = { "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
 local SECONDARY_PROF_NAMES = { "Mining", "Herbalism", "Skinning", "Cooking" }
+
+-- Remove professions that don't exist on this client's expansion level
+local _expansionLevel = GetClassicExpansionLevel and GetClassicExpansionLevel() or 99
+if _expansionLevel < 1 then
+    TRACKED_PROFESSIONS["Jewelcrafting"] = nil
+    PROFESSION_SPELL_IDS["Jewelcrafting"] = nil
+    for i = #PRIMARY_PROF_NAMES, 1, -1 do
+        if PRIMARY_PROF_NAMES[i] == "Jewelcrafting" then
+            table.remove(PRIMARY_PROF_NAMES, i)
+        end
+    end
+end
+
 -- Flat list for DB iteration, member counts, etc.
 local PROF_NAMES = {}
 for _, n in ipairs(PRIMARY_PROF_NAMES)   do PROF_NAMES[#PROF_NAMES + 1] = n end
