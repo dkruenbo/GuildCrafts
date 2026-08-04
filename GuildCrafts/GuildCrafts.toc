@@ -12,13 +12,13 @@ Libs\embeds.xml
 
 # Core modules
 Core.lua
-Data.lua
+Modules\Data.lua
 Data\Data_TBC.lua
-SyncPausePolicy.lua
-Comms.lua
-Favorites.lua
-Tooltip.lua
-MinimapButton.lua
+Modules\SyncPausePolicy.lua
+Modules\Comms.lua
+Modules\Favorites.lua
+Modules\Tooltip.lua
+Modules\MinimapButton.lua
 
 # UI (all panels consolidated in MainFrame.lua)
 UI\MainFrame.lua
