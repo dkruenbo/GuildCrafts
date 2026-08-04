@@ -407,7 +407,7 @@ function UI:CreateSearchBar(parent)
         end
     end)
 
-    -- Expansion filter buttons: [Orig] and [TBC]
+    -- Expansion filter buttons — only shown when expansion data files are loaded
     local function makeExpBtn(label, rightOffset, width)
         local btn = CreateFrame("Button", nil, container, "BackdropTemplate")
         btn:SetSize(width, 24)
@@ -428,6 +428,10 @@ function UI:CreateSearchBar(parent)
     end
     local tbcBtn  = makeExpBtn("TBC",     -84, 40)
     local origBtn = makeExpBtn("Vanilla", -128, 56)
+    if not GuildCrafts.TBC_ITEM_IDS then
+        tbcBtn:Hide()
+        origBtn:Hide()
+    end
     tbcBtn:SetScript("OnClick",  function() UI:ToggleExpansionFilter("TBC")  end)
     origBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("ORIG") end)
     tbcBtn:SetScript("OnEnter",  function(btn)
@@ -659,6 +663,7 @@ local PROFESSION_ICONS = {
     ["Blacksmithing"]  = "Interface\\Icons\\Trade_BlackSmithing",
     ["Enchanting"]     = "Interface\\Icons\\Trade_Engraving",
     ["Engineering"]    = "Interface\\Icons\\Trade_Engineering",
+    ["Inscription"]    = "Interface\\Icons\\INV_Inscription_Tradeskill01",
     ["Jewelcrafting"]  = "Interface\\Icons\\INV_Misc_Gem_01",
     ["Leatherworking"] = "Interface\\Icons\\INV_Misc_ArmorKit_17",
     ["Tailoring"]      = "Interface\\Icons\\Trade_Tailoring",
