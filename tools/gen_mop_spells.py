@@ -34,11 +34,11 @@ except ImportError:
 # TODO: verify this build at https://wago.tools/builds before generating.
 MOP_BUILD = "5.5.4.69078"
 
-OUTPUT         = "GuildCrafts/Data_MOP.lua"
+OUTPUT         = "GuildCrafts/Data/Data_MOP.lua"
 DATAGEN_SRC    = "tools/DataGenerated.lua"
-DATA_TBC_SRC   = "GuildCrafts/Data_TBC.lua"
-DATA_WOTLK_SRC = "GuildCrafts/Data_WOTLK.lua"
-DATA_CATA_SRC  = "GuildCrafts/Data_CATA.lua"
+DATA_TBC_SRC   = "GuildCrafts/Data/Data_TBC.lua"
+DATA_WOTLK_SRC = "GuildCrafts/Data/Data_WOTLK.lua"
+DATA_CATA_SRC  = "GuildCrafts/Data/Data_CATA.lua"
 
 BASE_CSV_URL = "https://wago.tools/db2/{table}/csv"
 

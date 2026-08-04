@@ -29,10 +29,10 @@ except ImportError:
 
 CATA_BUILD = "4.4.2.60895"
 
-OUTPUT         = "GuildCrafts/Data_CATA.lua"
+OUTPUT         = "GuildCrafts/Data/Data_CATA.lua"
 DATAGEN_SRC    = "tools/DataGenerated.lua"
-DATA_TBC_SRC   = "GuildCrafts/Data_TBC.lua"
-DATA_WOTLK_SRC = "GuildCrafts/Data_WOTLK.lua"
+DATA_TBC_SRC   = "GuildCrafts/Data/Data_TBC.lua"
+DATA_WOTLK_SRC = "GuildCrafts/Data/Data_WOTLK.lua"
 
 BASE_CSV_URL = "https://wago.tools/db2/{table}/csv"
 

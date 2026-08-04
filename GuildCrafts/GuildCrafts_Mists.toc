@@ -13,10 +13,10 @@ Libs\embeds.xml
 # Core modules
 Core.lua
 Data.lua
-Data_TBC.lua
-Data_WOTLK.lua
-Data_CATA.lua
-Data_MOP.lua
+Data\Data_TBC.lua
+Data\Data_WOTLK.lua
+Data\Data_CATA.lua
+Data\Data_MOP.lua
 SyncPausePolicy.lua
 Comms.lua
 Favorites.lua
