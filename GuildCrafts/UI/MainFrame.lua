@@ -428,6 +428,18 @@ function UI:CreateSearchBar(parent)
     end
     local tbcBtn  = makeExpBtn("TBC",     -84, 40)
     local origBtn = makeExpBtn("Vanilla", -128, 56)
+    local wotlkBtn
+    if GuildCrafts.WOTLK_ITEM_IDS then
+        wotlkBtn = makeExpBtn("WotLK", -36, 48)
+        wotlkBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("WOTLK") end)
+        wotlkBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine("WotLK Recipes", 1, 1, 1)
+            GameTooltip:AddLine("Show Wrath of the Lich King recipes.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        wotlkBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
     if not GuildCrafts.TBC_ITEM_IDS then
         tbcBtn:Hide()
         origBtn:Hide()
@@ -448,8 +460,9 @@ function UI:CreateSearchBar(parent)
         GameTooltip:Show()
     end)
     origBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    self._expFilterTBCBtn  = tbcBtn
-    self._expFilterOrigBtn = origBtn
+    self._expFilterTBCBtn   = tbcBtn
+    self._expFilterOrigBtn  = origBtn
+    self._expFilterWotlkBtn = wotlkBtn
 
     self.searchBox = search
     self.scopeButton = scopeBtn
@@ -2578,15 +2591,19 @@ function UI:_UpdateTooltipBtnVisuals()
     end
 end
 
---- Update visual state of the [Orig] and [TBC] expansion filter buttons.
+--- Update visual state of the expansion filter buttons.
 function UI:_UpdateExpansionFilterVisuals()
     if not self._expFilterOrigBtn then return end
     local f = GuildCrafts.db and GuildCrafts.db.profile.expansionFilter
     if not f then return end
-    for _, info in ipairs({
-        { btn = self._expFilterOrigBtn, tag = "ORIG" },
-        { btn = self._expFilterTBCBtn,  tag = "TBC"  },
-    }) do
+    local buttons = {
+        { btn = self._expFilterOrigBtn,  tag = "ORIG"  },
+        { btn = self._expFilterTBCBtn,   tag = "TBC"   },
+    }
+    if self._expFilterWotlkBtn then
+        buttons[#buttons + 1] = { btn = self._expFilterWotlkBtn, tag = "WOTLK" }
+    end
+    for _, info in ipairs(buttons) do
         if f[info.tag] then
             info.btn:SetBackdropColor(0.12, 0.12, 0.12, 1)
             info.btn:SetBackdropBorderColor(1, 0.82, 0, 1)
@@ -2599,13 +2616,16 @@ function UI:_UpdateExpansionFilterVisuals()
     end
 end
 
---- Toggle an expansion filter tag ("ORIG" or "TBC") and refresh the active view.
+--- Toggle an expansion filter tag and refresh the active view.
 function UI:ToggleExpansionFilter(tag)
     if not GuildCrafts.db then return end
     local f = GuildCrafts.db.profile.expansionFilter
-    local other = tag == "ORIG" and "TBC" or "ORIG"
-    -- Prevent both being off
-    if f[tag] and not f[other] then return end
+    -- Prevent all tags being off: count how many are currently on
+    if f[tag] then
+        local onCount = 0
+        for _, v in pairs(f) do if v then onCount = onCount + 1 end end
+        if onCount <= 1 then return end
+    end
     f[tag] = not f[tag]
     self:_UpdateExpansionFilterVisuals()
     if self._searchActive and self._lastSearchResults then

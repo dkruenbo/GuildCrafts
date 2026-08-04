@@ -187,13 +187,13 @@ function Data:GetSpecialisationDescription(spec)
     return nil
 end
 
---- Returns "TBC", "ORIG", or nil (show regardless) for a recipe.
---- recipeKey: positive = createdItemId, negative = -spellId (enchanting).
---- Looks up directly in TBC_ITEM_IDS — no scan required.
+--- Returns expansion tag for a recipe: "WOTLK", "TBC", or "ORIG".
 function Data:GetExpansionTag(_profName, recipeKey)
-    local ids = GuildCrafts.TBC_ITEM_IDS
-    if not ids then return "ORIG" end
-    return ids[recipeKey] and "TBC" or "ORIG"
+    local wotlk = GuildCrafts.WOTLK_ITEM_IDS
+    if wotlk and wotlk[recipeKey] then return "WOTLK" end
+    local tbc = GuildCrafts.TBC_ITEM_IDS
+    if not tbc then return "ORIG" end
+    return tbc[recipeKey] and "TBC" or "ORIG"
 end
 
 -- AceDB defaults
@@ -218,7 +218,9 @@ local DB_DEFAULTS = {
     },
     profile = {
         showOnlineOnly      = false,
-        expansionFilter     = GuildCrafts.TBC_ITEM_IDS
+        expansionFilter     = GuildCrafts.WOTLK_ITEM_IDS
+            and { ORIG = true, TBC = true, WOTLK = true }
+            or  GuildCrafts.TBC_ITEM_IDS
             and { ORIG = true, TBC = true }
             or  { ORIG = true },
         showTooltipCrafters = true,
