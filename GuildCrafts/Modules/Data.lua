@@ -276,6 +276,14 @@ function Data:OnInitialize()
     GuildCrafts.db = LibStub("AceDB-3.0"):New("GuildCraftsDB", DB_DEFAULTS, true)
     self.db = GuildCrafts.db
 
+    -- Backfill expansion filter tags added in later versions
+    local f = self.db.profile.expansionFilter
+    if f then
+        if GuildCrafts.WOTLK_ITEM_IDS and f.WOTLK == nil then f.WOTLK = true end
+        if GuildCrafts.CATA_ITEM_IDS  and f.CATA  == nil then f.CATA  = true end
+        if GuildCrafts.MOP_ITEM_IDS   and f.MOP   == nil then f.MOP   = true end
+    end
+
     -- Migrate legacy per-crafter reagents/categories into shared RecipeDB
     self:MigrateToRecipeDB()
 end
@@ -599,7 +607,12 @@ function Data:DetectProfessions()
     if GetProfessions then
         -- MoP+ path: GetProfessions() returns indices for the player's professions
         local prof1, prof2, _, fishing, cooking = GetProfessions()
-        for _, idx in ipairs({prof1, prof2, fishing, cooking}) do
+        local profIndices = {}
+        if prof1 then profIndices[#profIndices + 1] = prof1 end
+        if prof2 then profIndices[#profIndices + 1] = prof2 end
+        if fishing then profIndices[#profIndices + 1] = fishing end
+        if cooking then profIndices[#profIndices + 1] = cooking end
+        for _, idx in ipairs(profIndices) do
             if idx then
                 local name, _, skillRank, skillMaxRank = GetProfessionInfo(idx)
                 if name then
@@ -1347,6 +1360,9 @@ end
 
 function Data:ScanTradeSkillModern()
     if not C_TradeSkillUI or not C_TradeSkillUI.IsTradeSkillReady() then return end
+    -- Don't scan linked/NPC tradeskills — they aren't ours
+    if C_TradeSkillUI.IsTradeSkillLinked and C_TradeSkillUI.IsTradeSkillLinked() then return end
+    if C_TradeSkillUI.IsNPCCrafting and C_TradeSkillUI.IsNPCCrafting() then return end
 
     local profInfo = C_TradeSkillUI.GetBaseProfessionInfo()
     if not profInfo or not profInfo.professionName then return end
@@ -1407,14 +1423,39 @@ function Data:ScanTradeSkillModern()
                 key = -recipeID
             end
 
-            if key and not recipes[key] then
-                local recipeData = {
-                    name = info.name or "",
-                    source = "",
-                }
-                recipes[key] = recipeData
-                newRecipes[key] = recipeData
-                newCount = newCount + 1
+            if key then
+                -- Scan reagents into shared RecipeDB
+                if C_TradeSkillUI.GetRecipeNumReagents then
+                    local numReagents = C_TradeSkillUI.GetRecipeNumReagents(recipeID)
+                    if numReagents and numReagents > 0 then
+                        local existingReagents = self:GetRecipeReagents(key)
+                        if not existingReagents or #existingReagents < numReagents then
+                            local reagents = {}
+                            for j = 1, numReagents do
+                                local reagentName, _, reagentCount = C_TradeSkillUI.GetRecipeReagentInfo(recipeID, j)
+                                if reagentName then
+                                    local itemID_r
+                                    local rLink = C_TradeSkillUI.GetRecipeReagentItemLink(recipeID, j)
+                                    if rLink then itemID_r = tonumber(rLink:match("item:(%d+)")) end
+                                    reagents[#reagents + 1] = { name = reagentName, count = reagentCount or 1, itemID = itemID_r }
+                                end
+                            end
+                            if #reagents > 0 then
+                                self:SetRecipeInfo(key, info.name, info.categoryName, reagents)
+                            end
+                        end
+                    end
+                end
+
+                if not recipes[key] then
+                    local recipeData = {
+                        name = info.name or "",
+                        source = "",
+                    }
+                    recipes[key] = recipeData
+                    newRecipes[key] = recipeData
+                    newCount = newCount + 1
+                end
             end
         end
     end

@@ -44,11 +44,12 @@ function GuildCrafts:OnEnable()
     -- Called after all addons have loaded (PLAYER_LOGIN equivalent).
     -- Register game events.
     self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerEnteringWorld")
-    self:RegisterEvent("TRADE_SKILL_SHOW", "OnTradeSkillShow")
     self:RegisterEvent("GUILD_ROSTER_UPDATE", "OnGuildRosterUpdate")
-    -- MoP+ fires TRADE_SKILL_LIST_UPDATE when recipe data is ready
+    -- MoP+/Cata: TRADE_SKILL_LIST_UPDATE fires when recipe data is ready
     if C_TradeSkillUI then
         self:RegisterEvent("TRADE_SKILL_LIST_UPDATE", "OnTradeSkillShow")
+    else
+        self:RegisterEvent("TRADE_SKILL_SHOW", "OnTradeSkillShow")
     end
     -- Enchanting in Classic/TBC uses CRAFT_SHOW, not TRADE_SKILL_SHOW
     if GetNumCrafts then
