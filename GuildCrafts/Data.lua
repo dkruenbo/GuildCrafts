@@ -39,6 +39,38 @@ local time = time
 local pairs = pairs
 local tonumber = tonumber
 
+-- Compat: C_Spell.GetSpellInfo (WotLK+) returns a table; classic global returns multiple values.
+local function GetSpellName(spellID)
+    if C_Spell and C_Spell.GetSpellInfo then
+        local info = C_Spell.GetSpellInfo(spellID)
+        return info and info.name
+    end
+    return GetSpellInfo(spellID)
+end
+
+-- Compat: C_SkillLine (WotLK+) replaces GetNumSkillLines/GetSkillLineInfo.
+local function IterSkillLines()
+    if C_SkillLine and C_SkillLine.GetSkillLines then
+        local lines = C_SkillLine.GetSkillLines()
+        local i = 0
+        return function()
+            i = i + 1
+            local sl = lines[i]
+            if not sl then return nil end
+            return sl.displayName, sl.isHeader, sl.skillLevel, sl.maxPooledSkillLevel
+        end
+    else
+        local n = GetNumSkillLines and GetNumSkillLines() or 0
+        local i = 0
+        return function()
+            i = i + 1
+            if i > n then return nil end
+            local name, isHeader, _, rank, _, _, maxRank = GetSkillLineInfo(i)
+            return name, isHeader, rank, maxRank
+        end
+    end
+end
+
 -- Staleness thresholds (seconds)
 local STALE_DISPLAY_THRESHOLD   = 30 * 24 * 3600  -- show [Nd ago] tag; CountStaleMembers baseline
 local EX_GUILD_GRACE_PERIOD     =  7 * 24 * 3600  -- prune ex-members after 7 days absent
@@ -101,14 +133,14 @@ local _localeToCanonical = nil
 local function BuildLocaleMap()
     _localeToCanonical = {}
     for canonical, spellID in pairs(PROFESSION_SPELL_IDS) do
-        local localizedName = GetSpellInfo(spellID)
+        local localizedName = GetSpellName(spellID)
         if localizedName then
             _localeToCanonical[localizedName] = canonical
         end
     end
     -- Add tradeskill window-title aliases (e.g. "Smelting" → "Mining")
     for canonical, spellID in pairs(TRADESKILL_TITLE_SPELL_IDS) do
-        local localizedName = GetSpellInfo(spellID)
+        local localizedName = GetSpellName(spellID)
         if localizedName then
             _localeToCanonical[localizedName] = canonical
         end
@@ -136,7 +168,7 @@ function Data:GetLocalizedRecipeName(recipeKey, fallback)
         local name = GetItemInfo(recipeKey)
         if name then return name end
     elseif recipeKey and recipeKey < 0 then
-        local name = GetSpellInfo(-recipeKey)
+        local name = GetSpellName(-recipeKey)
         if name then return name end
     end
     return fallback or "Unknown"
@@ -572,9 +604,8 @@ function Data:DetectProfessions()
             end
         end
     else
-        -- Classic/TBC path: GetSkillLineInfo enumerates all skills
-        for i = 1, GetNumSkillLines() do
-            local skillName, isHeader, _, skillRank, _, _, skillMaxRank = GetSkillLineInfo(i)
+        -- Classic/TBC/WotLK path via IterSkillLines compat wrapper
+        for skillName, isHeader, skillRank, skillMaxRank in IterSkillLines() do
             if not isHeader then
                 local canonical = self:GetCanonicalProfName(skillName)
                 if TRACKED_PROFESSIONS[canonical] then
@@ -1119,10 +1150,8 @@ function Data:ScanCraft()
 
     -- Guard: CRAFT_SHOW fires for both Enchanting and Beast Training (hunter pet)
     -- windows in Classic TBC. Only scan when the player actually has Enchanting.
-    -- Compare against the canonical name so non-English clients are handled.
     local hasEnchanting = false
-    for i = 1, GetNumSkillLines() do
-        local skillName, isHeader = GetSkillLineInfo(i)
+    for skillName, isHeader in IterSkillLines() do
         if not isHeader and self:GetCanonicalProfName(skillName) == "Enchanting" then
             hasEnchanting = true
             break
@@ -1144,8 +1173,7 @@ function Data:ScanCraft()
     end
 
     -- Refresh Enchanting skill level while the window is open
-    for i = 1, GetNumSkillLines() do
-        local skillName, isHeader, _, skillRank, _, _, skillMaxRank = GetSkillLineInfo(i)
+    for skillName, isHeader, skillRank, skillMaxRank in IterSkillLines() do
         if not isHeader and self:GetCanonicalProfName(skillName) == profName then
             local profDataLocal = entry.professions[profName]
             if profDataLocal.skillLevel ~= skillRank or profDataLocal.maxSkillLevel ~= skillMaxRank then
