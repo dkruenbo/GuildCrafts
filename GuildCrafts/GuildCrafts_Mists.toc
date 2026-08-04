@@ -1,4 +1,4 @@
-## Interface: 50400
+## Interface: 50504
 ## Title: GuildCrafts
 ## Notes: Track all learned recipes across guild members' professions
 ## Author: GuildCrafts Team
@@ -15,6 +15,7 @@ Core.lua
 Data.lua
 Data_TBC.lua
 Data_WOTLK.lua
+Data_MOP.lua
 SyncPausePolicy.lua
 Comms.lua
 Favorites.lua

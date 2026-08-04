@@ -219,8 +219,10 @@ function Data:GetSpecialisationDescription(spec)
     return nil
 end
 
---- Returns expansion tag for a recipe: "WOTLK", "TBC", or "ORIG".
+--- Returns expansion tag for a recipe: "MOP", "WOTLK", "TBC", or "ORIG".
 function Data:GetExpansionTag(_profName, recipeKey)
+    local mop = GuildCrafts.MOP_ITEM_IDS
+    if mop and mop[recipeKey] then return "MOP" end
     local wotlk = GuildCrafts.WOTLK_ITEM_IDS
     if wotlk and wotlk[recipeKey] then return "WOTLK" end
     local tbc = GuildCrafts.TBC_ITEM_IDS
@@ -250,7 +252,9 @@ local DB_DEFAULTS = {
     },
     profile = {
         showOnlineOnly      = false,
-        expansionFilter     = GuildCrafts.WOTLK_ITEM_IDS
+        expansionFilter     = GuildCrafts.MOP_ITEM_IDS
+            and { ORIG = true, TBC = true, WOTLK = true, MOP = true }
+            or  GuildCrafts.WOTLK_ITEM_IDS
             and { ORIG = true, TBC = true, WOTLK = true }
             or  GuildCrafts.TBC_ITEM_IDS
             and { ORIG = true, TBC = true }

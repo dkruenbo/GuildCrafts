@@ -428,7 +428,18 @@ function UI:CreateSearchBar(parent)
     end
     local tbcBtn  = makeExpBtn("TBC",     -84, 40)
     local origBtn = makeExpBtn("Vanilla", -128, 56)
-    local wotlkBtn
+    local wotlkBtn, mopBtn
+    if GuildCrafts.MOP_ITEM_IDS then
+        mopBtn = makeExpBtn("MoP", 8, 38)
+        mopBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("MOP") end)
+        mopBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine("MoP Recipes", 1, 1, 1)
+            GameTooltip:AddLine("Show Mists of Pandaria recipes.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        mopBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
     if GuildCrafts.WOTLK_ITEM_IDS then
         wotlkBtn = makeExpBtn("WotLK", -36, 48)
         wotlkBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("WOTLK") end)
@@ -463,6 +474,7 @@ function UI:CreateSearchBar(parent)
     self._expFilterTBCBtn   = tbcBtn
     self._expFilterOrigBtn  = origBtn
     self._expFilterWotlkBtn = wotlkBtn
+    self._expFilterMopBtn   = mopBtn
 
     self.searchBox = search
     self.scopeButton = scopeBtn
@@ -2602,6 +2614,9 @@ function UI:_UpdateExpansionFilterVisuals()
     }
     if self._expFilterWotlkBtn then
         buttons[#buttons + 1] = { btn = self._expFilterWotlkBtn, tag = "WOTLK" }
+    end
+    if self._expFilterMopBtn then
+        buttons[#buttons + 1] = { btn = self._expFilterMopBtn, tag = "MOP" }
     end
     for _, info in ipairs(buttons) do
         if f[info.tag] then
