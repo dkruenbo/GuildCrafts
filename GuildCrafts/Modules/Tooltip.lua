@@ -103,15 +103,24 @@ end
 ----------------------------------------------------------------------
 
 function Tooltip:OnEnable()
-    if TooltipDataProcessor then
+    -- TooltipDataProcessor handles bags/AH/mail/inventory on TBC 2.5.6+ and Cata
+    if TooltipDataProcessor and Enum and Enum.TooltipDataType then
         TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
             self:OnTooltipSetItem(tooltip, data)
         end)
-    else
-        self:SecureHookScript(GameTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
-        if ItemRefTooltip then
-            self:SecureHookScript(ItemRefTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
+    end
+    -- SetHyperlink hook for MoP Classic and as fallback on all versions
+    self:SecureHook(GameTooltip, "SetHyperlink", function(tooltip, link)
+        if link and link:match("^item:") then
+            self:OnTooltipSetItem(tooltip)
         end
+    end)
+    if ItemRefTooltip then
+        self:SecureHook(ItemRefTooltip, "SetHyperlink", function(tooltip, link)
+            if link and link:match("^item:") then
+                self:OnTooltipSetItem(tooltip)
+            end
+        end)
     end
 
     self:RebuildIndex()
@@ -125,7 +134,11 @@ function Tooltip:OnTooltipSetItem(tooltip, data)
     if not GuildCrafts.Data or not GuildCrafts.Data.db then return end
     if GuildCrafts.db and GuildCrafts.db.profile.showTooltipCrafters == false then return end
 
-    -- Use whatever index is current; deferred timer handles rebuilds after data changes.
+    -- Dedup: prevent double injection when both hooks fire for the same tooltip
+    local stamp = tooltip._gcStamp
+    local now = GetTime()
+    if stamp and (now - stamp) < 0.05 then return end
+    tooltip._gcStamp = now
 
     -- Get the item from the tooltip or from TooltipDataProcessor data
     local itemLink, itemID, itemName
@@ -139,6 +152,11 @@ function Tooltip:OnTooltipSetItem(tooltip, data)
         itemID = data.id
         itemName = GetItemInfo(itemID)
     end
+
+    GuildCrafts:Debug("Tooltip hook: itemID=", itemID, "itemName=", itemName,
+        "itemLink=", itemLink and "yes" or "nil", "data=", data and "yes" or "nil",
+        "data.id=", data and data.id or "nil", "indexDirty=", indexDirty)
+
     if not itemID then return end
 
     -- Find crafters for this item using the index
