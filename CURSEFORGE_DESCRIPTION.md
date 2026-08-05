@@ -88,6 +88,14 @@ See **every guild member who can craft a recipe**.
 
 This makes it easy to see **who can craft something and what it costs** at a glance.
 
+### Expansion Filter
+
+Five toggle buttons let you filter recipes by expansion:
+
+**Vanilla · TBC · WotLK · Cata · MoP**
+
+Toggle any combination to show only the recipes you care about. The filter applies to both the Members and Recipes views. Your selection persists across sessions.
+
 ### Online Filter & Tooltip Toggle
 
 Two toggle buttons sit in the **bottom bar** of the GuildCrafts window.
@@ -164,16 +172,26 @@ Your recipes will now automatically sync with other guild members who use the ad
 
 ***
 
-# Supported Version
+# Supported Versions
 
-Built for **WoW TBC Anniversary Edition**  
-Interface version **20505**
+GuildCrafts supports all WoW Classic game versions via multi-TOC:
+
+*   **Classic Era** (1.15.x)
+*   **TBC Anniversary** (2.5.x)
+*   **WotLK Classic** (3.4.x)
+*   **Cata Classic** (4.4.x)
+*   **MoP Classic** (5.5.x)
+
+Install a single addon folder — the game automatically loads the correct version.
 
 Supports all crafting and gathering professions:
 
-**Crafting:** Alchemy · Blacksmithing · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
+**Crafting:** Alchemy · Blacksmithing · Enchanting · Engineering · Inscription¹ · Jewelcrafting² · Leatherworking · Tailoring
 
 **Secondary:** Mining (incl. Smelting) · Herbalism · Skinning · Cooking
+
+¹ Inscription available on WotLK Classic and later  
+² Jewelcrafting available on TBC Anniversary and later
 
 Gathering professions track skill levels and member counts. Mining additionally tracks Smelting recipes.
 
