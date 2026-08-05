@@ -39,7 +39,13 @@ local time = time
 local pairs = pairs
 local tonumber = tonumber
 
--- Compat: C_Spell.GetSpellInfo (WotLK+) returns a table; classic global returns multiple values.
+------------------------------------------------------------------------
+-- Compatibility wrappers
+-- Keep all client-version specific API differences below.
+-- Promote to Compat.lua if this section grows substantially.
+------------------------------------------------------------------------
+
+-- C_Spell.GetSpellInfo (WotLK+) returns a table; classic global returns multiple values.
 local function GetSpellName(spellID)
     if C_Spell and C_Spell.GetSpellInfo then
         local info = C_Spell.GetSpellInfo(spellID)
@@ -48,7 +54,7 @@ local function GetSpellName(spellID)
     return GetSpellInfo(spellID)
 end
 
--- Compat: C_SkillLine (WotLK+) replaces GetNumSkillLines/GetSkillLineInfo.
+-- C_SkillLine (WotLK+) replaces GetNumSkillLines/GetSkillLineInfo.
 local function IterSkillLines()
     if C_SkillLine and C_SkillLine.GetSkillLines then
         local lines = C_SkillLine.GetSkillLines()
