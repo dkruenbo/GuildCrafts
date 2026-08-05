@@ -408,10 +408,9 @@ function UI:CreateSearchBar(parent)
     end)
 
     -- Expansion filter buttons — only shown when expansion data files are loaded
-    local function makeExpBtn(label, rightOffset, width)
+    local function makeExpBtn(label, width)
         local btn = CreateFrame("Button", nil, container, "BackdropTemplate")
         btn:SetSize(width, 24)
-        btn:SetPoint("RIGHT", container, "RIGHT", rightOffset, 0)
         btn:SetBackdrop({
             bgFile   = "Interface\\Buttons\\WHITE8x8",
             edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -426,11 +425,13 @@ function UI:CreateSearchBar(parent)
         btn._textFS = fs
         return btn
     end
-    local tbcBtn  = makeExpBtn("TBC",     -124, 38)
-    local origBtn = makeExpBtn("Vanilla", -166, 52)
-    local wotlkBtn, cataBtn, mopBtn
+
+    -- Build visible buttons right-to-left, chained from scopeBtn
+    local expBtns = {}
+    local mopBtn, cataBtn, wotlkBtn, tbcBtn, origBtn
+
     if GuildCrafts.MOP_ITEM_IDS then
-        mopBtn = makeExpBtn("MoP", 8, 36)
+        mopBtn = makeExpBtn("MoP", 36)
         mopBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("MOP") end)
         mopBtn:SetScript("OnEnter", function(btn)
             GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
@@ -439,9 +440,10 @@ function UI:CreateSearchBar(parent)
             GameTooltip:Show()
         end)
         mopBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        expBtns[#expBtns + 1] = mopBtn
     end
     if GuildCrafts.CATA_ITEM_IDS then
-        cataBtn = makeExpBtn("Cata", -32, 38)
+        cataBtn = makeExpBtn("Cata", 38)
         cataBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("CATA") end)
         cataBtn:SetScript("OnEnter", function(btn)
             GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
@@ -450,9 +452,10 @@ function UI:CreateSearchBar(parent)
             GameTooltip:Show()
         end)
         cataBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        expBtns[#expBtns + 1] = cataBtn
     end
     if GuildCrafts.WOTLK_ITEM_IDS then
-        wotlkBtn = makeExpBtn("WotLK", -74, 46)
+        wotlkBtn = makeExpBtn("WotLK", 46)
         wotlkBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("WOTLK") end)
         wotlkBtn:SetScript("OnEnter", function(btn)
             GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
@@ -461,27 +464,41 @@ function UI:CreateSearchBar(parent)
             GameTooltip:Show()
         end)
         wotlkBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        expBtns[#expBtns + 1] = wotlkBtn
     end
-    if not GuildCrafts.TBC_ITEM_IDS then
-        tbcBtn:Hide()
-        origBtn:Hide()
+    if GuildCrafts.TBC_ITEM_IDS then
+        tbcBtn = makeExpBtn("TBC", 38)
+        tbcBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("TBC") end)
+        tbcBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine("TBC Recipes", 1, 1, 1)
+            GameTooltip:AddLine("Show The Burning Crusade recipes.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        tbcBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        expBtns[#expBtns + 1] = tbcBtn
+
+        origBtn = makeExpBtn("Vanilla", 52)
+        origBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("ORIG") end)
+        origBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine("Vanilla Recipes", 1, 1, 1)
+            GameTooltip:AddLine("Show Vanilla Classic recipes.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        origBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        expBtns[#expBtns + 1] = origBtn
     end
-    tbcBtn:SetScript("OnClick",  function() UI:ToggleExpansionFilter("TBC")  end)
-    origBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("ORIG") end)
-    tbcBtn:SetScript("OnEnter",  function(btn)
-        GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
-        GameTooltip:AddLine("TBC Recipes", 1, 1, 1)
-        GameTooltip:AddLine("Show The Burning Crusade recipes.", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    tbcBtn:SetScript("OnLeave",  function() GameTooltip:Hide() end)
-    origBtn:SetScript("OnEnter", function(btn)
-        GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
-        GameTooltip:AddLine("Vanilla Recipes", 1, 1, 1)
-        GameTooltip:AddLine("Show Vanilla Classic recipes.", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    origBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Chain positions: first button anchors to scopeBtn left, rest chain leftward
+    for i, btn in ipairs(expBtns) do
+        if i == 1 then
+            btn:SetPoint("RIGHT", scopeBtn, "LEFT", -4, 0)
+        else
+            btn:SetPoint("RIGHT", expBtns[i - 1], "LEFT", -4, 0)
+        end
+    end
+
     self._expFilterTBCBtn   = tbcBtn
     self._expFilterOrigBtn  = origBtn
     self._expFilterWotlkBtn = wotlkBtn
