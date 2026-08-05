@@ -1365,17 +1365,35 @@ end
 ----------------------------------------------------------------------
 
 function Data:ScanTradeSkillModern()
-    if not C_TradeSkillUI or not C_TradeSkillUI.IsTradeSkillReady() then return end
+    if not C_TradeSkillUI then
+        GuildCrafts:Debug("ScanTradeSkillModern: C_TradeSkillUI is nil")
+        return
+    end
+    if C_TradeSkillUI.IsTradeSkillReady and not C_TradeSkillUI.IsTradeSkillReady() then
+        GuildCrafts:Debug("ScanTradeSkillModern: IsTradeSkillReady() = false, retrying in 1s")
+        self:ScheduleTimer("ScanTradeSkillModern", 1)
+        return
+    end
     -- Don't scan linked/NPC tradeskills — they aren't ours
     if C_TradeSkillUI.IsTradeSkillLinked and C_TradeSkillUI.IsTradeSkillLinked() then return end
     if C_TradeSkillUI.IsNPCCrafting and C_TradeSkillUI.IsNPCCrafting() then return end
 
     local profInfo = C_TradeSkillUI.GetBaseProfessionInfo()
-    if not profInfo or not profInfo.professionName then return end
+    if not profInfo then
+        GuildCrafts:Debug("ScanTradeSkillModern: GetBaseProfessionInfo() returned nil")
+        return
+    end
+    local profDisplayName = profInfo.professionName or profInfo.parentProfessionName or profInfo.name
+    if not profDisplayName then
+        GuildCrafts:Debug("ScanTradeSkillModern: no professionName in profInfo, keys:", table.concat((function()
+            local k = {}; for key in pairs(profInfo) do k[#k+1] = tostring(key) end; return k
+        end)(), ", "))
+        return
+    end
 
-    local profName = self:GetCanonicalProfName(profInfo.professionName)
+    local profName = self:GetCanonicalProfName(profDisplayName)
     if not profName or not TRACKED_PROFESSIONS[profName] then
-        GuildCrafts:Debug("Open profession not tracked:", profName or "nil")
+        GuildCrafts:Debug("Open profession not tracked:", profDisplayName, "->", profName or "nil")
         return
     end
 
@@ -1398,7 +1416,11 @@ function Data:ScanTradeSkillModern()
     end
 
     local recipeIDs = C_TradeSkillUI.GetAllRecipeIDs()
-    if not recipeIDs or #recipeIDs == 0 then return end
+    if not recipeIDs or #recipeIDs == 0 then
+        GuildCrafts:Debug("ScanTradeSkillModern: GetAllRecipeIDs() empty for", profName, "— retrying in 1s")
+        self:ScheduleTimer("ScanTradeSkillModern", 1)
+        return
+    end
 
     local recipes = entry.professions[profName].recipes
 
