@@ -337,7 +337,7 @@ function UI:CreateSearchBar(parent)
     local search = CreateFrame("EditBox", "GuildCraftsSearchBox", container, "BackdropTemplate")
     search:SetHeight(24)
     search:SetPoint("LEFT", container, "LEFT", 2, 0)
-    search:SetPoint("RIGHT", container, "RIGHT", -188, 0)
+    search:SetPoint("RIGHT", container, "RIGHT", -188, 0)  -- repositioned later after buttons
     search:SetFontObject(ChatFontNormal)
     search:SetAutoFocus(false)
     search:SetBackdrop({
@@ -498,6 +498,12 @@ function UI:CreateSearchBar(parent)
             btn:SetPoint("RIGHT", expBtns[i - 1], "LEFT", -4, 0)
         end
     end
+
+    -- Anchor search box right edge to leftmost button so they never overlap
+    local leftmostAnchor = expBtns[#expBtns] or scopeBtn
+    search:ClearAllPoints()
+    search:SetPoint("LEFT", container, "LEFT", 2, 0)
+    search:SetPoint("RIGHT", leftmostAnchor, "LEFT", -6, 0)
 
     self._expFilterTBCBtn   = tbcBtn
     self._expFilterOrigBtn  = origBtn
