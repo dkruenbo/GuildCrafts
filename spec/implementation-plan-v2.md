@@ -2,6 +2,8 @@
 
 > Planned improvements following the v1 release. Each item is self-contained and can be implemented independently. Ordered by estimated value-to-effort ratio.
 
+> **Status: All patches complete.** Shipped as part of releases 1.4.0 through 1.8.0. Multi-expansion support shipped separately in 2.0.0.
+
 ---
 
 ## 1 — SyncPausePolicy

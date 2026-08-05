@@ -404,6 +404,9 @@ function Data:RebuildOnlineCache()
             self._onlineCache[name] = isOnline or false
         end
     end
+
+    -- Always mark self as online (roster may not include us on early fires)
+    self._onlineCache[self:GetPlayerKey()] = true
 end
 
 function Data:IsMemberOnline(memberKey)
@@ -607,6 +610,10 @@ function Data:DetectProfessions()
     local playerKey = self:GetPlayerKey()
     local entry = self:GetMemberEntry(playerKey, true)
     if not entry then return end
+
+    -- Always clear absent marker on self — we are definitively online
+    if entry._absentSince then entry._absentSince = nil end
+
     local currentProfs = {}
     local skillLevels = {}  -- profName -> { rank, max }
 
@@ -618,11 +625,24 @@ function Data:DetectProfessions()
         if prof2 then profIndices[#profIndices + 1] = prof2 end
         if fishing then profIndices[#profIndices + 1] = fishing end
         if cooking then profIndices[#profIndices + 1] = cooking end
-        for _, idx in ipairs(profIndices) do
-            if idx then
-                local name, _, skillRank, skillMaxRank = GetProfessionInfo(idx)
-                if name then
-                    local canonical = self:GetCanonicalProfName(name)
+        if #profIndices > 0 then
+            for _, idx in ipairs(profIndices) do
+                if idx then
+                    local name, _, skillRank, skillMaxRank = GetProfessionInfo(idx)
+                    if name then
+                        local canonical = self:GetCanonicalProfName(name)
+                        if TRACKED_PROFESSIONS[canonical] then
+                            currentProfs[canonical] = true
+                            skillLevels[canonical] = { rank = skillRank, max = skillMaxRank }
+                        end
+                    end
+                end
+            end
+        else
+            -- GetProfessions exists but returned nothing (Classic Era) — use skill lines
+            for skillName, isHeader, skillRank, skillMaxRank in IterSkillLines() do
+                if not isHeader then
+                    local canonical = self:GetCanonicalProfName(skillName)
                     if TRACKED_PROFESSIONS[canonical] then
                         currentProfs[canonical] = true
                         skillLevels[canonical] = { rank = skillRank, max = skillMaxRank }
@@ -973,6 +993,8 @@ end
 ----------------------------------------------------------------------
 
 function Data:ScanTradeSkill()
+    if IsTradeSkillLinked and IsTradeSkillLinked() then return end
+
     local numSkills = GetNumTradeSkills()
     if not numSkills or numSkills == 0 then
         return
@@ -1819,8 +1841,10 @@ function Data:PruneRoster()
     local now = time()
     local gdb = self:GetGuildDB()
     if not gdb then return end
+    local localPlayerKey = self:GetPlayerKey()
     for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.lastUpdate and not rosterKeys[memberKey]
+                and memberKey ~= localPlayerKey
                 and not entry._tombstone then
             if not entry._absentSince then
                 -- First time absent — mark with timestamp
@@ -1861,6 +1885,7 @@ function Data:PruneRoster()
     local inactivePruned = 0
     for memberKey, entry in pairs(gdb) do
         if type(memberKey) == "string"
+        and memberKey ~= localPlayerKey
         and type(entry) == "table"
         and not entry._tombstone
         and entry.lastUpdate and entry.lastUpdate > 0
@@ -1892,7 +1917,6 @@ function Data:PruneRoster()
     -- Prune legacy entries with no scan timestamp (lastUpdate nil or 0)
     -- Skip the local player — we're always authoritative for our own data
     local legacyPruned = 0
-    local localPlayerKey = self:GetPlayerKey()
     for memberKey, entry in pairs(gdb) do
         if type(memberKey) == "string"
         and memberKey ~= localPlayerKey

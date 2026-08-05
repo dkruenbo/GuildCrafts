@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.11.0"
+GuildCrafts.DISPLAY_VERSION = "2.0.0"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -171,7 +171,6 @@ function GuildCrafts:OnLoginReady()
 end
 
 function GuildCrafts:OnTradeSkillShow()
-    self:Debug("OnTradeSkillShow fired")
     if self.Data then
         if C_TradeSkillUI and C_TradeSkillUI.GetBaseProfessionInfo then
             self.Data:ScanTradeSkillModern()

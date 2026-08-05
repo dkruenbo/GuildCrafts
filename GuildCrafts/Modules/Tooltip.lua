@@ -153,10 +153,6 @@ function Tooltip:OnTooltipSetItem(tooltip, data)
         itemName = GetItemInfo(itemID)
     end
 
-    GuildCrafts:Debug("Tooltip hook: itemID=", itemID, "itemName=", itemName,
-        "itemLink=", itemLink and "yes" or "nil", "data=", data and "yes" or "nil",
-        "data.id=", data and data.id or "nil", "indexDirty=", indexDirty)
-
     if not itemID then return end
 
     -- Find crafters for this item using the index

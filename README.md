@@ -37,4 +37,7 @@ Design documents and planning files. Not part of the addon — these are referen
 | `tech-stack.md` | Libraries and technology choices with rationale |
 | `improvements.md` | Tiered feature roadmap with implementation status |
 | `implementation-plan.md` | Original build plan and milestone sequence |
-| `GuildCrafts-Guide.txt` | Plain-English user guide explaining every feature |
+| `implementation-plan-v2.md` | Patch-based plan for sync reliability and multi-expansion |
+| `migration-classic-era.md` | Classic Era (1.15.x) compatibility notes |
+| `migration-wotlk.md` | WotLK Classic (3.4.x) compatibility notes |
+| `migration-mop.md` | MoP Classic (5.5.x) compatibility notes |
