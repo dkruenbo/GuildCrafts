@@ -104,22 +104,16 @@ end
 
 function Tooltip:OnEnable()
     if TooltipDataProcessor then
-        -- 2.5.6+ modern tooltip pipeline (aligned with Classic Era 1.15.9).
-        -- AddTooltipPostCall fires for all tooltips showing items, including
-        -- ItemRefTooltip, so no separate hook is needed.
         TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
-            self:OnTooltipSetItem(tooltip)
+            self:OnTooltipSetItem(tooltip, data)
         end)
     else
-        -- Legacy path: 2.5.5 and earlier.
         self:SecureHookScript(GameTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
         if ItemRefTooltip then
             self:SecureHookScript(ItemRefTooltip, "OnTooltipSetItem", "OnTooltipSetItem")
         end
     end
 
-    -- Rebuild on enable. RebuildIndex will defer automatically if the client
-    -- is somehow in combat (e.g. world PvP on login); otherwise runs immediately.
     self:RebuildIndex()
 end
 
@@ -127,21 +121,25 @@ end
 -- Tooltip Hook
 ----------------------------------------------------------------------
 
-function Tooltip:OnTooltipSetItem(tooltip)
+function Tooltip:OnTooltipSetItem(tooltip, data)
     if not GuildCrafts.Data or not GuildCrafts.Data.db then return end
     if GuildCrafts.db and GuildCrafts.db.profile.showTooltipCrafters == false then return end
 
     -- Use whatever index is current; deferred timer handles rebuilds after data changes.
 
-    -- Get the item from the tooltip
-    local _, itemLink = tooltip:GetItem()
-    if not itemLink then return end
-
-    local itemID = tonumber(itemLink:match("item:(%d+)"))
+    -- Get the item from the tooltip or from TooltipDataProcessor data
+    local itemLink, itemID, itemName
+    if tooltip.GetItem then
+        _, itemLink = tooltip:GetItem()
+    end
+    if itemLink then
+        itemID = tonumber(itemLink:match("item:(%d+)"))
+        itemName = GetItemInfo(itemLink)
+    elseif data and data.id then
+        itemID = data.id
+        itemName = GetItemInfo(itemID)
+    end
     if not itemID then return end
-
-    -- Also get item name for fallback matching (enchants store by name)
-    local itemName = GetItemInfo(itemLink)
 
     -- Find crafters for this item using the index
     local crafters = self:FindCrafters(itemID, itemName)
