@@ -39,19 +39,58 @@ local time = time
 local pairs = pairs
 local tonumber = tonumber
 
+------------------------------------------------------------------------
+-- Compatibility wrappers
+-- Keep all client-version specific API differences below.
+-- Promote to Compat.lua if this section grows substantially.
+------------------------------------------------------------------------
+
+-- C_Spell.GetSpellInfo (WotLK+) returns a table; classic global returns multiple values.
+local function GetSpellName(spellID)
+    if C_Spell and C_Spell.GetSpellInfo then
+        local info = C_Spell.GetSpellInfo(spellID)
+        return info and info.name
+    end
+    return GetSpellInfo(spellID)
+end
+
+-- C_SkillLine (WotLK+) replaces GetNumSkillLines/GetSkillLineInfo.
+local function IterSkillLines()
+    if C_SkillLine and C_SkillLine.GetSkillLines then
+        local lines = C_SkillLine.GetSkillLines()
+        local i = 0
+        return function()
+            i = i + 1
+            local sl = lines[i]
+            if not sl then return nil end
+            return sl.displayName, sl.isHeader, sl.skillLevel, sl.maxPooledSkillLevel
+        end
+    else
+        local n = GetNumSkillLines and GetNumSkillLines() or 0
+        local i = 0
+        return function()
+            i = i + 1
+            if i > n then return nil end
+            local name, isHeader, _, rank, _, _, maxRank = GetSkillLineInfo(i)
+            return name, isHeader, rank, maxRank
+        end
+    end
+end
+
 -- Staleness thresholds (seconds)
 local STALE_DISPLAY_THRESHOLD   = 30 * 24 * 3600  -- show [Nd ago] tag; CountStaleMembers baseline
 local EX_GUILD_GRACE_PERIOD     =  7 * 24 * 3600  -- prune ex-members after 7 days absent
 local INACTIVE_MEMBER_THRESHOLD = 45 * 24 * 3600  -- prune still-in-guild members with no scan in 45 days
 local TOUCH_BROADCAST_THRESHOLD = 25 * 24 * 3600  -- broadcast timestamp touch only when data is 25+ days old
 
--- TBC crafting professions we track (canonical English keys)
+-- Crafting professions we track (canonical English keys)
 local TRACKED_PROFESSIONS = {
     -- Primary (crafting)
     ["Alchemy"]        = true,
     ["Blacksmithing"]  = true,
     ["Enchanting"]     = true,
     ["Engineering"]    = true,
+    ["Inscription"]    = true,
     ["Jewelcrafting"]  = true,
     ["Leatherworking"] = true,
     ["Tailoring"]      = true,
@@ -78,6 +117,7 @@ local PROFESSION_SPELL_IDS = {
     ["Cooking"]        = 2550,
     ["Enchanting"]     = 7411,
     ["Engineering"]    = 4036,
+    ["Inscription"]    = 45357,
     ["Jewelcrafting"]  = 25229,
     ["Leatherworking"] = 2108,
     ["Tailoring"]      = 3908,
@@ -99,14 +139,14 @@ local _localeToCanonical = nil
 local function BuildLocaleMap()
     _localeToCanonical = {}
     for canonical, spellID in pairs(PROFESSION_SPELL_IDS) do
-        local localizedName = GetSpellInfo(spellID)
+        local localizedName = GetSpellName(spellID)
         if localizedName then
             _localeToCanonical[localizedName] = canonical
         end
     end
     -- Add tradeskill window-title aliases (e.g. "Smelting" → "Mining")
     for canonical, spellID in pairs(TRADESKILL_TITLE_SPELL_IDS) do
-        local localizedName = GetSpellInfo(spellID)
+        local localizedName = GetSpellName(spellID)
         if localizedName then
             _localeToCanonical[localizedName] = canonical
         end
@@ -134,7 +174,7 @@ function Data:GetLocalizedRecipeName(recipeKey, fallback)
         local name = GetItemInfo(recipeKey)
         if name then return name end
     elseif recipeKey and recipeKey < 0 then
-        local name = GetSpellInfo(-recipeKey)
+        local name = GetSpellName(-recipeKey)
         if name then return name end
     end
     return fallback or "Unknown"
@@ -185,13 +225,17 @@ function Data:GetSpecialisationDescription(spec)
     return nil
 end
 
---- Returns "TBC", "ORIG", or nil (show regardless) for a recipe.
---- recipeKey: positive = createdItemId, negative = -spellId (enchanting).
---- Looks up directly in TBC_ITEM_IDS — no scan required.
+--- Returns expansion tag for a recipe: "MOP", "CATA", "WOTLK", "TBC", or "ORIG".
 function Data:GetExpansionTag(_profName, recipeKey)
-    local ids = GuildCrafts.TBC_ITEM_IDS
-    if not ids then return nil end
-    return ids[recipeKey] and "TBC" or "ORIG"
+    local mop = GuildCrafts.MOP_ITEM_IDS
+    if mop and mop[recipeKey] then return "MOP" end
+    local cata = GuildCrafts.CATA_ITEM_IDS
+    if cata and cata[recipeKey] then return "CATA" end
+    local wotlk = GuildCrafts.WOTLK_ITEM_IDS
+    if wotlk and wotlk[recipeKey] then return "WOTLK" end
+    local tbc = GuildCrafts.TBC_ITEM_IDS
+    if not tbc then return "ORIG" end
+    return tbc[recipeKey] and "TBC" or "ORIG"
 end
 
 -- AceDB defaults
@@ -216,7 +260,15 @@ local DB_DEFAULTS = {
     },
     profile = {
         showOnlineOnly      = false,
-        expansionFilter     = { ORIG = true, TBC = true },
+        expansionFilter     = GuildCrafts.MOP_ITEM_IDS
+            and { ORIG = true, TBC = true, WOTLK = true, CATA = true, MOP = true }
+            or  GuildCrafts.CATA_ITEM_IDS
+            and { ORIG = true, TBC = true, WOTLK = true, CATA = true }
+            or  GuildCrafts.WOTLK_ITEM_IDS
+            and { ORIG = true, TBC = true, WOTLK = true }
+            or  GuildCrafts.TBC_ITEM_IDS
+            and { ORIG = true, TBC = true }
+            or  { ORIG = true },
         showTooltipCrafters = true,
     },
 }
@@ -229,6 +281,14 @@ function Data:OnInitialize()
     -- Set up AceDB
     GuildCrafts.db = LibStub("AceDB-3.0"):New("GuildCraftsDB", DB_DEFAULTS, true)
     self.db = GuildCrafts.db
+
+    -- Backfill expansion filter tags added in later versions
+    local f = self.db.profile.expansionFilter
+    if f then
+        if GuildCrafts.WOTLK_ITEM_IDS and f.WOTLK == nil then f.WOTLK = true end
+        if GuildCrafts.CATA_ITEM_IDS  and f.CATA  == nil then f.CATA  = true end
+        if GuildCrafts.MOP_ITEM_IDS   and f.MOP   == nil then f.MOP   = true end
+    end
 
     -- Migrate legacy per-crafter reagents/categories into shared RecipeDB
     self:MigrateToRecipeDB()
@@ -344,6 +404,9 @@ function Data:RebuildOnlineCache()
             self._onlineCache[name] = isOnline or false
         end
     end
+
+    -- Always mark self as online (roster may not include us on early fires)
+    self._onlineCache[self:GetPlayerKey()] = true
 end
 
 function Data:IsMemberOnline(memberKey)
@@ -547,19 +610,55 @@ function Data:DetectProfessions()
     local playerKey = self:GetPlayerKey()
     local entry = self:GetMemberEntry(playerKey, true)
     if not entry then return end
-    local currentProfs = {}
 
-    -- GetSkillLineInfo enumerates all skills including professions.
-    -- Canonicalize the localized name so non-English clients store the same
-    -- stable English key that TRACKED_PROFESSIONS and the rest of the addon use.
+    -- Always clear absent marker on self — we are definitively online
+    if entry._absentSince then entry._absentSince = nil end
+
+    local currentProfs = {}
     local skillLevels = {}  -- profName -> { rank, max }
-    for i = 1, GetNumSkillLines() do
-        local skillName, isHeader, _, skillRank, _, _, skillMaxRank, _, _, _, _, _, _ = GetSkillLineInfo(i)
-        if not isHeader then
-            local canonical = self:GetCanonicalProfName(skillName)
-            if TRACKED_PROFESSIONS[canonical] then
-                currentProfs[canonical] = true
-                skillLevels[canonical] = { rank = skillRank, max = skillMaxRank }
+
+    if GetProfessions then
+        -- MoP+ path: GetProfessions() returns indices for the player's professions
+        local prof1, prof2, _, fishing, cooking = GetProfessions()
+        local profIndices = {}
+        if prof1 then profIndices[#profIndices + 1] = prof1 end
+        if prof2 then profIndices[#profIndices + 1] = prof2 end
+        if fishing then profIndices[#profIndices + 1] = fishing end
+        if cooking then profIndices[#profIndices + 1] = cooking end
+        if #profIndices > 0 then
+            for _, idx in ipairs(profIndices) do
+                if idx then
+                    local name, _, skillRank, skillMaxRank = GetProfessionInfo(idx)
+                    if name then
+                        local canonical = self:GetCanonicalProfName(name)
+                        if TRACKED_PROFESSIONS[canonical] then
+                            currentProfs[canonical] = true
+                            skillLevels[canonical] = { rank = skillRank, max = skillMaxRank }
+                        end
+                    end
+                end
+            end
+        else
+            -- GetProfessions exists but returned nothing (Classic Era) — use skill lines
+            for skillName, isHeader, skillRank, skillMaxRank in IterSkillLines() do
+                if not isHeader then
+                    local canonical = self:GetCanonicalProfName(skillName)
+                    if TRACKED_PROFESSIONS[canonical] then
+                        currentProfs[canonical] = true
+                        skillLevels[canonical] = { rank = skillRank, max = skillMaxRank }
+                    end
+                end
+            end
+        end
+    else
+        -- Classic/TBC/WotLK path via IterSkillLines compat wrapper
+        for skillName, isHeader, skillRank, skillMaxRank in IterSkillLines() do
+            if not isHeader then
+                local canonical = self:GetCanonicalProfName(skillName)
+                if TRACKED_PROFESSIONS[canonical] then
+                    currentProfs[canonical] = true
+                    skillLevels[canonical] = { rank = skillRank, max = skillMaxRank }
+                end
             end
         end
     end
@@ -894,6 +993,8 @@ end
 ----------------------------------------------------------------------
 
 function Data:ScanTradeSkill()
+    if IsTradeSkillLinked and IsTradeSkillLinked() then return end
+
     local numSkills = GetNumTradeSkills()
     if not numSkills or numSkills == 0 then
         return
@@ -1098,10 +1199,8 @@ function Data:ScanCraft()
 
     -- Guard: CRAFT_SHOW fires for both Enchanting and Beast Training (hunter pet)
     -- windows in Classic TBC. Only scan when the player actually has Enchanting.
-    -- Compare against the canonical name so non-English clients are handled.
     local hasEnchanting = false
-    for i = 1, GetNumSkillLines() do
-        local skillName, isHeader = GetSkillLineInfo(i)
+    for skillName, isHeader in IterSkillLines() do
         if not isHeader and self:GetCanonicalProfName(skillName) == "Enchanting" then
             hasEnchanting = true
             break
@@ -1123,8 +1222,7 @@ function Data:ScanCraft()
     end
 
     -- Refresh Enchanting skill level while the window is open
-    for i = 1, GetNumSkillLines() do
-        local skillName, isHeader, _, skillRank, _, _, skillMaxRank = GetSkillLineInfo(i)
+    for skillName, isHeader, skillRank, skillMaxRank in IterSkillLines() do
         if not isHeader and self:GetCanonicalProfName(skillName) == profName then
             local profDataLocal = entry.professions[profName]
             if profDataLocal.skillLevel ~= skillRank or profDataLocal.maxSkillLevel ~= skillMaxRank then
@@ -1282,6 +1380,160 @@ function Data:GetCraftRecipeKey(index)
     end
 
     return nil
+end
+
+----------------------------------------------------------------------
+-- Modern Scan (MoP+ uses C_TradeSkillUI namespace)
+----------------------------------------------------------------------
+
+function Data:ScanTradeSkillModern()
+    if not C_TradeSkillUI then
+        GuildCrafts:Debug("ScanTradeSkillModern: C_TradeSkillUI is nil")
+        return
+    end
+    if C_TradeSkillUI.IsTradeSkillReady and not C_TradeSkillUI.IsTradeSkillReady() then
+        GuildCrafts:Debug("ScanTradeSkillModern: IsTradeSkillReady() = false, retrying in 1s")
+        self:ScheduleTimer("ScanTradeSkillModern", 1)
+        return
+    end
+    -- Don't scan linked/NPC tradeskills — they aren't ours
+    if C_TradeSkillUI.IsTradeSkillLinked and C_TradeSkillUI.IsTradeSkillLinked() then return end
+    if C_TradeSkillUI.IsNPCCrafting and C_TradeSkillUI.IsNPCCrafting() then return end
+
+    local profInfo = C_TradeSkillUI.GetBaseProfessionInfo()
+    if not profInfo then
+        GuildCrafts:Debug("ScanTradeSkillModern: GetBaseProfessionInfo() returned nil")
+        return
+    end
+    local profDisplayName = profInfo.professionName or profInfo.parentProfessionName or profInfo.name
+    if not profDisplayName then
+        GuildCrafts:Debug("ScanTradeSkillModern: no professionName in profInfo, keys:", table.concat((function()
+            local k = {}; for key in pairs(profInfo) do k[#k+1] = tostring(key) end; return k
+        end)(), ", "))
+        return
+    end
+
+    local profName = self:GetCanonicalProfName(profDisplayName)
+    if not profName or not TRACKED_PROFESSIONS[profName] then
+        GuildCrafts:Debug("Open profession not tracked:", profDisplayName, "->", profName or "nil")
+        return
+    end
+
+    local playerKey = self:GetPlayerKey()
+    local entry = self:GetMemberEntry(playerKey, true)
+    if not entry then return end
+    local ageAtScanStart = entry.lastUpdate and (time() - entry.lastUpdate) or math.huge
+    if not entry.professions[profName] then
+        entry.professions[profName] = { recipes = {} }
+    end
+
+    -- Refresh skill level
+    if profInfo.skillLevel and profInfo.maxSkillLevel then
+        local profDataLocal = entry.professions[profName]
+        if profDataLocal.skillLevel ~= profInfo.skillLevel or profDataLocal.maxSkillLevel ~= profInfo.maxSkillLevel then
+            profDataLocal.skillLevel = profInfo.skillLevel
+            profDataLocal.maxSkillLevel = profInfo.maxSkillLevel
+            entry.lastUpdate = time()
+        end
+    end
+
+    local recipeIDs = C_TradeSkillUI.GetAllRecipeIDs()
+    if not recipeIDs or #recipeIDs == 0 then
+        GuildCrafts:Debug("ScanTradeSkillModern: GetAllRecipeIDs() empty for", profName, "— retrying in 1s")
+        self:ScheduleTimer("ScanTradeSkillModern", 1)
+        return
+    end
+
+    local recipes = entry.professions[profName].recipes
+
+    -- Partial-scan protection
+    do
+        local existingCount = 0
+        for _ in pairs(recipes) do existingCount = existingCount + 1 end
+        if existingCount > 0 and #recipeIDs < (existingCount * 0.5) then
+            GuildCrafts:Debug("ScanTradeSkillModern: partial-scan guard triggered for", profName,
+                "(recipeIDs", #recipeIDs, "< 50% of existing", existingCount, ") — deferring 2s")
+            self:ScheduleTimer("ScanTradeSkillModern", 2)
+            return
+        end
+    end
+
+    local newCount = 0
+    local newRecipes = {}
+
+    for _, recipeID in ipairs(recipeIDs) do
+        local info = C_TradeSkillUI.GetRecipeInfo(recipeID)
+        if info and info.learned then
+            local key
+            local itemLink = C_TradeSkillUI.GetRecipeItemLink(recipeID)
+            if itemLink then
+                local itemID = tonumber(itemLink:match("item:(%d+)"))
+                key = itemID or -recipeID
+            else
+                key = -recipeID
+            end
+
+            if key then
+                -- Scan reagents into shared RecipeDB
+                if C_TradeSkillUI.GetRecipeNumReagents then
+                    local numReagents = C_TradeSkillUI.GetRecipeNumReagents(recipeID)
+                    if numReagents and numReagents > 0 then
+                        local existingReagents = self:GetRecipeReagents(key)
+                        if not existingReagents or #existingReagents < numReagents then
+                            local reagents = {}
+                            for j = 1, numReagents do
+                                local reagentName, _, reagentCount = C_TradeSkillUI.GetRecipeReagentInfo(recipeID, j)
+                                if reagentName then
+                                    local itemID_r
+                                    local rLink = C_TradeSkillUI.GetRecipeReagentItemLink(recipeID, j)
+                                    if rLink then itemID_r = tonumber(rLink:match("item:(%d+)")) end
+                                    reagents[#reagents + 1] = { name = reagentName, count = reagentCount or 1, itemID = itemID_r }
+                                end
+                            end
+                            if #reagents > 0 then
+                                self:SetRecipeInfo(key, info.name, info.categoryName, reagents)
+                            end
+                        end
+                    end
+                end
+
+                if not recipes[key] then
+                    local recipeData = {
+                        name = info.name or "",
+                        source = "",
+                    }
+                    recipes[key] = recipeData
+                    newRecipes[key] = recipeData
+                    newCount = newCount + 1
+                end
+            end
+        end
+    end
+
+    local changed = newCount > 0
+    if newCount > 0 then
+        entry.lastUpdate = time()
+        GuildCrafts:Printf("Scanned %s: %d new recipe(s) found.", profName, newCount)
+
+        if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastNewRecipes then
+            GuildCrafts.Comms:BroadcastNewRecipes(playerKey, profName, newRecipes)
+        end
+        if GuildCrafts.Comms and GuildCrafts.Comms.BroadcastLocalAdvertise then
+            GuildCrafts.Comms:BroadcastLocalAdvertise(
+                playerKey, entry.lastUpdate, self:GetPlayerProfCounts())
+        end
+        if GuildCrafts.Tooltip then
+            GuildCrafts.Tooltip:InvalidateIndex()
+        end
+    else
+        entry.lastUpdate = time()
+        if ageAtScanStart >= TOUCH_BROADCAST_THRESHOLD and GuildCrafts.Comms and GuildCrafts.Comms.BroadcastTimestampTouch then
+            GuildCrafts.Comms:BroadcastTimestampTouch(playerKey, profName)
+        end
+        GuildCrafts:Debug("Scanned " .. profName .. ": no new recipes.")
+    end
+
+    return changed
 end
 
 ----------------------------------------------------------------------
@@ -1589,8 +1841,10 @@ function Data:PruneRoster()
     local now = time()
     local gdb = self:GetGuildDB()
     if not gdb then return end
+    local localPlayerKey = self:GetPlayerKey()
     for memberKey, entry in pairs(gdb) do
         if type(entry) == "table" and entry.lastUpdate and not rosterKeys[memberKey]
+                and memberKey ~= localPlayerKey
                 and not entry._tombstone then
             if not entry._absentSince then
                 -- First time absent — mark with timestamp
@@ -1631,6 +1885,7 @@ function Data:PruneRoster()
     local inactivePruned = 0
     for memberKey, entry in pairs(gdb) do
         if type(memberKey) == "string"
+        and memberKey ~= localPlayerKey
         and type(entry) == "table"
         and not entry._tombstone
         and entry.lastUpdate and entry.lastUpdate > 0
@@ -1662,7 +1917,6 @@ function Data:PruneRoster()
     -- Prune legacy entries with no scan timestamp (lastUpdate nil or 0)
     -- Skip the local player — we're always authoritative for our own data
     local legacyPruned = 0
-    local localPlayerKey = self:GetPlayerKey()
     for memberKey, entry in pairs(gdb) do
         if type(memberKey) == "string"
         and memberKey ~= localPlayerKey
@@ -1728,8 +1982,30 @@ end
 -- Profession Name Lists
 ----------------------------------------------------------------------
 
-local PRIMARY_PROF_NAMES   = { "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Jewelcrafting", "Leatherworking", "Tailoring" }
+local PRIMARY_PROF_NAMES   = { "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Inscription", "Jewelcrafting", "Leatherworking", "Tailoring" }
 local SECONDARY_PROF_NAMES = { "Mining", "Herbalism", "Skinning", "Cooking" }
+
+-- Remove professions that don't exist on this client's expansion level
+local _expansionLevel = GetClassicExpansionLevel and GetClassicExpansionLevel() or 99
+if _expansionLevel < 1 then
+    TRACKED_PROFESSIONS["Jewelcrafting"] = nil
+    PROFESSION_SPELL_IDS["Jewelcrafting"] = nil
+    for i = #PRIMARY_PROF_NAMES, 1, -1 do
+        if PRIMARY_PROF_NAMES[i] == "Jewelcrafting" then
+            table.remove(PRIMARY_PROF_NAMES, i)
+        end
+    end
+end
+if _expansionLevel < 2 then
+    TRACKED_PROFESSIONS["Inscription"] = nil
+    PROFESSION_SPELL_IDS["Inscription"] = nil
+    for i = #PRIMARY_PROF_NAMES, 1, -1 do
+        if PRIMARY_PROF_NAMES[i] == "Inscription" then
+            table.remove(PRIMARY_PROF_NAMES, i)
+        end
+    end
+end
+
 -- Flat list for DB iteration, member counts, etc.
 local PROF_NAMES = {}
 for _, n in ipairs(PRIMARY_PROF_NAMES)   do PROF_NAMES[#PROF_NAMES + 1] = n end

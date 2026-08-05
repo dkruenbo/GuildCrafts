@@ -102,6 +102,19 @@ This document describes planned releases with implementation notes for each item
 | — | Ex-guild grace period reduced: 30d → 7d | Done in 1.3.0 |
 | — | Login stale-data warning (own entry, once per session) | Done in 1.3.0 |
 
+### 2.0.0 — Multi-Expansion Support
+
+| Issue | Title | Status |
+|-------|-------|--------|
+| — | Multi-TOC: Classic Era, TBC Anniversary, WotLK Classic, Cata Classic, MoP Classic | Done in 2.0.0 |
+| — | Expansion recipe data: Data_WOTLK.lua, Data_CATA.lua, Data_MOP.lua | Done in 2.0.0 |
+| — | Dynamic expansion filter buttons (Vanilla/TBC/WotLK/Cata/MoP) | Done in 2.0.0 |
+| — | Modern scanner path (C_TradeSkillUI) for Cata/MoP | Done in 2.0.0 |
+| — | Classic Era: IterSkillLines fallback for profession detection | Done in 2.0.0 |
+| — | Classic Era: SetHyperlink tooltip hook (TooltipDataProcessor fallback) | Done in 2.0.0 |
+| — | Linked tradeskill guard (prevents data corruption) | Done in 2.0.0 |
+| — | Self-prune protection (player entry never marked absent or pruned) | Done in 2.0.0 |
+
 ---
 
 ## Planned

@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "1.11.0"
+GuildCrafts.DISPLAY_VERSION = "2.0.0"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -44,10 +44,19 @@ function GuildCrafts:OnEnable()
     -- Called after all addons have loaded (PLAYER_LOGIN equivalent).
     -- Register game events.
     self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerEnteringWorld")
-    self:RegisterEvent("TRADE_SKILL_SHOW", "OnTradeSkillShow")
     self:RegisterEvent("GUILD_ROSTER_UPDATE", "OnGuildRosterUpdate")
-    -- Enchanting in Classic TBC uses CRAFT_SHOW, not TRADE_SKILL_SHOW
-    self:RegisterEvent("CRAFT_SHOW", "OnCraftShow")
+    -- MoP+/Cata: register both events — TRADE_SKILL_LIST_UPDATE fires when data is
+    -- ready on some clients, TRADE_SKILL_SHOW fires on open for others.
+    if C_TradeSkillUI then
+        self:RegisterEvent("TRADE_SKILL_LIST_UPDATE", "OnTradeSkillShow")
+        self:RegisterEvent("TRADE_SKILL_SHOW", "OnTradeSkillShow")
+    else
+        self:RegisterEvent("TRADE_SKILL_SHOW", "OnTradeSkillShow")
+    end
+    -- Enchanting in Classic/TBC uses CRAFT_SHOW, not TRADE_SKILL_SHOW
+    if GetNumCrafts then
+        self:RegisterEvent("CRAFT_SHOW", "OnCraftShow")
+    end
     -- Fired when the client loads an item into memory (e.g. after GetItemInfo)
     -- Used to retry quality-color lookups that returned nil on first render
     self:RegisterEvent("GET_ITEM_INFO_RECEIVED", "OnItemInfoReceived")
@@ -162,10 +171,12 @@ function GuildCrafts:OnLoginReady()
 end
 
 function GuildCrafts:OnTradeSkillShow()
-    -- Profession window was opened — scan recipes (DELTA_UPDATE + DELTA_AD
-    -- are broadcast from within ScanTradeSkill when new recipes are found)
     if self.Data then
-        self.Data:ScanTradeSkill()
+        if C_TradeSkillUI and C_TradeSkillUI.GetBaseProfessionInfo then
+            self.Data:ScanTradeSkillModern()
+        else
+            self.Data:ScanTradeSkill()
+        end
     end
 end
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.0.0 — 2026-08-05
+
+### New features
+
+- **Multi-expansion support** — a single addon folder now works on Classic Era (1.15.x), TBC Anniversary (2.5.x), WotLK Classic (3.4.x), Cata Classic (4.4.x), and MoP Classic (5.5.x) via multi-TOC. The game automatically loads the correct version. WotLK, Cata, and MoP recipe data files are included; expansion filter buttons appear dynamically based on client.
+
+### Improvements
+
+- **Classic Era profession detection** — `GetProfessions()` exists on the modern engine but returns nil on Classic Era; the addon now falls back to skill-line iteration automatically.
+- **Classic Era tooltip hooks** — `TooltipDataProcessor` callbacks don't fire on all clients; a `SetHyperlink` hook with dedup guard ensures tooltip crafters appear on every supported version.
+- **Linked tradeskill guard** — opening another player's linked recipes no longer corrupts your own data (TBC/WotLK).
+- **Self-prune protection** — the player's own entry can no longer be incorrectly marked as absent or pruned by the inactive-member cleanup.
+- **Dynamic UI button layout** — expansion filter buttons chain right-to-left from the scope dropdown; the search box auto-sizes to fill remaining space regardless of how many buttons are visible.
+
+### Fixes
+
+- **MoP Classic scan** — `C_TradeSkillUI` namespace exists on MoP but lacks `GetBaseProfessionInfo`; the scanner now checks for the specific function before choosing the modern path.
+- **MoP Classic events** — both `TRADE_SKILL_SHOW` and `TRADE_SKILL_LIST_UPDATE` are now registered when `C_TradeSkillUI` is present, fixing scans not triggering on MoP.
+
+---
+
 ## 1.11.0 — 2026-07-21
 
 ### New features

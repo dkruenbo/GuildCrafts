@@ -337,7 +337,7 @@ function UI:CreateSearchBar(parent)
     local search = CreateFrame("EditBox", "GuildCraftsSearchBox", container, "BackdropTemplate")
     search:SetHeight(24)
     search:SetPoint("LEFT", container, "LEFT", 2, 0)
-    search:SetPoint("RIGHT", container, "RIGHT", -188, 0)
+    search:SetPoint("RIGHT", container, "RIGHT", -188, 0)  -- repositioned later after buttons
     search:SetFontObject(ChatFontNormal)
     search:SetAutoFocus(false)
     search:SetBackdrop({
@@ -407,11 +407,10 @@ function UI:CreateSearchBar(parent)
         end
     end)
 
-    -- Expansion filter buttons: [Orig] and [TBC]
-    local function makeExpBtn(label, rightOffset, width)
+    -- Expansion filter buttons — only shown when expansion data files are loaded
+    local function makeExpBtn(label, width)
         local btn = CreateFrame("Button", nil, container, "BackdropTemplate")
         btn:SetSize(width, 24)
-        btn:SetPoint("RIGHT", container, "RIGHT", rightOffset, 0)
         btn:SetBackdrop({
             bgFile   = "Interface\\Buttons\\WHITE8x8",
             edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -426,26 +425,91 @@ function UI:CreateSearchBar(parent)
         btn._textFS = fs
         return btn
     end
-    local tbcBtn  = makeExpBtn("TBC",     -84, 40)
-    local origBtn = makeExpBtn("Vanilla", -128, 56)
-    tbcBtn:SetScript("OnClick",  function() UI:ToggleExpansionFilter("TBC")  end)
-    origBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("ORIG") end)
-    tbcBtn:SetScript("OnEnter",  function(btn)
-        GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
-        GameTooltip:AddLine("TBC Recipes", 1, 1, 1)
-        GameTooltip:AddLine("Show The Burning Crusade recipes.", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    tbcBtn:SetScript("OnLeave",  function() GameTooltip:Hide() end)
-    origBtn:SetScript("OnEnter", function(btn)
-        GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
-        GameTooltip:AddLine("Vanilla Recipes", 1, 1, 1)
-        GameTooltip:AddLine("Show Vanilla Classic recipes.", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    origBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    self._expFilterTBCBtn  = tbcBtn
-    self._expFilterOrigBtn = origBtn
+
+    -- Build visible buttons right-to-left, chained from scopeBtn
+    local expBtns = {}
+    local mopBtn, cataBtn, wotlkBtn, tbcBtn, origBtn
+
+    if GuildCrafts.MOP_ITEM_IDS then
+        mopBtn = makeExpBtn("MoP", 36)
+        mopBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("MOP") end)
+        mopBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine("MoP Recipes", 1, 1, 1)
+            GameTooltip:AddLine("Show Mists of Pandaria recipes.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        mopBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        expBtns[#expBtns + 1] = mopBtn
+    end
+    if GuildCrafts.CATA_ITEM_IDS then
+        cataBtn = makeExpBtn("Cata", 38)
+        cataBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("CATA") end)
+        cataBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine("Cata Recipes", 1, 1, 1)
+            GameTooltip:AddLine("Show Cataclysm recipes.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        cataBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        expBtns[#expBtns + 1] = cataBtn
+    end
+    if GuildCrafts.WOTLK_ITEM_IDS then
+        wotlkBtn = makeExpBtn("WotLK", 46)
+        wotlkBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("WOTLK") end)
+        wotlkBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine("WotLK Recipes", 1, 1, 1)
+            GameTooltip:AddLine("Show Wrath of the Lich King recipes.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        wotlkBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        expBtns[#expBtns + 1] = wotlkBtn
+    end
+    if GuildCrafts.TBC_ITEM_IDS then
+        tbcBtn = makeExpBtn("TBC", 38)
+        tbcBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("TBC") end)
+        tbcBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine("TBC Recipes", 1, 1, 1)
+            GameTooltip:AddLine("Show The Burning Crusade recipes.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        tbcBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        expBtns[#expBtns + 1] = tbcBtn
+
+        origBtn = makeExpBtn("Vanilla", 52)
+        origBtn:SetScript("OnClick", function() UI:ToggleExpansionFilter("ORIG") end)
+        origBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine("Vanilla Recipes", 1, 1, 1)
+            GameTooltip:AddLine("Show Vanilla Classic recipes.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        origBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        expBtns[#expBtns + 1] = origBtn
+    end
+
+    -- Chain positions: first button anchors to scopeBtn left, rest chain leftward
+    for i, btn in ipairs(expBtns) do
+        if i == 1 then
+            btn:SetPoint("RIGHT", scopeBtn, "LEFT", -4, 0)
+        else
+            btn:SetPoint("RIGHT", expBtns[i - 1], "LEFT", -4, 0)
+        end
+    end
+
+    -- Anchor search box right edge to leftmost button so they never overlap
+    local leftmostAnchor = expBtns[#expBtns] or scopeBtn
+    search:ClearAllPoints()
+    search:SetPoint("LEFT", container, "LEFT", 2, 0)
+    search:SetPoint("RIGHT", leftmostAnchor, "LEFT", -6, 0)
+
+    self._expFilterTBCBtn   = tbcBtn
+    self._expFilterOrigBtn  = origBtn
+    self._expFilterWotlkBtn = wotlkBtn
+    self._expFilterCataBtn  = cataBtn
+    self._expFilterMopBtn   = mopBtn
 
     self.searchBox = search
     self.scopeButton = scopeBtn
@@ -659,6 +723,7 @@ local PROFESSION_ICONS = {
     ["Blacksmithing"]  = "Interface\\Icons\\Trade_BlackSmithing",
     ["Enchanting"]     = "Interface\\Icons\\Trade_Engraving",
     ["Engineering"]    = "Interface\\Icons\\Trade_Engineering",
+    ["Inscription"]    = "Interface\\Icons\\INV_Inscription_Tradeskill01",
     ["Jewelcrafting"]  = "Interface\\Icons\\INV_Misc_Gem_01",
     ["Leatherworking"] = "Interface\\Icons\\INV_Misc_ArmorKit_17",
     ["Tailoring"]      = "Interface\\Icons\\Trade_Tailoring",
@@ -2573,15 +2638,25 @@ function UI:_UpdateTooltipBtnVisuals()
     end
 end
 
---- Update visual state of the [Orig] and [TBC] expansion filter buttons.
+--- Update visual state of the expansion filter buttons.
 function UI:_UpdateExpansionFilterVisuals()
     if not self._expFilterOrigBtn then return end
     local f = GuildCrafts.db and GuildCrafts.db.profile.expansionFilter
     if not f then return end
-    for _, info in ipairs({
-        { btn = self._expFilterOrigBtn, tag = "ORIG" },
-        { btn = self._expFilterTBCBtn,  tag = "TBC"  },
-    }) do
+    local buttons = {
+        { btn = self._expFilterOrigBtn,  tag = "ORIG"  },
+        { btn = self._expFilterTBCBtn,   tag = "TBC"   },
+    }
+    if self._expFilterWotlkBtn then
+        buttons[#buttons + 1] = { btn = self._expFilterWotlkBtn, tag = "WOTLK" }
+    end
+    if self._expFilterCataBtn then
+        buttons[#buttons + 1] = { btn = self._expFilterCataBtn, tag = "CATA" }
+    end
+    if self._expFilterMopBtn then
+        buttons[#buttons + 1] = { btn = self._expFilterMopBtn, tag = "MOP" }
+    end
+    for _, info in ipairs(buttons) do
         if f[info.tag] then
             info.btn:SetBackdropColor(0.12, 0.12, 0.12, 1)
             info.btn:SetBackdropBorderColor(1, 0.82, 0, 1)
@@ -2594,13 +2669,16 @@ function UI:_UpdateExpansionFilterVisuals()
     end
 end
 
---- Toggle an expansion filter tag ("ORIG" or "TBC") and refresh the active view.
+--- Toggle an expansion filter tag and refresh the active view.
 function UI:ToggleExpansionFilter(tag)
     if not GuildCrafts.db then return end
     local f = GuildCrafts.db.profile.expansionFilter
-    local other = tag == "ORIG" and "TBC" or "ORIG"
-    -- Prevent both being off
-    if f[tag] and not f[other] then return end
+    -- Prevent all tags being off: count how many are currently on
+    if f[tag] then
+        local onCount = 0
+        for _, v in pairs(f) do if v then onCount = onCount + 1 end end
+        if onCount <= 1 then return end
+    end
     f[tag] = not f[tag]
     self:_UpdateExpansionFilterVisuals()
     if self._searchActive and self._lastSearchResults then

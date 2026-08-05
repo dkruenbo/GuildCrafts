@@ -1,233 +1,198 @@
 > **GuildCrafts is now considered feature-complete. Only critical fixes may be addressed going forward.**
 
-# GuildCrafts
+# GuildCrafts — Guild Profession Tracker for WoW Classic
 
-**Find guild crafters instantly.**
+**The fastest way to find a crafter in your guild.**
 
-Stop asking in guild chat _“Can anyone craft this?”_ and waiting for replies.
+Stop asking in guild chat _"Can anyone craft this?"_ and waiting for replies.
 
-GuildCrafts automatically builds a **shared crafting database for your guild**.  
-Search any item and instantly see **who can craft it**.
+GuildCrafts automatically builds a **shared profession database for your entire guild** — tracking every recipe, every crafter, every specialization across all WoW Classic versions.
 
-You can even search directly from guild chat.
+Search any item and instantly see **who can craft it**, what reagents it needs, and whether the crafter is online.
+
+You can even search directly from guild chat — no addon needed for the person asking:
 
 `!gc shadowcloth`  
 `!gc spellstrike hood`  
 `!gc flask`
 
-GuildCrafts automatically replies with matching crafters — **no addon required for the person asking**.
+***
+
+# Why Guilds Use GuildCrafts
+
+### Find Crafters Without Asking in Chat
+
+Type `!gc <item name>` in guild chat.  
+GuildCrafts automatically replies with matching crafters.
+
+**The person asking does NOT need the addon installed** — only crafters need it.
+
+Perfect for raids, farming sessions, or when browsing the auction house.
+
+### Automatic Recipe Sync Between Guild Members
+
+GuildCrafts combines the recipes of all addon users into a **single searchable guild recipe book**.
+
+*   Recipes sync automatically — no manual setup
+*   New recipes broadcast instantly when learned
+*   Works silently in the background with minimal chat traffic
+*   The more guild members who install it, the more complete the database
+
+### Item Tooltip Crafters
+
+Hover any item anywhere in the game — bags, auction house, trade chat, mail — and see **which guild members can craft it** directly in the tooltip.
+
+No chat, no alt-tabbing, no external websites.
 
 ***
 
-# Core Features
+# Guild Recipe Browser
 
-### Guild Chat Craft Lookup
+GuildCrafts includes a full **profession recipe browser** for your guild.
 
-Perfect for quickly finding crafters during raids, farming sessions, or when browsing the auction house.
-
-Just type:
-
-`!gc <item name>`
-
-GuildCrafts will reply with **guild members who can craft it**.
-
-Players asking the question **do not need the addon installed**.
-
-### Shared Guild Recipe Database
-
-GuildCrafts combines the recipes of all addon users into a **single guild recipe book**.
-
-Search by:
-
-*   recipe name
-*   crafted item
-*   profession
-
-Instantly see **which guild members can craft what**.
-
-The more guild members who install the addon, the more complete the database becomes.
-
-### Item Tooltip Integration
-
-GuildCrafts injects crafter info directly into native item tooltips.
-
-Hover any item anywhere in the game:
-
-*   bags
-*   auction house
-*   trade chat
-*   mail
-*   tooltips
-
-GuildCrafts shows **which guild members can craft that item** — no asking in chat or checking external websites.
-
-***
-
-# Recipe Browser
-
-GuildCrafts includes a full crafting browser for your guild.
-
-Browse professions and recipes in two ways:
-
-### Members View
+### Members View — Browse Recipes by Crafter
 
 See **every recipe known by a specific guild member**.
 
 Useful when you already know who might craft something.
 
-### Recipes View
+### Recipes View — Browse Crafters by Recipe
 
 See **every guild member who can craft a recipe**.
 
-*   Hover recipes to inspect the crafted item or spell
+*   Hover recipes to inspect the crafted item
 *   Expand recipes to view reagent materials
 *   Hover reagents to inspect them
 *   Hover the crafter preview to see the full crafter list
-*   Click `[W]` to whisper a crafter directly — chat opens pre-filled, you review before sending
+*   Click `[W]` to whisper a crafter directly — chat opens pre-filled
 *   Click `[>]` to post crafters directly to guild chat
 
-This makes it easy to see **who can craft something and what it costs** at a glance.
+### Expansion Filters — Vanilla · TBC · WotLK · Cata · MoP
+
+Five toggle buttons let you filter recipes by expansion. Toggle any combination to show only the recipes you care about. Your selection persists across sessions.
 
 ### Online Filter & Tooltip Toggle
 
-Two toggle buttons sit in the **bottom bar** of the GuildCrafts window.
+**\[Online\]** hides offline members across the member list, crafter lists, and profession counts. Glows gold when active.
 
-**\[Online\]** hides offline members across the member list, crafter lists, and profession counts. The button glows gold when the filter is active.
+**\[Tooltip\]** controls whether GuildCrafts injects crafter info into item tooltips. Disable it when popular items generate tooltips that are too long in large guilds. Persists across sessions.
 
-**\[Tooltip\]** controls whether GuildCrafts injects crafter info into item tooltips. Disable it when popular items (flasks, enchants) generate tooltips that are too long in large guilds. The setting persists across sessions.
-
-**\[Minimap\]** shows or hides the minimap icon without needing a slash command. Glows gold when the minimap button is visible.
+**\[Minimap\]** shows or hides the minimap icon without needing a slash command. Glows gold when visible.
 
 ### Online Status Indicator
 
-Every member row shows a small coloured `O` dot:
+Every member row shows a coloured status dot:
 
-*   **Green** — online and GuildCrafts is active this session
-*   **Yellow** — online, but GuildCrafts not detected (may have uninstalled)
+*   **Green** — online, GuildCrafts active
+*   **Yellow** — online, addon not detected (may have uninstalled)
 *   **Grey** — offline
-
-Hover the dot to see a tooltip explaining the status.
 
 ***
 
-# Quality of Life
+# Quality of Life Features
 
-### Favorites
+### Favorites — Bookmark Recipes and Crafters
 
 Star recipes or crafters you use often and access them instantly from the Favorites tab.
 
-Perfect for things like:
-
-*   regular raid consumables
-*   enchant contacts
-*   crafting partners
+Perfect for raid consumables, enchant contacts, and crafting partners.
 
 ### Cooldown Tracking
 
-GuildCrafts tracks profession cooldowns across your guild.
+GuildCrafts tracks profession cooldowns across your guild:
 
-Examples include:
+*   Mooncloth · Shadowcloth · Spellcloth
+*   Transmutes (Primal Might, etc.)
 
-*   Mooncloth
-*   Shadowcloth
-*   Spellcloth
-*   Transmutes
+Quickly see **which cooldowns are available** without asking in chat.
 
-Quickly see **which cooldowns are available**.
+### Specialization Tracking
 
-### Specializations
+GuildCrafts tracks profession specializations:
 
-GuildCrafts tracks profession specializations such as:
-
-*   Transmutation Master
-*   Mooncloth Tailoring
-*   Spellfire Tailoring
+*   Transmutation / Elixir / Potion Master
+*   Mooncloth / Shadoweave / Spellfire Tailoring
 *   Goblin / Gnomish Engineering
+*   Dragonscale / Elemental / Tribal Leatherworking
 
-So you always know **who can craft which variant**.
-
-Hover the specialization label in a member's detail panel to see a plain-English description of what it unlocks.
-
-Everything is built to stay **fast and easy to scan**.
+Always know **who can craft which variant**. Hover specialization labels for plain-English descriptions.
 
 ***
 
-# Setup
+# Setup — Under One Minute
 
-Getting started takes less than a minute.
-
-1.  Install the addon
+1.  Install the addon (CurseForge, WoWUp, or manual)
 2.  Open each of your profession windows once
 3.  Done
 
-Your recipes will now automatically sync with other guild members who use the addon.
+Your recipes automatically sync with other guild members who use the addon.
 
 ***
 
-# Supported Version
+# Supported WoW Classic Versions
 
-Built for **WoW TBC Anniversary Edition**  
-Interface version **20505**
+GuildCrafts works on **every WoW Classic game version** via multi-TOC:
 
-Supports all crafting and gathering professions:
+| Version | Interface |
+|---|---|
+| **Classic Era** | 1.15.x |
+| **TBC Anniversary** | 2.5.x |
+| **WotLK Classic** | 3.4.x |
+| **Cata Classic** | 4.4.x |
+| **MoP Classic** | 5.5.x |
 
-**Crafting:** Alchemy · Blacksmithing · Enchanting · Engineering · Jewelcrafting · Leatherworking · Tailoring
+Install a single addon folder — the game automatically loads the correct version.
+
+### Supported Professions
+
+**Crafting:** Alchemy · Blacksmithing · Enchanting · Engineering · Inscription¹ · Jewelcrafting² · Leatherworking · Tailoring
 
 **Secondary:** Mining (incl. Smelting) · Herbalism · Skinning · Cooking
+
+¹ Inscription available on WotLK Classic and later  
+² Jewelcrafting available on TBC Anniversary and later
 
 Gathering professions track skill levels and member counts. Mining additionally tracks Smelting recipes.
 
 ***
 
-# Commands
+# Slash Commands
 
-`/gc`  
-Open the GuildCrafts window.
+| Command | What it does |
+|---|---|
+| `/gc` | Open the GuildCrafts window |
+| `/gc minimap` | Toggle the minimap button |
+| `/gc reset` | Clear your local database and re-scan |
+| `!gc <query>` | Search for crafters from **guild chat** |
 
-`/gc minimap`  
-Toggle the minimap button.
-
-`/gc reset`  
-Clear your local database and re-scan recipes.
-
-`!gc <query>`  
-Search for crafters directly from **guild chat**.
-
-Example:
-
-`!gc shadowcloth`
+Example: `!gc shadowcloth`
 
 ***
 
-# Automatic Sync
+# How the Sync Works
 
 GuildCrafts synchronizes recipe data automatically between addon users.
 
-*   no setup required
-*   low chat traffic
-*   new recipes broadcast automatically
-*   only one guild member ever responds to `!gc` — even when multiple addon users are online or some are inside dungeons/battlegrounds
+*   No setup required
+*   Low chat traffic — only one guild member ever responds to `!gc` queries
+*   New recipes broadcast instantly when learned
+*   Works correctly even when some addon users are in dungeons or battlegrounds
+*   Members who leave the guild are cleaned up after 7 days
+*   Inactive members (no data update in 45 days) are auto-pruned
+*   If your data is more than 30 days old, a one-time reminder appears on login
 
-Members who leave the guild are automatically removed after 7 days. Guild members who haven't updated their data in 45 days are auto-pruned. Entries from early addon versions with no scan timestamp are also cleaned up automatically. Any active member can resync instantly by opening a profession window.
-
-If your own profession data is more than 30 days old, the addon shows a one-time reminder on login to rescan.
-
-Works best when multiple guild members use the addon — the more players sync, the more complete the database becomes.
+Works best when multiple guild members use the addon — the more players sync, the more complete the database.
 
 ***
 
 ## Project Status
 
-GuildCrafts has reached its original scope and is stable. Critical fixes will still be addressed. The project is not abandoned — contributions and new maintainers are welcome.
+GuildCrafts has reached its original scope and is stable. Critical fixes will still be addressed. Contributions and new maintainers are welcome.
 
 ***
 
 ## Support the Developer
 
-GuildCrafts is built to solve a real problem, and I'm thrilled to see so many guilds finding it useful.
-
-If it's saved you time or helped your guild coordinate better, consider buying me a coffee — it's genuinely appreciated.
+If GuildCrafts has saved you time or helped your guild coordinate better, consider buying me a coffee — it's genuinely appreciated.
 
 [Support me on Ko-fi ☕](https://ko-fi.com/lektor)
-
-_A huge thank you to everyone using the addon, reporting bugs, and sharing it with their guilds._

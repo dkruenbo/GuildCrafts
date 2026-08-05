@@ -1,4 +1,4 @@
-## Interface: 20506
+## Interface: 30403
 ## Title: GuildCrafts
 ## Notes: Track all learned recipes across guild members' professions
 ## Author: GuildCrafts Team
@@ -14,11 +14,12 @@ Libs\embeds.xml
 Core.lua
 Modules\Data.lua
 Data\Data_TBC.lua
+Data\Data_WOTLK.lua
 Modules\SyncPausePolicy.lua
 Modules\Comms.lua
 Modules\Favorites.lua
 Modules\Tooltip.lua
 Modules\MinimapButton.lua
 
-# UI (all panels consolidated in MainFrame.lua)
+# UI
 UI\MainFrame.lua
