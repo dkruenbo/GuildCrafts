@@ -2,7 +2,14 @@
 
 ## What this project is
 
-WoW TBC Anniversary addon (Interface 20505). Lua, AceAddon-3.0 framework.
+WoW Classic addon supporting multiple game versions via multi-TOC:
+- Classic Era (Interface 11507)
+- TBC Anniversary (Interface 20506)
+- WotLK Classic (Interface 30403)
+- Cata Classic (Interface 40402)
+- MoP Classic (Interface 50504)
+
+Lua, AceAddon-3.0 framework.
 Tracks guild members' profession recipes and syncs them across all addon users
 via a DR/BDR election system over the GUILD addon message channel.
 
@@ -24,6 +31,10 @@ Three places must match before committing a version bump:
 |---|---|
 | `GuildCrafts/Core.lua` | `GuildCrafts.DISPLAY_VERSION = "X.Y.Z"` |
 | `GuildCrafts/GuildCrafts.toc` | `## Version: X.Y.Z` |
+| `GuildCrafts/GuildCrafts_Vanilla.toc` | `## Version: X.Y.Z` |
+| `GuildCrafts/GuildCrafts_Wrath.toc` | `## Version: X.Y.Z` |
+| `GuildCrafts/GuildCrafts_Cata.toc` | `## Version: X.Y.Z` |
+| `GuildCrafts/GuildCrafts_Mists.toc` | `## Version: X.Y.Z` |
 | `CHANGELOG.md` | `## X.Y.Z — YYYY-MM-DD` |
 
 `GuildCrafts.VERSION` (integer) and `GuildCrafts.DATA_FORMAT_VERSION` (integer)
@@ -94,8 +105,38 @@ Current status:
 - ✅ Patch 1 — SyncPausePolicy + Partial Scan Protection (v1.4.0)
 - ✅ Patch 2 — DELTA_AD broadcast (v1.5.0)
 - ✅ Patch 3 — Chunk RESUME recovery (v1.6.0)
-- ⏳ Patch 4 — Per-peer backoff (v1.7.0) — branch: `feature/patch-4-per-peer-backoff`
-- ⏳ Patch 5 — Tombstone pruning + [>]→[G] rename (v1.8.0)
+- ✅ Patch 4 — Per-peer backoff (v1.7.0)
+- ✅ Patch 5 — Tombstone pruning (v1.8.0)
+- ✅ Multi-expansion support — branch: `feature/multi-expansion-support`
+
+---
+
+## Folder Structure
+
+```
+GuildCrafts/
+  Core.lua                 -- Bootstrap, events, slash commands
+  GuildCrafts.toc          -- TBC Anniversary (default)
+  GuildCrafts_Vanilla.toc  -- Classic Era
+  GuildCrafts_Wrath.toc    -- WotLK Classic
+  GuildCrafts_Cata.toc     -- Cata Classic
+  GuildCrafts_Mists.toc    -- MoP Classic
+  Modules/
+    Data.lua               -- Scanning, merging, pruning, compat wrappers
+    Comms.lua              -- Sync protocol, DR/BDR election
+    SyncPausePolicy.lua    -- Combat/instance pause
+    Favorites.lua          -- Bookmark system
+    Tooltip.lua            -- Item tooltip injection
+    MinimapButton.lua      -- LDB minimap icon
+  Data/
+    Data_TBC.lua           -- TBC recipe keys (static)
+    Data_WOTLK.lua         -- WotLK recipe keys (static)
+    Data_CATA.lua          -- Cata recipe keys (static)
+    Data_MOP.lua           -- MoP recipe keys (static)
+  UI/
+    MainFrame.lua          -- All UI panels
+  Libs/                    -- Embedded libraries
+```
 
 ---
 
