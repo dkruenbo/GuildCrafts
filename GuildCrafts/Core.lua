@@ -45,9 +45,11 @@ function GuildCrafts:OnEnable()
     -- Register game events.
     self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerEnteringWorld")
     self:RegisterEvent("GUILD_ROSTER_UPDATE", "OnGuildRosterUpdate")
-    -- MoP+/Cata: TRADE_SKILL_LIST_UPDATE fires when recipe data is ready
+    -- MoP+/Cata: register both events — TRADE_SKILL_LIST_UPDATE fires when data is
+    -- ready on some clients, TRADE_SKILL_SHOW fires on open for others.
     if C_TradeSkillUI then
         self:RegisterEvent("TRADE_SKILL_LIST_UPDATE", "OnTradeSkillShow")
+        self:RegisterEvent("TRADE_SKILL_SHOW", "OnTradeSkillShow")
     else
         self:RegisterEvent("TRADE_SKILL_SHOW", "OnTradeSkillShow")
     end
@@ -169,8 +171,9 @@ function GuildCrafts:OnLoginReady()
 end
 
 function GuildCrafts:OnTradeSkillShow()
+    self:Debug("OnTradeSkillShow fired")
     if self.Data then
-        if C_TradeSkillUI then
+        if C_TradeSkillUI and C_TradeSkillUI.GetBaseProfessionInfo then
             self.Data:ScanTradeSkillModern()
         else
             self.Data:ScanTradeSkill()
