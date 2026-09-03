@@ -528,8 +528,22 @@ expire after 30 days, at which point they are hard-deleted.
 
 ## 9. Pause Policy
 
-All outgoing sync traffic — including HELLO, SYNC\_REQUEST, DELTA\_UPDATE, and
-DELTA\_AD — is suppressed while `SyncPausePolicy:ShouldPause()` returns true.
+Bulk sync traffic — SYNC\_REQUEST, SYNC\_RESPONSE, SYNC\_PULL, SYNC\_PUSH,
+DELTA\_UPDATE, and DELTA\_AD — is suppressed while
+`SyncPausePolicy:ShouldPause()` returns true.
+
+Signaling messages required for role-election consistency bypass the pause
+policy and always transmit:
+
+- `HEARTBEAT` — the DR's 60-second keepalive
+- `HELLO` — login and reply discovery
+- `GC_ACK` — addon-channel dedup signal for the `!gc` responder
+
+These are single tiny packets (≤ ~50 bytes) and were never the source of the
+chat-throttle pressure the pause was designed to prevent. Suppressing them
+caused split-brain elections in players who were regularly in combat or
+transitioning zones (both nodes' `addonUsers` sets never converged, so both
+computed `myRole = "DR"` and answered `!gc` in parallel).
 
 Pause conditions and grace periods:
 
@@ -544,9 +558,9 @@ immediately after leaving combat or an instance. Conditions and timers are
 tracked independently; `ShouldPause()` returns true if any flag is set.
 
 Callers that are suppressed by the pause policy reschedule themselves (e.g.
-`BroadcastHello` in 5 s, `SendSyncRequest` in 10 s). The DR's `SendChunked`
-calls `onComplete` immediately when suppressed so the sync queue does not
-deadlock; affected requesters will time out and retry normally.
+`SendSyncRequest` in 10 s). The DR's `SendChunked` calls `onComplete`
+immediately when suppressed so the sync queue does not deadlock; affected
+requesters will time out and retry normally.
 
 The DR heartbeat watchdog explicitly suppresses eviction while the player is
 inside an instance, since GUILD addon messages are not delivered across
