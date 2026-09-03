@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.1 — 2026-09-03
+
+### Fixes
+
+- **`!gc` double-response from split-brain election** — two nodes could both self-elect as Designated Router and reply simultaneously to the same `!gc` query, producing identical duplicate responses in guild chat. Root cause: `SendMessage()` unconditionally suppressed outgoing addon-channel traffic while `SyncPausePolicy` was active (combat, inside an instance, zone transition grace). This included `HEARTBEAT` and `HELLO` — the exact messages that keep the DR/BDR election in sync. When two players were regularly in combat or transitioning zones, their heartbeats were silently dropped, `addonUsers` never converged, and both computed `myRole = "DR"`. Fixed by whitelisting `HEARTBEAT` and `HELLO` so they always transmit; these are single tiny packets and were never the source of chat-throttle pressure the pause was designed to prevent.
+
+### Improvements
+
+- **Addon-channel dedup for `!gc` responses** — a new lightweight `GC_ACK` addon-channel broadcast fires the instant a responder decides to post to guild chat. Other responders check this in addition to the guild-chat echo when deciding whether to skip. The addon channel is much lower-latency than the guild-chat echo path, which closes the residual window where two nodes both fire before either echo lands.
+- **DR jitter for defense in depth** — the Designated Router now applies a very small 0–1.5 s jitter to its response even in the converged case, so a residual split-brain (both nodes think they are DR) resolves via the `GC_ACK` broadcast instead of both posting. Unconverged elections keep the existing 2–6 s jitter. No user-visible latency change in normal single-DR operation.
+
+---
+
 ## 2.0.0 — 2026-08-05
 
 ### New features
