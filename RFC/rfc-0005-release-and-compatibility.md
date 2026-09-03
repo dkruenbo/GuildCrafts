@@ -62,9 +62,12 @@ number of the target WoW version:
 
 | Game version | Interface number |
 |---|---|
+| Classic Era 1.15.x | `11507` |
 | TBC Classic 2.5.5 | `20505` |
 | TBC Classic 2.5.6 | `20506` |
-| WotLK Classic 3.4.x | `30400` (approximate; confirm at release) |
+| WotLK Classic 3.4.x | `30403` |
+| Cata Classic 4.4.x | `40402` |
+| MoP Classic 5.5.x | `50504` |
 
 The interface number is bumped when Blizzard releases a new client patch that
 changes the number. It is **not** bumped for every display-version release.
@@ -101,11 +104,11 @@ end
 This guard must be preserved whenever Tooltip.lua is modified. The handler
 body (`tooltip:GetItem()` and crafter lookup) is identical for both paths.
 
-### 4.2 TradeSkill API (WotLK modernisation)
+### 4.2 TradeSkill API (multi-expansion compatibility)
 
-WotLK Classic replaces several classic TradeSkill globals with modern
-namespace APIs. Compatibility wrappers live in `Data.lua` (on the
-`wotlk-migration` branch only; not on `main`):
+Classic Era, WotLK Classic, Cata Classic, and MoP Classic expose different
+TradeSkill and skill-line APIs. Compatibility wrappers live in
+`Modules/Data.lua` on `main`:
 
 | Classic API | Modern replacement | Wrapper |
 |---|---|---|
@@ -114,8 +117,11 @@ namespace APIs. Compatibility wrappers live in `Data.lua` (on the
 | `GetNumTradeSkills()` (may be absent) | — | `if not GetNumTradeSkills then return end` nil guard |
 | `GetTradeSkillNumReagents()` (may be absent) | — | `if not GetTradeSkillNumReagents then return nil end` nil guard |
 
-Each wrapper prefers the modern API and falls back to the classic API, so the
-same code runs on both TBC and WotLK clients.
+Each wrapper prefers the modern API when the specific function exists and
+falls back to the classic API. The scanner also guards against namespaces that
+exist on a client but do not provide the required function. The same addon
+code therefore runs across Classic Era, TBC Anniversary, WotLK Classic, Cata
+Classic, and MoP Classic.
 
 ---
 
@@ -135,19 +141,11 @@ from the maintainer.
 
 | Branch | Purpose |
 |--------|---------|
-| `main` | Production-ready code targeting TBC Classic (current live). |
+| `main` | Production-ready multi-expansion release. |
 | `feature/patch-N-*` | Short-lived feature/fix branches, squash-merged into `main`. |
-| `wotlk-migration` | Long-lived local branch with WotLK API compat guards. **Never pushed** until Blizzard announces WotLK Classic Anniversary. |
-
-The `wotlk-migration` branch diverges from `main` after v1.10.1 and carries
-additional commits for:
-- `Data.lua` API compat wrappers (§4.2 above)
-- `GuildCrafts.toc` `## Interface` targeting WotLK
-- `CHANGELOG.md` `2.0.0 — TBD` entry at the top
-
-Changes shipped to `main` are cherry-picked onto `wotlk-migration` as needed.
-The reverse does not apply — `wotlk-migration`-only changes must not be
-cherry-picked to `main`.
+`wotlk-migration` was an intermediate development branch and has been
+retired. Its compatibility work shipped in the 2.0.0 multi-expansion release;
+there is no separate WotLK branch to maintain.
 
 ---
 
@@ -214,16 +212,15 @@ Rules:
 - Sections (`### New features`, `### Improvements`, `### Fixes`) are only
   included when there is at least one item for that section.
 - Credit contributors by name in the relevant bullet when applicable.
-- The `wotlk-migration` branch maintains its own CHANGELOG with a `2.0.0 — TBD`
-  entry at the top; `main` entries are cherry-picked below it.
+- Release entries are maintained in the root `CHANGELOG.md` on `main`.
 
 ---
 
 ## 10. CurseForge Distribution
 
-- Project page: GuildCrafts on CurseForge (WoW TBC Classic category).
-- Supported clients: TBC Classic; WotLK Classic to be added when the
-  `wotlk-migration` branch is published.
+- Project page: GuildCrafts on CurseForge (WoW Classic category).
+- Supported clients: Classic Era, TBC Anniversary, WotLK Classic, Cata
+  Classic, and MoP Classic.
 - `CURSEFORGE_DESCRIPTION.md` contains the rendered project description
   (Markdown is rendered by CurseForge).
 - Do not include development files (`spec/`, `tools/`, `.DS_Store`,

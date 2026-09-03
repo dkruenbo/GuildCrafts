@@ -1,8 +1,8 @@
 # GuildCrafts Protocol — RFC 0002
 
 **Status:** Informational  
-**Applies to:** GuildCrafts v1.4.0+  
-**Channel:** `GUILD` addon message channel (WoW TBC Classic / WotLK Classic)
+**Applies to:** GuildCrafts v1.4.0 through v2.0.1
+**Channel:** `GUILD` addon message channel (WoW Classic Era through MoP Classic)
 
 ---
 
