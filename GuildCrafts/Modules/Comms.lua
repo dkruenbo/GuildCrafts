@@ -54,6 +54,15 @@ local MSG_SYNC_RESPONSE      = "SYNC_RESPONSE"
 local MSG_SYNC_PULL          = "SYNC_PULL"
 local MSG_SYNC_PUSH          = "SYNC_PUSH"
 local MSG_SYNC_RESUME        = "SYNC_RESUME"
+local MSG_GC_ACK             = "GC_ACK"     -- addon-channel dedup signal for !gc responder
+
+-- Signaling messages bypass SyncPausePolicy: tiny, low-frequency, and dropping
+-- them causes DR/BDR election to split-brain (heartbeats never converge).
+local CRITICAL_SIGNALS = {
+    [MSG_HEARTBEAT] = true,
+    [MSG_HELLO]     = true,
+    [MSG_GC_ACK]    = true,
+}
 
 -- Chunk RESUME
 local PROGRESS_TIMEOUT     = 4    -- seconds without chunk progress before sending RESUME
@@ -164,16 +173,6 @@ end
 ----------------------------------------------------------------------
 
 function Comms:BroadcastHello()
-    if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
-        GuildCrafts:Debug("BroadcastHello delayed (SyncPausePolicy) — rescheduling in 5s")
-        -- Cancel any existing reschedule timer before creating a new one so that
-        -- a long pause doesn't accumulate N timers that all fire on unpause.
-        if self._helloRescheduleTimer then
-            self:CancelTimer(self._helloRescheduleTimer)
-        end
-        self._helloRescheduleTimer = self:ScheduleTimer("BroadcastHello", 5)
-        return
-    end
     self._helloRescheduleTimer = nil
     local playerKey = GuildCrafts.Data:GetPlayerKey()
     self:SendMessage(MSG_HELLO, {
@@ -383,6 +382,12 @@ function Comms:SendHeartbeat()
         timestamp = time(),
     }, "GUILD")
     GuildCrafts:Debug("Sent HEARTBEAT")
+end
+
+--- Broadcast a lightweight !gc responder ACK to the addon channel.
+--- Bypasses SyncPausePolicy (whitelisted) so it fires even during combat.
+function Comms:BroadcastGcAck()
+    self:SendMessage(MSG_GC_ACK, {}, "GUILD")
 end
 
 function Comms:HandleHeartbeat(payload)
@@ -1313,7 +1318,8 @@ end
 
 --- Serialize, optionally compress, and send a message.
 function Comms:SendMessage(msgType, payload, distribution, target, priority)
-    if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
+    if not CRITICAL_SIGNALS[msgType]
+        and GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then
         GuildCrafts:Debug("SendMessage suppressed (SyncPausePolicy):", msgType)
         return
     end
@@ -1475,6 +1481,14 @@ function Comms:ProcessIncoming(message, _distribution, sender)
         self:HandleDeltaAd(payload, sender)
     elseif msgType == MSG_SYNC_RESUME then
         self:HandleSyncResume(payload, sender)
+    elseif msgType == MSG_GC_ACK then
+        -- Fast-path dedup for !gc responders: guild-chat echo can be delayed by
+        -- throttle or lag, but the addon channel is low-latency. Any node that
+        -- sees another responder's ACK skips its own scheduled reply.
+        GuildCrafts._gcLastAddonAck = GetTime()
+        -- Split-brain heal: if we didn't know about this peer we would have
+        -- self-elected DR alongside them. Touch adds and re-elects.
+        self:TouchAddonUser(sender)
     else
         GuildCrafts:Debug("Unknown message type:", msgType, "from", sender)
     end

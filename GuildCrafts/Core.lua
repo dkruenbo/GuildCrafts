@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "2.0.0"
+GuildCrafts.DISPLAY_VERSION = "2.0.1"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -296,6 +296,11 @@ end
 -- same wall-clock second still suppresses BDR/OTHER fallback timers.
 GuildCrafts._gcLastGuildCraftsMsg = 0
 
+-- Epoch of the last MSG_GC_ACK observed on the addon channel.
+-- Addon-channel dedup is much faster than the guild-chat echo path and
+-- catches split-brain cases where two nodes both think they are DR.
+GuildCrafts._gcLastAddonAck = 0
+
 --- CHAT_MSG_GUILD handler for !gc <query> commands.
 --- DR responds immediately; BDR falls back after 5 s; anyone else after 12 s.
 --- DR inside an instance uses 8–12 s so a newly elected outside DR/BDR can
@@ -372,12 +377,16 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
         -- same frame before any guild-chat echo can update _gcLastGuildCraftsMsg
         -- and trigger the dedup check on the other nodes.
         -- Fix: apply jitter so the first responder's echo suppresses the rest.
-        -- When the election is properly converged (addonUsers has multiple
-        -- entries) the real DR keeps delay = 0 for an immediate response.
         local count = 0
         for _ in pairs(self.Comms.addonUsers) do count = count + 1 end
         if count <= 1 then
             delay = 2 + math.random(0, 4)  -- 2–6 s jitter for unconverged election
+        else
+            -- Small jitter even in the converged case: catches split-brain where
+            -- two nodes both self-elect DR (e.g. addonUsers drift after a long
+            -- session with dropped heartbeats). Whoever fires first broadcasts
+            -- MSG_GC_ACK on the addon channel; the other node sees it and skips.
+            delay = math.random() * 1.5
         end
     end
 
@@ -387,9 +396,10 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
     local capturedRecipeKey  = linkRecipeKey
 
     self:ScheduleTimer(function()
-        -- If any [GuildCrafts] message arrived after we scheduled, someone
-        -- already replied — skip to avoid double-posting.
+        -- Dedup: skip if either the guild-chat echo or an addon-channel ACK
+        -- from another responder arrived after we scheduled this reply.
         if self._gcLastGuildCraftsMsg > capturedScheduled then return end
+        if self._gcLastAddonAck > capturedScheduled then return end
 
         -- If we're an OTHER node responding at 12 s, DR and BDR both failed to
         -- answer !gc. We do NOT evict or re-elect here: a non-response only means
@@ -413,11 +423,16 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
         end
         if not results or #results == 0 then
             -- No match — do NOT set the cooldown so the user can retry immediately.
+            if self.Comms and self.Comms.BroadcastGcAck then self.Comms:BroadcastGcAck() end
             SendChatMessage("[GuildCrafts] No guild crafter found for \"" .. capturedQuery .. "\" \226\128\148 /gc to browse all recipes", "GUILD")
             return
         end
         -- Successful response — stamp the cooldown now to prevent spam.
         self._gcQueryCooldowns[capturedCooldown] = time()
+
+        -- Broadcast an addon-channel ACK BEFORE posting to guild chat so any
+        -- other responder still in its jitter window skips its own reply.
+        if self.Comms and self.Comms.BroadcastGcAck then self.Comms:BroadcastGcAck() end
 
         -- Stagger multi-line responses 0.5 s apart to avoid "sending too quickly"
         local msgQueue = {}
