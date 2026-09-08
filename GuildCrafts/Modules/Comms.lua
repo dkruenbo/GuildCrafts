@@ -187,7 +187,7 @@ function Comms:BroadcastHello()
 end
 
 function Comms:HandleHello(payload, sender)
-    local memberKey = payload.sender or sender
+    local memberKey = GuildCrafts.Data:NormalizeMemberKey(payload.sender or sender)
     if not memberKey then return end
 
     local isNew = not self.addonUsers[memberKey]
@@ -255,6 +255,7 @@ end
 --- Add or refresh the given key in addonUsers.
 --- Re-elects only when the key is brand new (avoids spurious churn).
 function Comms:TouchAddonUser(key, version)
+    key = GuildCrafts.Data:NormalizeMemberKey(key)
     if not key then return end
     local isNew = not self.addonUsers[key]
     if isNew then
@@ -393,15 +394,16 @@ end
 function Comms:HandleHeartbeat(payload)
     -- Register the sender in addonUsers BEFORE election logic so that
     -- RecomputeElection() always has complete peer information.
-    if payload.dr then
+    local heartbeatKey = GuildCrafts.Data:NormalizeMemberKey(payload.dr)
+    if heartbeatKey then
         self.lastDRHeartbeat = time()
-        if not self.addonUsers[payload.dr] then
-            self.addonUsers[payload.dr] = {
+        if not self.addonUsers[heartbeatKey] then
+            self.addonUsers[heartbeatKey] = {
                 version  = 1,
                 lastSeen = time(),
             }
         else
-            self.addonUsers[payload.dr].lastSeen = time()
+            self.addonUsers[heartbeatKey].lastSeen = time()
         end
     end
 
@@ -594,7 +596,8 @@ function Comms:OnSyncTimeout()
 end
 
 function Comms:HandleSyncRequest(payload, sender)
-    local requester = payload.sender or sender
+    local requester = GuildCrafts.Data:NormalizeMemberKey(payload.sender or sender)
+    if not requester then return end
     local retryCount = payload.retry or 0
     local playerKey = GuildCrafts.Data:GetPlayerKey()
 
@@ -645,6 +648,14 @@ function Comms:ProcessSyncRequest(requester, incomingVector)
     self.syncProcessing = true
 
     local localVector = GuildCrafts.Data:GetVersionVector()
+    local canonicalIncomingVector = {}
+    for rawMemberKey, timestamp in pairs(incomingVector or {}) do
+        local memberKey = GuildCrafts.Data:NormalizeMemberKey(rawMemberKey) or rawMemberKey
+        local previous = canonicalIncomingVector[memberKey]
+        if not previous or timestamp > previous then
+            canonicalIncomingVector[memberKey] = timestamp
+        end
+    end
     local db = GuildCrafts.Data:GetGuildDB()
     if not db then
         self.syncProcessing = false
@@ -657,7 +668,7 @@ function Comms:ProcessSyncRequest(requester, incomingVector)
 
     -- Check our entries vs incoming vector
     for memberKey, localTs in pairs(localVector) do
-        local incomingTs = incomingVector[memberKey]
+        local incomingTs = canonicalIncomingVector[memberKey]
         if not incomingTs or localTs > incomingTs then
             -- We have newer data → include in SYNC_RESPONSE (stripped)
             toSend[memberKey] = GuildCrafts.Data:StripSyncFields(db[memberKey])
@@ -665,7 +676,7 @@ function Comms:ProcessSyncRequest(requester, incomingVector)
     end
 
     -- Check incoming vector for entries we don't have or are behind on
-    for memberKey, incomingTs in pairs(incomingVector) do
+    for memberKey, incomingTs in pairs(canonicalIncomingVector) do
         local localTs = localVector[memberKey]
         if not localTs or incomingTs > localTs then
             -- Requester has newer data → request via SYNC_PULL
@@ -1008,8 +1019,9 @@ function Comms:HandleSyncPull(payload, sender)
     if not db then return end
     local responseData = {}
 
-    for _, memberKey in ipairs(payload.memberKeys) do
-        if db[memberKey] then
+    for _, rawMemberKey in ipairs(payload.memberKeys) do
+        local memberKey = GuildCrafts.Data:NormalizeMemberKey(rawMemberKey)
+        if memberKey and db[memberKey] then
             responseData[memberKey] = GuildCrafts.Data:StripSyncFields(db[memberKey])
         end
     end
@@ -1111,9 +1123,11 @@ end
 
 function Comms:HandleDeltaUpdate(payload, sender)
     if not payload.member then return end
+    local memberKey = GuildCrafts.Data:NormalizeMemberKey(payload.member)
+    if not memberKey then return end
     local playerKey = GuildCrafts.Data:GetPlayerKey()
     -- Don't process our own deltas
-    if payload.member == playerKey then return end
+    if memberKey == playerKey then return end
 
     -- Seeing a DELTA_UPDATE proves sender is online with the addon.
     self:TouchAddonUser(sender)
@@ -1121,10 +1135,10 @@ function Comms:HandleDeltaUpdate(payload, sender)
     if payload.type == "add" and payload.profession and payload.recipes then
         -- Merge each recipe
         for recipeKey, recipeData in pairs(payload.recipes) do
-            GuildCrafts.Data:MergeDelta(payload.member, payload.profession,
+            GuildCrafts.Data:MergeDelta(memberKey, payload.profession,
                 recipeKey, recipeData, payload.lastUpdate)
         end
-        GuildCrafts:Debug("DELTA_UPDATE (add) from", sender, "for", payload.member)
+        GuildCrafts:Debug("DELTA_UPDATE (add) from", sender, "for", memberKey)
 
     elseif payload.type == "touch" and payload.lastUpdate then
         -- Lightweight timestamp bump — the sender has no new recipes but is still
@@ -1134,23 +1148,23 @@ function Comms:HandleDeltaUpdate(payload, sender)
         -- tombstone here, MergeIncoming would see equal timestamps and block the
         -- subsequent resurrection.
         local gdb = GuildCrafts.Data:GetGuildDB()
-        local entry = gdb and gdb[payload.member]
+        local entry = gdb and gdb[memberKey]
         if entry and not entry._tombstone and payload.lastUpdate > (entry.lastUpdate or 0) then
             entry.lastUpdate = payload.lastUpdate
         end
-        GuildCrafts:Debug("DELTA_UPDATE (touch) from", sender, "for", payload.member)
+        GuildCrafts:Debug("DELTA_UPDATE (touch) from", sender, "for", memberKey)
         -- No recipe data changed; skip UI refresh.
         return
 
     elseif payload.type == "remove_profession" then
         -- Remove entire profession
         local gdb = GuildCrafts.Data:GetGuildDB()
-        local entry = gdb and gdb[payload.member]
+        local entry = gdb and gdb[memberKey]
         if entry then
             -- We need the profession name... if not provided, do full replacement
             -- using lastUpdate comparison
             if payload.profession then
-                GuildCrafts.Data:MergeProfessionRemoval(payload.member,
+                GuildCrafts.Data:MergeProfessionRemoval(memberKey,
                     payload.profession, payload.lastUpdate)
             else
                 -- Full member replacement via lastUpdate
@@ -1160,7 +1174,7 @@ function Comms:HandleDeltaUpdate(payload, sender)
                 end
             end
         end
-        GuildCrafts:Debug("DELTA_UPDATE (remove) from", sender, "for", payload.member)
+        GuildCrafts:Debug("DELTA_UPDATE (remove) from", sender, "for", memberKey)
     end
 
     -- Notify UI to refresh
@@ -1194,24 +1208,26 @@ end
 
 function Comms:HandleDeltaAd(payload, sender)
     if not payload.memberKey or not payload.rev then return end
+    local memberKey = GuildCrafts.Data:NormalizeMemberKey(payload.memberKey)
+    if not memberKey then return end
 
     -- Register the sender in addonUsers so they appear in the DR election.
     self:TouchAddonUser(sender)
 
     local playerKey = GuildCrafts.Data:GetPlayerKey()
     -- Ignore advertisements about ourselves.
-    if payload.memberKey == playerKey then return end
+    if memberKey == playerKey then return end
 
     -- Check if the advertised revision is actually newer than what we hold.
     local gdb = GuildCrafts.Data:GetGuildDB()
-    local localEntry = gdb and gdb[payload.memberKey]
+    local localEntry = gdb and gdb[memberKey]
     local localTs = localEntry and localEntry.lastUpdate or 0
     if payload.rev <= localTs then
-        GuildCrafts:Debug("DELTA_AD from", sender, "for", payload.memberKey, "— already current")
+        GuildCrafts:Debug("DELTA_AD from", sender, "for", memberKey, "— already current")
         return
     end
 
-    GuildCrafts:Debug("DELTA_AD from", sender, "for", payload.memberKey,
+    GuildCrafts:Debug("DELTA_AD from", sender, "for", memberKey,
         "rev", payload.rev, "— local", localTs)
 
     -- DR forwards to guild so non-DR nodes that missed the original also get
@@ -1219,12 +1235,12 @@ function Comms:HandleDeltaAd(payload, sender)
     if self.myRole == "DR" and not payload.forwarded then
         self:SendMessage(MSG_DELTA_AD, {
             sender     = payload.sender or sender,
-            memberKey  = payload.memberKey,
+            memberKey  = memberKey,
             rev        = payload.rev,
             profCounts = payload.profCounts,
             forwarded  = true,
         }, "GUILD", nil, PRIO_NORMAL)
-        GuildCrafts:Debug("DR forwarded DELTA_AD for", payload.memberKey)
+        GuildCrafts:Debug("DR forwarded DELTA_AD for", memberKey)
         -- DR accumulates data through SYNC_PUSH; scheduling a sync pull via
         -- SendSyncRequest would immediately no-op and could cancel a legitimate
         -- pending timer from HELLO discovery. Return now.
@@ -1416,10 +1432,10 @@ function Comms:ProcessIncoming(message, _distribution, sender)
         return
     end
 
-    -- Normalize sender to "Name-Realm" format
-    if sender and not sender:find("-") then
-        sender = sender .. "-" .. GetRealmName()
-    end
+    -- AceComm may strip realm punctuation; normalize it to the same key form
+    -- used by Data:GetPlayerKey() before election or payload handling.
+    sender = GuildCrafts.Data:NormalizeMemberKey(sender)
+    if not sender then return end
 
     -- Update lastSeen for known addon users
     if self.addonUsers[sender] then
@@ -1538,6 +1554,8 @@ end
 
 --- Returns true if the given member key is a currently known active addon user.
 function Comms:IsActiveAddonUser(key)
+    key = GuildCrafts.Data:NormalizeMemberKey(key)
+    if not key then return false end
     return self.addonUsers[key] ~= nil
 end
 

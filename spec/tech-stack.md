@@ -69,10 +69,11 @@ GuildCrafts/
 - **Unicast channel**: `WHISPER` distribution type for `SYNC_RESPONSE` — sent directly from DR to requester to avoid flooding all online members with large payloads. **Note:** `SendAddonMessage(prefix, data, "WHISPER", target)` is invisible addon-to-addon communication — it does NOT produce a visible whisper in the chat window. It only fires the hidden `CHAT_MSG_ADDON` event that addons listen for. This is fundamentally different from `SendChatMessage()` which produces visible chat.
 - **Serialization**: AceSerializer-3.0 → compressed with LibDeflate for large payloads.
 - Messages are throttled via ChatThrottleLib to avoid disconnects. `SYNC_RESPONSE` uses `BULK` priority; `DELTA_UPDATE` uses `NORMAL` priority.
-- **Designated Router (DR)**: Only the DR responds to `SYNC_REQUEST` messages, preventing channel flooding. A BDR stands by for failover.
+- **Designated Router (DR)**: Only the DR responds to `SYNC_REQUEST` messages, preventing channel flooding. A BDR stands by for failover. Clients inside instances do not answer `!gc` because GUILD addon messages cannot reliably cross instance boundaries.
 
 ### DR / BDR Election
-- Election is **deterministic** — the online addon user with the lexicographically lowest `CharacterName-Realm` is DR; second-lowest is BDR.
+- Election is **deterministic** — the known addon user with the lexicographically lowest canonical `CharacterName-Realm` key is DR; second-lowest is BDR.
+- Canonical keys normalize connected-realm display punctuation before entering election, roster, sync, or SavedVariables state.
 - No election negotiation messages needed; every node computes the same result from the same online user list.
 - Re-election triggers: `HELLO` from a new addon user, DR heartbeat timeout, `GUILD_ROSTER_UPDATE` (someone goes offline).
 

@@ -174,14 +174,20 @@ Example: `!gc shadowcloth`
 GuildCrafts synchronizes recipe data automatically between addon users.
 
 *   No setup required
-*   Low chat traffic — only one guild member ever responds to `!gc` queries
+*   Low chat traffic — only one reachable guild member responds to `!gc` queries
 *   New recipes broadcast instantly when learned
-*   Works correctly even when some addon users are in dungeons or battlegrounds
+*   Instanced addon users stay silent so they cannot create duplicate responses
 *   Members who leave the guild are cleaned up after 7 days
 *   Inactive members (no data update in 45 days) are auto-pruned
 *   If your data is more than 30 days old, a one-time reminder appears on login
 
 Works best when multiple guild members use the addon — the more players sync, the more complete the database.
+
+GuildCrafts normalizes connected-realm names so the same character is not
+counted as multiple addon users. Players inside raids, dungeons, battlegrounds,
+or arenas do not answer `!gc` because GUILD addon messages cannot reliably cross
+those boundaries; this prevents duplicate guild-chat responses. If every addon
+user is instanced, the query may wait until someone is back in the open world.
 
 ***
 

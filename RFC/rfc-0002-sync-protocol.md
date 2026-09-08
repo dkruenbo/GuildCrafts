@@ -1,7 +1,7 @@
 # GuildCrafts Protocol — RFC 0002
 
 **Status:** Informational  
-**Applies to:** GuildCrafts v1.4.0 through v2.0.1
+**Applies to:** GuildCrafts v1.4.0+
 **Channel:** `GUILD` addon message channel (WoW Classic Era through MoP Classic)
 
 ---
@@ -90,7 +90,9 @@ A node sets its own role by comparing its player key against `DR` and `BDR`.
 Election runs whenever `addonUsers` changes (peer added, peer removed).
 
 **Convergence prerequisite:** all nodes must have the same `addonUsers` set.
-The HELLO handshake and post-sync HELLO sweep are the primary mechanisms for
+All member and peer identities use a canonical `Name-Realm` key. Realm display
+spaces, hyphens, and apostrophes are normalized before identities enter the
+election, sync payloads, or saved data. The HELLO handshake and post-sync HELLO sweep are the primary mechanisms for
 achieving this. Nodes that miss HELLOs are discovered through SYNC\_REQUEST
 visibility (any inbound message registers the sender as a known user).
 
@@ -212,7 +214,10 @@ Proves the DR is alive. Non-DR nodes reset their watchdog timer on receipt.
 heartbeat has been received in 180 s (`HEARTBEAT_TIMEOUT`) and the player is
 not inside an instance, the DR entry is removed from `addonUsers` and
 election re-runs. The node that wins the new election becomes the DR and
-immediately begins broadcasting heartbeats.
+immediately begins broadcasting heartbeats. A client currently inside an
+instance does not answer `!gc` queries: GUILD addon messages cannot reliably
+cross instance boundaries, so an isolated client cannot safely participate in
+the responder election.
 
 ### 4.3 SYNC\_REQUEST
 

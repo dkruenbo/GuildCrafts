@@ -138,7 +138,7 @@ name.
 | `Comms` | `Data:MergeDelta()` | DELTA\_UPDATE received |
 | `Comms` | `Data:GetVersionVector()` | Build SYNC\_REQUEST payload |
 | `Comms` | `Data:GetGuildDB()` | Read/write guild database |
-| `Comms` | `SyncPausePolicy:ShouldPause()` | Before any outbound message |
+| `Comms` | `SyncPausePolicy:ShouldPause()` | Before bulk outbound sync traffic; HEARTBEAT, HELLO, and GC_ACK bypass the pause |
 | `Comms` | `UI:Refresh()` | After sync completes |
 | `Comms` | `UI:UpdateSyncIndicator()` | After HELLO / HEARTBEAT |
 | `Tooltip` | `Data:GetGuildDB()` | Look up crafters for hovered item |

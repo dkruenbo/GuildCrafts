@@ -10,7 +10,7 @@
 
 **Priority: High | Effort: Low**
 
-Suspend all outgoing sync traffic during high-activity game states where chat messages are most likely to be dropped, throttled, or disruptive.
+Suspend bulk outgoing sync traffic during high-activity game states where chat messages are most likely to be dropped, throttled, or disruptive. Tiny election-signaling messages remain enabled so DR/BDR state can converge.
 
 ### Pause conditions
 | Condition | How to detect | Grace after |
@@ -23,7 +23,8 @@ Suspend all outgoing sync traffic during high-activity game states where chat me
 - New module: `SyncPausePolicy.lua`
 - Tracks the current pause state and the reason for it
 - Exposes a single method: `SyncPausePolicy:ShouldPause()` → boolean
-- Every outgoing send site in `Comms.lua` checks this before firing:
+- Every bulk outgoing send site in `Comms.lua` checks this before firing; tiny
+    election signals (`HELLO`, `HEARTBEAT`, and `GC_ACK`) bypass the pause:
   ```lua
   if GuildCrafts.SyncPausePolicy and GuildCrafts.SyncPausePolicy:ShouldPause() then return end
   ```
