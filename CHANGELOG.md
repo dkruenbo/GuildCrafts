@@ -1,510 +1,518 @@
-# Changelog
+  # Changelog
 
-## 2.0.1 — 2026-09-03
+  ## 2.0.2 — 2026-09-08
 
-### Fixes
+  ### Fixes
 
-- **`!gc` double-response from split-brain election** — two nodes could both self-elect as Designated Router and reply simultaneously to the same `!gc` query, producing identical duplicate responses in guild chat. Root cause: `SendMessage()` unconditionally suppressed outgoing addon-channel traffic while `SyncPausePolicy` was active (combat, inside an instance, zone transition grace). This included `HEARTBEAT` and `HELLO` — the exact messages that keep the DR/BDR election in sync. When two players were regularly in combat or transitioning zones, their heartbeats were silently dropped, `addonUsers` never converged, and both computed `myRole = "DR"`. Fixed by whitelisting `HEARTBEAT` and `HELLO` so they always transmit; these are single tiny packets and were never the source of chat-throttle pressure the pause was designed to prevent.
+  - **Connected-realm duplicate responders** — member identities now use one canonical `Name-Realm` format across player keys, guild roster entries, AceComm senders, election state, sync payloads, and saved data. Realm spaces, hyphens, and apostrophes are normalized so the same character cannot appear as multiple addon users and independently become DR.
+  - **SavedVariables key migration** — existing display-realm keys are merged into their canonical entries without discarding newer profession data or tombstones. Member favorites and incoming version vectors are migrated too.
+  - **In-instance `!gc` responses** — clients inside raids, dungeons, battlegrounds, or arenas no longer answer `!gc` queries because GUILD addon traffic cannot reliably cross those boundaries. This prevents isolated clients from responding simultaneously.
 
-### Improvements
+  ## 2.0.1 — 2026-09-03
 
-- **Addon-channel dedup for `!gc` responses** — a new lightweight `GC_ACK` addon-channel broadcast fires the instant a responder decides to post to guild chat. Other responders check this in addition to the guild-chat echo when deciding whether to skip. The addon channel is much lower-latency than the guild-chat echo path, which closes the residual window where two nodes both fire before either echo lands.
-- **DR jitter for defense in depth** — the Designated Router now applies a very small 0–1.5 s jitter to its response even in the converged case, so a residual split-brain (both nodes think they are DR) resolves via the `GC_ACK` broadcast instead of both posting. Unconverged elections keep the existing 2–6 s jitter. No user-visible latency change in normal single-DR operation.
+  ### Fixes
 
----
+  - **`!gc` double-response from split-brain election** — two nodes could both self-elect as Designated Router and reply simultaneously to the same `!gc` query, producing identical duplicate responses in guild chat. Root cause: `SendMessage()` unconditionally suppressed outgoing addon-channel traffic while `SyncPausePolicy` was active (combat, inside an instance, zone transition grace). This included `HEARTBEAT` and `HELLO` — the exact messages that keep the DR/BDR election in sync. When two players were regularly in combat or transitioning zones, their heartbeats were silently dropped, `addonUsers` never converged, and both computed `myRole = "DR"`. Fixed by whitelisting `HEARTBEAT` and `HELLO` so they always transmit; these are single tiny packets and were never the source of chat-throttle pressure the pause was designed to prevent.
 
-## 2.0.0 — 2026-08-05
+  ### Improvements
 
-### New features
+  - **Addon-channel dedup for `!gc` responses** — a new lightweight `GC_ACK` addon-channel broadcast fires the instant a responder decides to post to guild chat. Other responders check this in addition to the guild-chat echo when deciding whether to skip. The addon channel is much lower-latency than the guild-chat echo path, which closes the residual window where two nodes both fire before either echo lands.
+  - **DR jitter for defense in depth** — the Designated Router now applies a very small 0–1.5 s jitter to its response even in the converged case, so a residual split-brain (both nodes think they are DR) resolves via the `GC_ACK` broadcast instead of both posting. Unconverged elections keep the existing 2–6 s jitter. No user-visible latency change in normal single-DR operation.
 
-- **Multi-expansion support** — a single addon folder now works on Classic Era (1.15.x), TBC Anniversary (2.5.x), WotLK Classic (3.4.x), Cata Classic (4.4.x), and MoP Classic (5.5.x) via multi-TOC. The game automatically loads the correct version. WotLK, Cata, and MoP recipe data files are included; expansion filter buttons appear dynamically based on client.
+  ---
 
-### Improvements
+  ## 2.0.0 — 2026-08-05
 
-- **Classic Era profession detection** — `GetProfessions()` exists on the modern engine but returns nil on Classic Era; the addon now falls back to skill-line iteration automatically.
-- **Classic Era tooltip hooks** — `TooltipDataProcessor` callbacks don't fire on all clients; a `SetHyperlink` hook with dedup guard ensures tooltip crafters appear on every supported version.
-- **Linked tradeskill guard** — opening another player's linked recipes no longer corrupts your own data (TBC/WotLK).
-- **Self-prune protection** — the player's own entry can no longer be incorrectly marked as absent or pruned by the inactive-member cleanup.
-- **Dynamic UI button layout** — expansion filter buttons chain right-to-left from the scope dropdown; the search box auto-sizes to fill remaining space regardless of how many buttons are visible.
+  ### New features
 
-### Fixes
+  - **Multi-expansion support** — a single addon folder now works on Classic Era (1.15.x), TBC Anniversary (2.5.x), WotLK Classic (3.4.x), Cata Classic (4.4.x), and MoP Classic (5.5.x) via multi-TOC. The game automatically loads the correct version. WotLK, Cata, and MoP recipe data files are included; expansion filter buttons appear dynamically based on client.
 
-- **MoP Classic scan** — `C_TradeSkillUI` namespace exists on MoP but lacks `GetBaseProfessionInfo`; the scanner now checks for the specific function before choosing the modern path.
-- **MoP Classic events** — both `TRADE_SKILL_SHOW` and `TRADE_SKILL_LIST_UPDATE` are now registered when `C_TradeSkillUI` is present, fixing scans not triggering on MoP.
+  ### Improvements
 
----
+  - **Classic Era profession detection** — `GetProfessions()` exists on the modern engine but returns nil on Classic Era; the addon now falls back to skill-line iteration automatically.
+  - **Classic Era tooltip hooks** — `TooltipDataProcessor` callbacks don't fire on all clients; a `SetHyperlink` hook with dedup guard ensures tooltip crafters appear on every supported version.
+  - **Linked tradeskill guard** — opening another player's linked recipes no longer corrupts your own data (TBC/WotLK).
+  - **Self-prune protection** — the player's own entry can no longer be incorrectly marked as absent or pruned by the inactive-member cleanup.
+  - **Dynamic UI button layout** — expansion filter buttons chain right-to-left from the scope dropdown; the search box auto-sizes to fill remaining space regardless of how many buttons are visible.
 
-## 1.11.0 — 2026-07-21
+  ### Fixes
 
-### New features
+  - **MoP Classic scan** — `C_TradeSkillUI` namespace exists on MoP but lacks `GetBaseProfessionInfo`; the scanner now checks for the specific function before choosing the modern path.
+  - **MoP Classic events** — both `TRADE_SKILL_SHOW` and `TRADE_SKILL_LIST_UPDATE` are now registered when `C_TradeSkillUI` is present, fixing scans not triggering on MoP.
 
-- **Shift-click a recipe name to link it to chat** — shift-clicking any recipe name in the member detail, recipes, favorites, or search results view inserts the item or spell hyperlink directly into the active chat input, exactly like shift-clicking items in bags or tooltips. Works for all professions including Enchanting (spell links). (Thanks to Cha0sx for the inspiration.)
+  ---
 
-### Changes
+  ## 1.11.0 — 2026-07-21
 
-- **Interface version bumped to 20506** — TBC Anniversary 2.5.6 is live. The tooltip crafter pipeline introduced in 1.10.1 (`TooltipDataProcessor` guard) continues to work correctly on the new client.
+  ### New features
 
----
+  - **Shift-click a recipe name to link it to chat** — shift-clicking any recipe name in the member detail, recipes, favorites, or search results view inserts the item or spell hyperlink directly into the active chat input, exactly like shift-clicking items in bags or tooltips. Works for all professions including Enchanting (spell links). (Thanks to Cha0sx for the inspiration.)
 
-## 1.10.1 — 2026-07-20
+  ### Changes
 
-### Fixes
+  - **Interface version bumped to 20506** — TBC Anniversary 2.5.6 is live. The tooltip crafter pipeline introduced in 1.10.1 (`TooltipDataProcessor` guard) continues to work correctly on the new client.
 
-- **Tooltip crafter rows compatible with TBC Anniversary 2.5.6 PTR** — the 2.5.6 client introduces the modern tooltip pipeline (`TooltipDataProcessor`), which replaces the old `OnTooltipSetItem` script event. GuildCrafts now detects which pipeline is available and uses `TooltipDataProcessor.AddTooltipPostCall` on 2.5.6+ while keeping the legacy hook on the current 2.5.5 live client. No tooltip breakage on either client.
+  ---
 
----
+  ## 1.10.1 — 2026-07-20
 
-## 1.10.0 — 2026-06-23
+  ### Fixes
 
-### Fixes
+  - **Tooltip crafter rows compatible with TBC Anniversary 2.5.6 PTR** — the 2.5.6 client introduces the modern tooltip pipeline (`TooltipDataProcessor`), which replaces the old `OnTooltipSetItem` script event. GuildCrafts now detects which pipeline is available and uses `TooltipDataProcessor.AddTooltipPostCall` on 2.5.6+ while keeping the legacy hook on the current 2.5.5 live client. No tooltip breakage on either client.
 
-- **`!gc` spam — all addon users responding simultaneously** — when the DR/BDR election had not yet converged (e.g. start of a raid session, mass login, or reconnect), every online addon user computed `myRole = "DR"` and scheduled their `!gc` response at `delay = 0`. All responses fired in the same WoW frame before any guild-chat echo could arrive to trigger the deduplication check, causing every addon user to post a reply simultaneously. Fixed by detecting the unconverged state (`addonUsers` contains only self) and applying a 2–6 s random jitter in that case. The first node to fire sends `[GuildCrafts]` to guild chat; its echo updates `_gcLastGuildCraftsMsg` on all other clients, and their later-firing timers see the timestamp and cancel. When the election is properly converged, the real DR keeps `delay = 0` for an immediate response — no regression for normal operation.
+  ---
 
----
+  ## 1.10.0 — 2026-06-23
 
-## 1.9.0 — 2026-06-08
+  ### Fixes
 
-### Fixes
+  - **`!gc` spam — all addon users responding simultaneously** — when the DR/BDR election had not yet converged (e.g. start of a raid session, mass login, or reconnect), every online addon user computed `myRole = "DR"` and scheduled their `!gc` response at `delay = 0`. All responses fired in the same WoW frame before any guild-chat echo could arrive to trigger the deduplication check, causing every addon user to post a reply simultaneously. Fixed by detecting the unconverged state (`addonUsers` contains only self) and applying a 2–6 s random jitter in that case. The first node to fire sends `[GuildCrafts]` to guild chat; its echo updates `_gcLastGuildCraftsMsg` on all other clients, and their later-firing timers see the timestamp and cancel. When the election is properly converged, the real DR keeps `delay = 0` for an immediate response — no regression for normal operation.
 
-- **Reduced combat frame spikes** — multiple sources of unnecessary in-combat processing have been removed or deferred, addressing the lag spikes reported by users during pull phases and combat:
+  ---
 
-  1. **`HandleSyncPush` guild broadcast removed.** When the DR received profession data from a member via `SYNC_PUSH` it was re-broadcasting the entire recipe set as `DELTA_UPDATE` messages to the guild channel. Every in-combat guild member had to decompress and deserialize each message. This was the primary cause of combat spikes. Data now converges through the normal `DELTA_AD` → `SYNC_REQUEST` → `SYNC_RESPONSE` path instead.
+  ## 1.9.0 — 2026-06-08
 
-  2. **`Tooltip:RebuildIndex` deferred during combat.** The reverse-lookup index (itemID → crafters) iterates the entire guild database and calls `GetItemInfo`/`GetSpellInfo` for every tracked recipe. A data merge completing ~2 s before pull phase would schedule the rebuild to fire right into combat. The rebuild now checks `InCombatLockdown()` and re-arms a 2 s retry until combat ends.
+  ### Fixes
 
-  3. **`PruneRoster` skipped during combat.** `GUILD_ROSTER_UPDATE` fires on every guild member transition (login, logout, zone change). Each event triggered a full roster scan and database iteration. The prune is now skipped while `InCombatLockdown()` is true and runs on the next event after combat ends.
+  - **Reduced combat frame spikes** — multiple sources of unnecessary in-combat processing have been removed or deferred, addressing the lag spikes reported by users during pull phases and combat:
 
+    1. **`HandleSyncPush` guild broadcast removed.** When the DR received profession data from a member via `SYNC_PUSH` it was re-broadcasting the entire recipe set as `DELTA_UPDATE` messages to the guild channel. Every in-combat guild member had to decompress and deserialize each message. This was the primary cause of combat spikes. Data now converges through the normal `DELTA_AD` → `SYNC_REQUEST` → `SYNC_RESPONSE` path instead.
 
----
+    2. **`Tooltip:RebuildIndex` deferred during combat.** The reverse-lookup index (itemID → crafters) iterates the entire guild database and calls `GetItemInfo`/`GetSpellInfo` for every tracked recipe. A data merge completing ~2 s before pull phase would schedule the rebuild to fire right into combat. The rebuild now checks `InCombatLockdown()` and re-arms a 2 s retry until combat ends.
 
-## 1.8.0 — 2026-06-04
+    3. **`PruneRoster` skipped during combat.** `GUILD_ROSTER_UPDATE` fires on every guild member transition (login, logout, zone change). Each event triggered a full roster scan and database iteration. The prune is now skipped while `InCombatLockdown()` is true and runs on the next event after combat ends.
 
-### Fixes
 
-- **Missing Mining recipes** — 6 TBC Mining profession recipes (Fel Iron Bar, Adamantite Bar, Eternium Bar, Felsteel Bar, Khorium Bar, Hardened Adamantite Bar) were absent from the recipe key table and would never be recognised as known recipes. Mining is fully tracked by the addon — opening the Mining/Smelting window scans and syncs those recipes the same as any other profession.
+  ---
 
-- **Zombie member fix** — former guild members can no longer be resurrected by a peer who was offline during the 7-day grace window. `PruneRoster()` now writes a lightweight tombstone (`{ _tombstone = true }`) instead of hard-deleting the entry. Tombstones propagate through the normal version-vector sync, so any peer who still carries a live entry for the ex-member will overwrite it with the tombstone on their next sync. Tombstones expire after 30 days and are excluded from the absent-since tracking loop to avoid double-processing. `MergeIncoming()` rejects any incoming live data that is older than a local tombstone; if the incoming data is strictly newer (the player rejoined the guild and re-scanned) it is accepted normally.
+  ## 1.8.0 — 2026-06-04
 
-### Improvements
+  ### Fixes
 
-- **`[G]` button** — the "post crafters to guild chat" button on recipe rows was renamed from `[>]` to `[G]` to reduce confusion with the expand-row chevron used elsewhere in the UI. (Thanks to the user gabbsmo for bringing this to our attention.)
+  - **Missing Mining recipes** — 6 TBC Mining profession recipes (Fel Iron Bar, Adamantite Bar, Eternium Bar, Felsteel Bar, Khorium Bar, Hardened Adamantite Bar) were absent from the recipe key table and would never be recognised as known recipes. Mining is fully tracked by the addon — opening the Mining/Smelting window scans and syncs those recipes the same as any other profession.
 
+  - **Zombie member fix** — former guild members can no longer be resurrected by a peer who was offline during the 7-day grace window. `PruneRoster()` now writes a lightweight tombstone (`{ _tombstone = true }`) instead of hard-deleting the entry. Tombstones propagate through the normal version-vector sync, so any peer who still carries a live entry for the ex-member will overwrite it with the tombstone on their next sync. Tombstones expire after 30 days and are excluded from the absent-since tracking loop to avoid double-processing. `MergeIncoming()` rejects any incoming live data that is older than a local tombstone; if the incoming data is strictly newer (the player rejoined the guild and re-scanned) it is accepted normally.
 
----
+  ### Improvements
 
-## 1.7.0 — 2026-05-30
+  - **`[G]` button** — the "post crafters to guild chat" button on recipe rows was renamed from `[>]` to `[G]` to reduce confusion with the expand-row chevron used elsewhere in the UI. (Thanks to the user gabbsmo for bringing this to our attention.)
 
-### New features
 
-- **Per-peer backoff** — nodes now track sync failures per peer instead of immediately evicting unresponsive DRs. After two consecutive timeouts from the same peer within 45 seconds the node enters backoff: the DR is skipped and the BDR is targeted directly on the next sync attempt, without waiting for another full 120-second timeout. Peers whose backoff window has expired are still eligible for eviction under the existing re-election logic. This prevents a briefly unresponsive DR (loading screen, instance transition, chat throttle) from triggering a disruptive re-election cascade every time it hiccups. Failure records are cleared automatically when a successful `SYNC_RESPONSE` or `SYNC_PUSH` is received from that peer. No wire-protocol changes — all tracking is local state.
+  ---
 
+  ## 1.7.0 — 2026-05-30
 
----
+  ### New features
 
-## 1.6.0 — 2026-05-25
+  - **Per-peer backoff** — nodes now track sync failures per peer instead of immediately evicting unresponsive DRs. After two consecutive timeouts from the same peer within 45 seconds the node enters backoff: the DR is skipped and the BDR is targeted directly on the next sync attempt, without waiting for another full 120-second timeout. Peers whose backoff window has expired are still eligible for eviction under the existing re-election logic. This prevents a briefly unresponsive DR (loading screen, instance transition, chat throttle) from triggering a disruptive re-election cascade every time it hiccups. Failure records are cleared automatically when a successful `SYNC_RESPONSE` or `SYNC_PUSH` is received from that peer. No wire-protocol changes — all tracking is local state.
 
-### New features
 
-- **Chunk RESUME recovery** — chunked `SYNC_RESPONSE` transfers are now resilient to dropped messages. The sender tags each transfer with a unique session ID and keeps a short-lived copy of every chunk for up to 35 seconds. If the receiver stops seeing new chunks for more than 4 seconds it whispers a `SYNC_RESUME` message back to the sender listing only the missing sequence numbers; the sender re-sends exactly those chunks. Recovery completes in roughly one `PROGRESS_TIMEOUT` (4 s) instead of waiting for the full 120 s `SYNC_TIMEOUT` before retrying the entire transfer. Up to three RESUME attempts are made before falling back to a full retry. Nodes running older versions of the addon are unaffected — transfers without a session ID continue to use the original code path.
+  ---
 
+  ## 1.6.0 — 2026-05-25
 
----
+  ### New features
 
-## 1.5.0 — 2026-05-20
+  - **Chunk RESUME recovery** — chunked `SYNC_RESPONSE` transfers are now resilient to dropped messages. The sender tags each transfer with a unique session ID and keeps a short-lived copy of every chunk for up to 35 seconds. If the receiver stops seeing new chunks for more than 4 seconds it whispers a `SYNC_RESUME` message back to the sender listing only the missing sequence numbers; the sender re-sends exactly those chunks. Recovery completes in roughly one `PROGRESS_TIMEOUT` (4 s) instead of waiting for the full 120 s `SYNC_TIMEOUT` before retrying the entire transfer. Up to three RESUME attempts are made before falling back to a full retry. Nodes running older versions of the addon are unaffected — transfers without a session ID continue to use the original code path.
 
-### New features
 
-- **Immediate advertise broadcast (`DELTA_AD`)** — when a profession scan finds new recipes, a tiny advertisement message is now broadcast to the guild immediately, carrying only a revision timestamp and per-profession recipe counts (no recipe data). Any peer who sees a `DELTA_AD` with a newer revision than what they already hold queues a sync pull with a short random jitter (1–5 s) to retrieve the data. This closes the propagation gap where a freshly scanned player's new recipes would not reach peers until the next full sync cycle. The Designated Router forwards received advertisements to the rest of the guild so nodes that missed the original broadcast are also notified.
+  ---
 
+  ## 1.5.0 — 2026-05-20
 
----
+  ### New features
 
-## 1.4.0 — 2026-05-15
+  - **Immediate advertise broadcast (`DELTA_AD`)** — when a profession scan finds new recipes, a tiny advertisement message is now broadcast to the guild immediately, carrying only a revision timestamp and per-profession recipe counts (no recipe data). Any peer who sees a `DELTA_AD` with a newer revision than what they already hold queues a sync pull with a short random jitter (1–5 s) to retrieve the data. This closes the propagation gap where a freshly scanned player's new recipes would not reach peers until the next full sync cycle. The Designated Router forwards received advertisements to the rest of the guild so nodes that missed the original broadcast are also notified.
 
-### New features
 
-- **SyncPausePolicy** — all outgoing sync traffic is now automatically suspended during combat, inside instances, and for a short grace period after zone transitions. This prevents addon messages from being dropped or contributing to chat throttle at exactly the moments when the client is busiest. Grace periods: 6 s after leaving combat, 12 s after a zone transition, 15 s after leaving an instance.
+  ---
 
-- **Partial scan protection** — opening a profession window that the API hasn't fully loaded yet can return far fewer recipes than you actually know. The addon now compares the scanned count against the stored count before writing; if the new data accounts for less than 50 % of what's already recorded, the write is skipped and a rescan is scheduled 2 s later. The same guard is applied to incoming sync data, preventing a peer's partial scan from overwriting your complete local copy.
+  ## 1.4.0 — 2026-05-15
 
+  ### New features
 
----
+  - **SyncPausePolicy** — all outgoing sync traffic is now automatically suspended during combat, inside instances, and for a short grace period after zone transitions. This prevents addon messages from being dropped or contributing to chat throttle at exactly the moments when the client is busiest. Grace periods: 6 s after leaving combat, 12 s after a zone transition, 15 s after leaving an instance.
 
-## 1.3.8 — 2026-04-28
+  - **Partial scan protection** — opening a profession window that the API hasn't fully loaded yet can return far fewer recipes than you actually know. The addon now compares the scanned count against the stored count before writing; if the new data accounts for less than 50 % of what's already recorded, the write is skipped and a rescan is scheduled 2 s later. The same guard is applied to incoming sync data, preventing a peer's partial scan from overwriting your complete local copy.
 
-### Fixes
 
-- **Sync queue could fire while previous sync chunks were still in-flight** — the DR marks itself as "processing" while sending a chunked `SYNC_RESPONSE`, but because chunk delivery is timer-based (1 chunk/second), the processing flag was cleared immediately after the first chunk was sent rather than after the last. In guilds with burst logins this allowed a queued `SYNC_REQUEST` to start a new sync before the previous one finished, potentially launching multiple interleaved chunk timer chains and hitting chat throttle limits. The processing flag is now cleared in the last chunk's timer callback via an `onComplete` hook on `SendChunked`.
+  ---
 
----
+  ## 1.3.8 — 2026-04-28
 
-## 1.3.7 — 2026-04-21
+  ### Fixes
 
-### Fixes
+  - **Sync queue could fire while previous sync chunks were still in-flight** — the DR marks itself as "processing" while sending a chunked `SYNC_RESPONSE`, but because chunk delivery is timer-based (1 chunk/second), the processing flag was cleared immediately after the first chunk was sent rather than after the last. In guilds with burst logins this allowed a queued `SYNC_REQUEST` to start a new sync before the previous one finished, potentially launching multiple interleaved chunk timer chains and hitting chat throttle limits. The processing flag is now cleared in the last chunk's timer callback via an `onComplete` hook on `SendChunked`.
 
-- **Stale-data warning never resolved when all recipes were already learned** — opening a profession window only updated your sync timestamp when new recipes or a skill level change were detected. Players who had learned everything would keep aging toward the prune threshold even while actively playing. The addon now always refreshes the timestamp when a profession window is opened, regardless of whether anything changed.
+  ---
 
-- **Peers and the Designated Requester could prune an active player** — because the timestamp update was local-only, other guild members' clients (and the DR) still saw the old timestamp and would eventually prune the entry at 45 days. The addon now broadcasts a lightweight `DELTA_UPDATE (touch)` message to the guild when data is 25–45 days old, so all peers stay in sync. To avoid unnecessary traffic the broadcast is rate-limited to once per hour per profession.
+  ## 1.3.7 — 2026-04-21
 
----
+  ### Fixes
 
-## 1.3.6a — 2026-04-15
+  - **Stale-data warning never resolved when all recipes were already learned** — opening a profession window only updated your sync timestamp when new recipes or a skill level change were detected. Players who had learned everything would keep aging toward the prune threshold even while actively playing. The addon now always refreshes the timestamp when a profession window is opened, regardless of whether anything changed.
 
-### Fixes
+  - **Peers and the Designated Requester could prune an active player** — because the timestamp update was local-only, other guild members' clients (and the DR) still saw the old timestamp and would eventually prune the entry at 45 days. The addon now broadcasts a lightweight `DELTA_UPDATE (touch)` message to the guild when data is 25–45 days old, so all peers stay in sync. To avoid unnecessary traffic the broadcast is rate-limited to once per hour per profession.
 
-- **Recipe name overlap in Recipes view** — the 1.3.6 fix only applied to search results; the Recipes tab (browsing all guild recipes for a profession) used a separate render path with the same undersized margin. Applied the same 205 px right margin to `ShowRecipesView` so long Enchanting recipe names no longer overlap the crafter column in either view
+  ---
 
----
+  ## 1.3.6a — 2026-04-15
 
-## 1.3.6 — 2026-04-15
+  ### Fixes
 
-### Fixes
+  - **Recipe name overlap in Recipes view** — the 1.3.6 fix only applied to search results; the Recipes tab (browsing all guild recipes for a profession) used a separate render path with the same undersized margin. Applied the same 205 px right margin to `ShowRecipesView` so long Enchanting recipe names no longer overlap the crafter column in either view
 
-- **Recipe name overlap with crafter column** — long recipe names (most visible in Enchanting) could overlap the crafter text on the right side of recipe rows. Increased the right margin reserved for the crafter column from 175 px to 205 px to give the full button + crafter text area proper clearance
+  ---
 
----
+  ## 1.3.6 — 2026-04-15
 
-## 1.3.5 — 2026-04-11
+  ### Fixes
 
-### Fixes
+  - **Recipe name overlap with crafter column** — long recipe names (most visible in Enchanting) could overlap the crafter text on the right side of recipe rows. Increased the right margin reserved for the crafter column from 175 px to 205 px to give the full button + crafter text area proper clearance
 
-- **GuildCrafts window no longer covers other windows** — the main frame was set to `HIGH` strata, which placed it on top of Blizzard UI panels including the tradeskill window, bags, and character sheet. Changed to `MEDIUM` so it behaves like a normal addon window and yields to game UI frames
+  ---
 
----
+  ## 1.3.5 — 2026-04-11
 
-## 1.3.4 — 2026-04-05
+  ### Fixes
 
-### Improvements
+  - **GuildCrafts window no longer covers other windows** — the main frame was set to `HIGH` strata, which placed it on top of Blizzard UI panels including the tradeskill window, bags, and character sheet. Changed to `MEDIUM` so it behaves like a normal addon window and yields to game UI frames
 
-- **Specialisation tags in item tooltips** — when hovering an item that guild members can craft, any crafter with a profession specialisation now shows it inline: e.g. `PlayerA — Alchemy [Elixir Master]`. Applies to all TBC specs: Alchemy (Potion/Elixir/Transmutation Master), Blacksmithing, Engineering, Leatherworking, and Tailoring. Offline crafters show the spec in grey
+  ---
 
-### Fixes
+  ## 1.3.4 — 2026-04-05
 
-- **LibDBIcon-1.0 minimap button** — replaced the custom minimap button implementation with the standard LibDBIcon-1.0 library. Leatrix Plus no longer warns about a non-standard minimap button; the button also works correctly with SexyMap and any other minimap manager automatically. Drag-to-position and `/gc minimap` toggle are unchanged
+  ### Improvements
 
----
+  - **Specialisation tags in item tooltips** — when hovering an item that guild members can craft, any crafter with a profession specialisation now shows it inline: e.g. `PlayerA — Alchemy [Elixir Master]`. Applies to all TBC specs: Alchemy (Potion/Elixir/Transmutation Master), Blacksmithing, Engineering, Leatherworking, and Tailoring. Offline crafters show the spec in grey
 
-## 1.3.3 — 2026-03-28
+  ### Fixes
 
-### Improvements
+  - **LibDBIcon-1.0 minimap button** — replaced the custom minimap button implementation with the standard LibDBIcon-1.0 library. Leatrix Plus no longer warns about a non-standard minimap button; the button also works correctly with SexyMap and any other minimap manager automatically. Drag-to-position and `/gc minimap` toggle are unchanged
 
-- **Sync burst reduction in large guilds** — contributed by [@shockedarmor](https://github.com/shockedarmor) (PR #72). When multiple guild members log in or are discovered within a short window, the old code fired one `SYNC_REQUEST` per discovery almost simultaneously. All three re-sync scheduling sites (`HandleHello`, `TouchAddonUser`, `RecomputeElection`) now share a single debounce timer: each new discovery cancels and reschedules a sync 10 seconds after the *last* event, collapsing a burst of discoveries into one request. Tested in a live 25-man raid with 30 addon users syncing simultaneously — no lag spikes and full convergence within a couple of minutes
+  ---
 
-- **Chunked sync is now paced** — `SendChunked` now sends one chunk per second via a timer instead of a tight synchronous loop, preventing a burst of whisper messages hitting all clients at once during a large sync
+  ## 1.3.3 — 2026-03-28
 
-- **Sync timing adjustments** — `SYNC_DELAY` raised from 5 s to 15 s (pushes the initial sync past the worst of login lag); `SYNC_TIMEOUT` raised from 30 s to 120 s (accommodates the slower paced chunk cadence)
+  ### Improvements
 
----
+  - **Sync burst reduction in large guilds** — contributed by [@shockedarmor](https://github.com/shockedarmor) (PR #72). When multiple guild members log in or are discovered within a short window, the old code fired one `SYNC_REQUEST` per discovery almost simultaneously. All three re-sync scheduling sites (`HandleHello`, `TouchAddonUser`, `RecomputeElection`) now share a single debounce timer: each new discovery cancels and reschedules a sync 10 seconds after the *last* event, collapsing a burst of discoveries into one request. Tested in a live 25-man raid with 30 addon users syncing simultaneously — no lag spikes and full convergence within a couple of minutes
 
-## 1.3.2 — 2026-03-26
+  - **Chunked sync is now paced** — `SendChunked` now sends one chunk per second via a timer instead of a tight synchronous loop, preventing a burst of whisper messages hitting all clients at once during a large sync
 
-### Fixes
+  - **Sync timing adjustments** — `SYNC_DELAY` raised from 5 s to 15 s (pushes the initial sync past the worst of login lag); `SYNC_TIMEOUT` raised from 30 s to 120 s (accommodates the slower paced chunk cadence)
 
-- **Guild chat message truncation** — when clicking the `[>]` post button for a recipe with many crafters, the crafter list plus the ` — /gc to browse` trailer could exceed WoW's 255-byte message limit by up to 3 bytes, silently cutting off the end of the line. `FormatCraftersLine` now accepts an optional `extraReserve` parameter so callers can account for any suffix they append; `PostCraftersToGuildChat` passes the exact byte-length of its trailer
+  ---
 
-- **`!gc` overflow line display** — when a `!gc` query matched more than 3 recipes, the overflow notice rendered as `[GuildCrafts] ...3 more result(s)` (number ran directly into the ellipsis). Changed to `[GuildCrafts] +3 more result(s) — /gc to browse`
+  ## 1.3.2 — 2026-03-26
 
----
+  ### Fixes
 
-## 1.3.1 — 2026-03-22
+  - **Guild chat message truncation** — when clicking the `[>]` post button for a recipe with many crafters, the crafter list plus the ` — /gc to browse` trailer could exceed WoW's 255-byte message limit by up to 3 bytes, silently cutting off the end of the line. `FormatCraftersLine` now accepts an optional `extraReserve` parameter so callers can account for any suffix they append; `PostCraftersToGuildChat` passes the exact byte-length of its trailer
 
-### Fixes
+  - **`!gc` overflow line display** — when a `!gc` query matched more than 3 recipes, the overflow notice rendered as `[GuildCrafts] ...3 more result(s)` (number ran directly into the ellipsis). Changed to `[GuildCrafts] +3 more result(s) — /gc to browse`
 
-- **`!gc` enchant link lookup** — shift-clicking an enchant spell link into guild chat (e.g. `!gc [Enchanting: Enchant Bracer - Spellpower]`) now correctly strips the leading `Profession: ` prefix before searching. Previously the prefix caused a false "No guild crafter found" even when crafters existed
+  ---
 
-### Improvements
+  ## 1.3.1 — 2026-03-22
 
-- **Locale-independent link lookup** — when a `!gc` query contains a shift-clicked hyperlink, the numeric item/spell ID is extracted and used for an exact key-based DB lookup before falling back to text search. A German DR can now answer an English player's shift-clicked link (and vice-versa) regardless of client language
+  ### Fixes
 
-### Housekeeping
+  - **`!gc` enchant link lookup** — shift-clicking an enchant spell link into guild chat (e.g. `!gc [Enchanting: Enchant Bracer - Spellpower]`) now correctly strips the leading `Profession: ` prefix before searching. Previously the prefix caused a false "No guild crafter found" even when crafters existed
 
-- **Removed simulation system** — the `/gc sim` debug subsystem (250+ lines) has been removed. It was a development-era tool no longer needed for a shipped addon
-- **Dead code cleanup** — removed 5 unused functions across Data, Comms, and Favorites modules (–304 lines total)
+  ### Improvements
 
----
+  - **Locale-independent link lookup** — when a `!gc` query contains a shift-clicked hyperlink, the numeric item/spell ID is extracted and used for an exact key-based DB lookup before falling back to text search. A German DR can now answer an English player's shift-clicked link (and vice-versa) regardless of client language
 
-## 1.3.0 — 2026-03-22
+  ### Housekeeping
 
-### Improvements
+  - **Removed simulation system** — the `/gc sim` debug subsystem (250+ lines) has been removed. It was a development-era tool no longer needed for a shipped addon
+  - **Dead code cleanup** — removed 5 unused functions across Data, Comms, and Favorites modules (–304 lines total)
 
-- **Ghost member auto-prune** — members who are still in the guild but haven't scanned their professions in 45 days are now automatically removed from the guild database. Previously only ex-guild members were pruned; a still-in-guild member who uninstalled GuildCrafts would accumulate an ever-staler entry indefinitely
-- **Ex-guild grace period reduced: 30d → 7d** — someone who leaves the guild is immediately irrelevant; their entry is now gone within a week instead of a month
-- **Login stale-data warning** — if your own profession data is more than 30 days old, a one-time amber message appears in chat on login reminding you to open your profession windows to resync. Fires once per session only
-- **Smarter login prompt** — the blanket "open profession windows" message is replaced with a targeted warning that lists only the specific professions you have but haven't scanned yet. Herbalism and Skinning are excluded (no recipes to scan). No message is shown if all professions are already synced
-- **Legacy entry cleanup** — entries from early addon versions that were never assigned a scan timestamp (`lastUpdate` nil or 0) are now pruned on the next roster cycle. Active members who open a profession window get a fresh entry immediately
-- **Silent load** — the startup chat message ("v1.x loaded…") has been removed. The addon only speaks when there is something actionable to say
+  ---
 
----
+  ## 1.3.0 — 2026-03-22
 
-## 1.2.5 — 2026-03-20
+  ### Improvements
 
-### Improvements
+  - **Ghost member auto-prune** — members who are still in the guild but haven't scanned their professions in 45 days are now automatically removed from the guild database. Previously only ex-guild members were pruned; a still-in-guild member who uninstalled GuildCrafts would accumulate an ever-staler entry indefinitely
+  - **Ex-guild grace period reduced: 30d → 7d** — someone who leaves the guild is immediately irrelevant; their entry is now gone within a week instead of a month
+  - **Login stale-data warning** — if your own profession data is more than 30 days old, a one-time amber message appears in chat on login reminding you to open your profession windows to resync. Fires once per session only
+  - **Smarter login prompt** — the blanket "open profession windows" message is replaced with a targeted warning that lists only the specific professions you have but haven't scanned yet. Herbalism and Skinning are excluded (no recipes to scan). No message is shown if all professions are already synced
+  - **Legacy entry cleanup** — entries from early addon versions that were never assigned a scan timestamp (`lastUpdate` nil or 0) are now pruned on the next roster cycle. Active members who open a profession window get a fresh entry immediately
+  - **Silent load** — the startup chat message ("v1.x loaded…") has been removed. The addon only speaks when there is something actionable to say
 
-- **Deferred tooltip index rebuild** — the reverse-lookup index used by item tooltips is no longer rebuilt synchronously during a hover event. `InvalidateIndex()` now schedules a 2-second deferred rebuild via `C_Timer.After`; hover events always use the most recently built index. This eliminates frame hitches on first hover after a sync burst in large guilds
-- **Richer sync status tooltip** — hovering the sync dot in the title bar now shows two additional lines: _Last synced_ (time since the last completed `SYNC_RESPONSE` transaction this session, or "not yet this session" for a DR that has not synced with anyone) and _Stale members (30d+)_ (count of member entries older than 30 days, shown in amber only when non-zero)
+  ---
 
----
+  ## 1.2.5 — 2026-03-20
 
-## 1.2.4b — 2026-03-19
+  ### Improvements
 
-### Fixes
+  - **Deferred tooltip index rebuild** — the reverse-lookup index used by item tooltips is no longer rebuilt synchronously during a hover event. `InvalidateIndex()` now schedules a 2-second deferred rebuild via `C_Timer.After`; hover events always use the most recently built index. This eliminates frame hitches on first hover after a sync burst in large guilds
+  - **Richer sync status tooltip** — hovering the sync dot in the title bar now shows two additional lines: _Last synced_ (time since the last completed `SYNC_RESPONSE` transaction this session, or "not yet this session" for a DR that has not synced with anyone) and _Stale members (30d+)_ (count of member entries older than 30 days, shown in amber only when non-zero)
 
-- **Fixed Enchanting fallback key collision risk** — the last-resort recipe key for enchants that yield neither an itemID nor a spellID was derived from a plain `craftName` hash in the range −1,000,000 to −2,000,000. This shared the same modulo space across all enchant names and could silently overwrite one recipe with another. Fix: the input is now namespaced (`"enc:" .. craftName`) and the hash is placed in a dedicated range below −2,000,000, separated from real spellID-based keys. Collision risk is reduced; the fallback path should never fire for any known TBC enchant
+  ---
 
----
+  ## 1.2.4b — 2026-03-19
 
-## 1.2.4a — 2026-03-18
+  ### Fixes
 
-### Fixes
+  - **Fixed Enchanting fallback key collision risk** — the last-resort recipe key for enchants that yield neither an itemID nor a spellID was derived from a plain `craftName` hash in the range −1,000,000 to −2,000,000. This shared the same modulo space across all enchant names and could silently overwrite one recipe with another. Fix: the input is now namespaced (`"enc:" .. craftName`) and the hash is placed in a dedicated range below −2,000,000, separated from real spellID-based keys. Collision risk is reduced; the fallback path should never fire for any known TBC enchant
 
-- **Fixed role change log showing wrong transition** — when a node stepped down from DR after receiving a higher-term heartbeat, the debug log showed `OTHER → BDR` instead of `DR → BDR`. Root cause: `myRole` was reset to `OTHER` in the generic message handler before `RecomputeElection()` ran, so `oldRole` was always `OTHER`
-- **Fixed sync panel showing stale DR** — `RecomputeElection()` was called in the generic message handler before `HandleHeartbeat` had registered the sender in `addonUsers`, so the election ran with an incomplete peer list and `currentDR` came out wrong. Fix: removed the premature role reset and election call from the generic handler; `HandleHeartbeat` now always calls `RecomputeElection()` and updates the sync indicator after registering the sender
+  ---
 
----
+  ## 1.2.4a — 2026-03-18
 
-## 1.2.4 — Secondary Professions — 2026-03-17
+  ### Fixes
 
-### New Features
+  - **Fixed role change log showing wrong transition** — when a node stepped down from DR after receiving a higher-term heartbeat, the debug log showed `OTHER → BDR` instead of `DR → BDR`. Root cause: `myRole` was reset to `OTHER` in the generic message handler before `RecomputeElection()` ran, so `oldRole` was always `OTHER`
+  - **Fixed sync panel showing stale DR** — `RecomputeElection()` was called in the generic message handler before `HandleHeartbeat` had registered the sender in `addonUsers`, so the election ran with an incomplete peer list and `currentDR` came out wrong. Fix: removed the premature role reset and election call from the generic handler; `HandleHeartbeat` now always calls `RecomputeElection()` and updates the sync indicator after registering the sender
 
-- **Mining (Smelting), Herbalism, and Skinning now tracked** — gathering professions appear in the profession browser alongside crafting professions. Skill levels are tracked and synced; member counts show in the left panel the same way as any other profession
-- **Smelting recipes tracked under Mining** — the Smelting tradeskill window fires `TRADE_SKILL_SHOW` exactly like any crafting profession, so Smelting recipes are scanned and stored under the Mining entry. 
-- **Secondary profession divider in left panel** — a thin separator divides the crafting professions (Alchemy, Blacksmithing, Enchanting, Engineering, Jewelcrafting, Leatherworking, Tailoring) from the secondary group (Mining, Herbalism, Skinning, Cooking) in the left navigation panel
-- **Cooking moved to secondary group** — Cooking now appears below the divider with the other secondary professions
-- **Gathering profession detail panel** — clicking a Herbalism or Skinning member shows their name, skill level, and last-scanned timestamp at the top, with a clear `Herbalism is a gathering profession. No recipes to display.` note below instead of the generic empty-state message
+  ---
 
-### Fixes
+  ## 1.2.4 — Secondary Professions — 2026-03-17
 
-- **Fixed DR term oscillation** — two online addon users could endlessly leapfrog each other's DR authority terms (1472 → 1473 → 1474...) spamming the debug window. Root cause: `RecomputeElection()` was called before the heartbeat sender was registered in the peer list, so the stepping-down node re-elected itself immediately. Fix: register the peer first, then compute election once with complete information 
+  ### New Features
 
----
+  - **Mining (Smelting), Herbalism, and Skinning now tracked** — gathering professions appear in the profession browser alongside crafting professions. Skill levels are tracked and synced; member counts show in the left panel the same way as any other profession
+  - **Smelting recipes tracked under Mining** — the Smelting tradeskill window fires `TRADE_SKILL_SHOW` exactly like any crafting profession, so Smelting recipes are scanned and stored under the Mining entry. 
+  - **Secondary profession divider in left panel** — a thin separator divides the crafting professions (Alchemy, Blacksmithing, Enchanting, Engineering, Jewelcrafting, Leatherworking, Tailoring) from the secondary group (Mining, Herbalism, Skinning, Cooking) in the left navigation panel
+  - **Cooking moved to secondary group** — Cooking now appears below the divider with the other secondary professions
+  - **Gathering profession detail panel** — clicking a Herbalism or Skinning member shows their name, skill level, and last-scanned timestamp at the top, with a clear `Herbalism is a gathering profession. No recipes to display.` note below instead of the generic empty-state message
 
-## 1.2.3a — 2026-03-16
+  ### Fixes
 
-### Fixes
+  - **Fixed DR term oscillation** — two online addon users could endlessly leapfrog each other's DR authority terms (1472 → 1473 → 1474...) spamming the debug window. Root cause: `RecomputeElection()` was called before the heartbeat sender was registered in the peer list, so the stepping-down node re-elected itself immediately. Fix: register the peer first, then compute election once with complete information 
 
-- **Fixed `!gc` double-response when DR is inside an instance** — when the Designated Router enters a battleground or dungeon, heartbeats stop crossing the instance boundary. After 3 minutes the BDR is promoted to DR outside, but the original DR is still alive and also responding to `!gc` queries — causing two replies in guild chat. The fix: a DR inside an instance now treats itself as a regular node for `!gc` purposes (12–20 s delay with jitter). The outside DR/BDR responds first; the in-instance DR sees the `[GuildCrafts]` echo in guild chat and cancels its pending reply. When the DR leaves the instance it broadcasts HELLO, roles re-converge within seconds, and it reclaims the DR role normally
+  ---
 
----
+  ## 1.2.3a — 2026-03-16
 
-## 1.2.3 — Whisper & UI Polish — 2026-03-16
+  ### Fixes
 
-### New Features
+  - **Fixed `!gc` double-response when DR is inside an instance** — when the Designated Router enters a battleground or dungeon, heartbeats stop crossing the instance boundary. After 3 minutes the BDR is promoted to DR outside, but the original DR is still alive and also responding to `!gc` queries — causing two replies in guild chat. The fix: a DR inside an instance now treats itself as a regular node for `!gc` purposes (12–20 s delay with jitter). The outside DR/BDR responds first; the in-instance DR sees the `[GuildCrafts]` echo in guild chat and cancels its pending reply. When the DR leaves the instance it broadcasts HELLO, roles re-converge within seconds, and it reclaims the DR role normally
 
-- **`[W]` whisper button** — each recipe row now has a `[W]` button to the left of `[>]`. Clicking it opens the chat edit box pre-filled with `/w CharName Can you craft X for me?`. If there is only one non-self crafter the whisper opens directly; if there are multiple, a small dropdown picker appears (online crafters shown in green, offline in grey). The button is hidden when you are the only known crafter
+  ---
 
-- **Bottom bar with `[Online]` and `[Tooltip]` toggles** — the cryptic `O` dot has been replaced by proper labelled buttons in a thin bar at the bottom of the window. `[Online]` filters the crafter list to online members; `[Tooltip]` controls whether guild crafters are injected into hover tooltips. Both buttons glow yellow when active and dim when inactive, matching the existing `[Vanilla]` / `[TBC]` style
+  ## 1.2.3 — Whisper & UI Polish — 2026-03-16
 
-- **Tooltip crafters toggle** — the new `[Tooltip]` button lets you disable the tooltip crafter injection entirely. Useful in large guilds where popular items (flasks, enchants) generate very long tooltips. Off means no crafter section is shown at all; the setting persists across sessions
+  ### New Features
 
-- **Three-state online indicator** — the `O` dot next to each member name is now colour-coded with three states: **green** = online and GuildCrafts is active; **yellow** = online but GuildCrafts not detected (addon may be uninstalled); **grey** = offline. Hovering the dot shows a tooltip explaining the state
+  - **`[W]` whisper button** — each recipe row now has a `[W]` button to the left of `[>]`. Clicking it opens the chat edit box pre-filled with `/w CharName Can you craft X for me?`. If there is only one non-self crafter the whisper opens directly; if there are multiple, a small dropdown picker appears (online crafters shown in green, offline in grey). The button is hidden when you are the only known crafter
 
-### Fixes
+  - **Bottom bar with `[Online]` and `[Tooltip]` toggles** — the cryptic `O` dot has been replaced by proper labelled buttons in a thin bar at the bottom of the window. `[Online]` filters the crafter list to online members; `[Tooltip]` controls whether guild crafters are injected into hover tooltips. Both buttons glow yellow when active and dim when inactive, matching the existing `[Vanilla]` / `[TBC]` style
 
-- **Cooking now appears in the profession list** — Cooking was tracked and synced correctly but was missing from the profession browser due to a hardcoded list that omitted it
-- **Cooking now has a profession icon** — the bread/food icon is shown next to Cooking in the profession list, matching all other professions
-- **Sync dot now updates correctly for the DR** — the Designated Router never receives a `SYNC_RESPONSE`, so the sync indicator was stuck on red even when other addon users were online. The dot now updates immediately when new peers are discovered via HELLO or heartbeat
-- **Sync dot now updates on roster change** — the online indicator cross-checks `addonUsers` against the guild roster cache; it now re-evaluates whenever the roster rebuilds
-- **Bottom bar buttons no longer overlap the resize grip** — the bar's right edge is offset far enough from the corner that it no longer touches the resize dragger
-- **Fixed instances causing false DR eviction** — GUILD addon messages are not delivered inside instances and arenas. The DR heartbeat watchdog now pauses eviction while the player is in an instance, preventing a false re-election every 3 minutes when the DR zones in
+  - **Tooltip crafters toggle** — the new `[Tooltip]` button lets you disable the tooltip crafter injection entirely. Useful in large guilds where popular items (flasks, enchants) generate very long tooltips. Off means no crafter section is shown at all; the setting persists across sessions
 
-### Removed
+  - **Three-state online indicator** — the `O` dot next to each member name is now colour-coded with three states: **green** = online and GuildCrafts is active; **yellow** = online but GuildCrafts not detected (addon may be uninstalled); **grey** = offline. Hovering the dot shows a tooltip explaining the state
 
-- **Craft request protocol** — the peer-to-peer craft request / accept / decline / complete flow (popup, comms commands, queue) has been removed. The `[W]` whisper button is the replacement workflow
+  ### Fixes
 
----
+  - **Cooking now appears in the profession list** — Cooking was tracked and synced correctly but was missing from the profession browser due to a hardcoded list that omitted it
+  - **Cooking now has a profession icon** — the bread/food icon is shown next to Cooking in the profession list, matching all other professions
+  - **Sync dot now updates correctly for the DR** — the Designated Router never receives a `SYNC_RESPONSE`, so the sync indicator was stuck on red even when other addon users were online. The dot now updates immediately when new peers are discovered via HELLO or heartbeat
+  - **Sync dot now updates on roster change** — the online indicator cross-checks `addonUsers` against the guild roster cache; it now re-evaluates whenever the roster rebuilds
+  - **Bottom bar buttons no longer overlap the resize grip** — the bar's right edge is offset far enough from the corner that it no longer touches the resize dragger
+  - **Fixed instances causing false DR eviction** — GUILD addon messages are not delivered inside instances and arenas. The DR heartbeat watchdog now pauses eviction while the player is in an instance, preventing a false re-election every 3 minutes when the DR zones in
 
-## 1.2.2 — Expansion Filter — 2026-03-13
+  ### Removed
 
-### New Features
+  - **Craft request protocol** — the peer-to-peer craft request / accept / decline / complete flow (popup, comms commands, queue) has been removed. The `[W]` whisper button is the replacement workflow
 
-- **Expansion filter buttons** — two toggle buttons `[Vanilla]` and `[TBC]` in the search bar let you narrow the recipe display to Original Classic recipes, TBC recipes, or both. Filter state persists across reloads per character. Both are active by default so first-run behaviour is unchanged
-- **Accurate TBC classification** — recipes are classified via a pre-generated lookup table (`TBC_ITEM_IDS`) covering all TBC crafting professions. Lookup is a direct hash — no per-frame scan, zero runtime cost
-- **Enchanting fully covered** — enchanting recipe keys are `-spellID` as returned by `GetCraftRecipeLink`; the lookup table is keyed accordingly so all TBC enchants classify correctly
+  ---
 
----
+  ## 1.2.2 — Expansion Filter — 2026-03-13
 
-## 1.2.1 — Data Clarity & Search UX — 2026-03-13
+  ### New Features
 
-### New Features
+  - **Expansion filter buttons** — two toggle buttons `[Vanilla]` and `[TBC]` in the search bar let you narrow the recipe display to Original Classic recipes, TBC recipes, or both. Filter state persists across reloads per character. Both are active by default so first-run behaviour is unchanged
+  - **Accurate TBC classification** — recipes are classified via a pre-generated lookup table (`TBC_ITEM_IDS`) covering all TBC crafting professions. Lookup is a direct hash — no per-frame scan, zero runtime cost
+  - **Enchanting fully covered** — enchanting recipe keys are `-spellID` as returned by `GetCraftRecipeLink`; the lookup table is keyed accordingly so all TBC enchants classify correctly
 
-- **Online-only crafter filter** — a new `[Online]` toggle button in the profession header bar filters the crafter display in Recipes view and Search Results to show only online crafters. Toggle state persists across reloads. When active, recipes with no online crafter show `—`
-- **"Scanned: N ago" timestamp in member detail** — the member recipe panel now shows a small grey label (`Scanned: 2h ago`, `Scanned: 3d ago`, etc.) below the member name so you can immediately judge how fresh the data is
-- **Specialisation description tooltip** — hovering a member row that shows a specialisation tag (e.g. `[Transmutation Master]`, `[Dragonscale Leatherworking]`) now pops a GameTooltip with a plain-English explanation of what the spec unlocks
-- **Better empty search state** — searching for a term with no results now shows a clear "Nobody in the guild knows X" message instead of a silent blank
+  ---
 
----
+  ## 1.2.1 — Data Clarity & Search UX — 2026-03-13
 
-## 1.2.0 — Protocol Correctness — 2026-03-12
+  ### New Features
 
-### New Features
+  - **Online-only crafter filter** — a new `[Online]` toggle button in the profession header bar filters the crafter display in Recipes view and Search Results to show only online crafters. Toggle state persists across reloads. When active, recipes with no online crafter show `—`
+  - **"Scanned: N ago" timestamp in member detail** — the member recipe panel now shows a small grey label (`Scanned: 2h ago`, `Scanned: 3d ago`, etc.) below the member name so you can immediately judge how fresh the data is
+  - **Specialisation description tooltip** — hovering a member row that shows a specialisation tag (e.g. `[Transmutation Master]`, `[Dragonscale Leatherworking]`) now pops a GameTooltip with a plain-English explanation of what the spec unlocks
+  - **Better empty search state** — searching for a term with no results now shows a clear "Nobody in the guild knows X" message instead of a silent blank
 
-- **Cooking now tracked** — raid food, utility food, and all Cooking recipes are now included in the guild database, search, and tooltip injection (closes #60)
+  ---
 
-### Improvements
+  ## 1.2.0 — Protocol Correctness — 2026-03-12
 
-- **Term-based DR authority** — the Designated Router now carries a monotone term counter in every message. If a DR is replaced by a new election, any late-arriving messages from the old DR are silently discarded, preventing stale data from overwriting newer guild recipes
-- **Immediate step-down** — if a node is currently acting as DR and receives a heartbeat from a higher-term authority, it steps down instantly and triggers a fresh election rather than waiting for the next heartbeat cycle
+  ### New Features
 
-### Fixes
+  - **Cooking now tracked** — raid food, utility food, and all Cooking recipes are now included in the guild database, search, and tooltip injection (closes #60)
 
-- Fixed a race where the old DR kept responding to sync requests after being superseded, because `myRole` was not updated until the next heartbeat timeout
+  ### Improvements
 
----
+  - **Term-based DR authority** — the Designated Router now carries a monotone term counter in every message. If a DR is replaced by a new election, any late-arriving messages from the old DR are silently discarded, preventing stale data from overwriting newer guild recipes
+  - **Immediate step-down** — if a node is currently acting as DR and receives a heartbeat from a higher-term authority, it steps down instantly and triggers a fresh election rather than waiting for the next heartbeat cycle
 
-## 1.1.8a — 2026-03-10
+  ### Fixes
 
-### New Features
+  - Fixed a race where the old DR kept responding to sync requests after being superseded, because `myRole` was not updated until the next heartbeat timeout
 
-- **Hover crafter names to see the full list** — hovering the crafter text (right side of a recipe row) in Search results and Recipes view shows a tooltip with all crafters and their online status
-- **Hover a reagent to see its tooltip** — expanding a recipe and hovering any reagent line shows the native WoW item tooltip
+  ---
 
-### Fixes
+  ## 1.1.8a — 2026-03-10
 
-- Tooltip hit zone is now scoped to the recipe name only — hovering the crafter list, expand icon, or post button no longer triggers the item tooltip
-- Fixed potential tooltip flicker when moving the cursor between the recipe name and the rest of the row
+  ### New Features
 
----
+  - **Hover crafter names to see the full list** — hovering the crafter text (right side of a recipe row) in Search results and Recipes view shows a tooltip with all crafters and their online status
+  - **Hover a reagent to see its tooltip** — expanding a recipe and hovering any reagent line shows the native WoW item tooltip
 
-## 1.1.8 — Recipe Hover Tooltips — 2026-03-10
+  ### Fixes
 
-### New Features
+  - Tooltip hit zone is now scoped to the recipe name only — hovering the crafter list, expand icon, or post button no longer triggers the item tooltip
+  - Fixed potential tooltip flicker when moving the cursor between the recipe name and the rest of the row
 
-- **Hover a recipe name to see its tooltip** — hovering the recipe name in Search results, Recipes view, member detail, or Favorites shows the native WoW item or spell tooltip. Enchanting recipes (spell-based) show the spell tooltip; all other professions show the item tooltip
+  ---
 
----
+  ## 1.1.8 — Recipe Hover Tooltips — 2026-03-10
 
-## 1.1.7a — Guild Chat Fixes — 2026-03-08
+  ### New Features
 
-### Fixes
+  - **Hover a recipe name to see its tooltip** — hovering the recipe name in Search results, Recipes view, member detail, or Favorites shows the native WoW item or spell tooltip. Enchanting recipes (spell-based) show the spell tooltip; all other professions show the item tooltip
 
-- Fixed responses occasionally posting twice in quick succession
-- Fixed guild chat messages being cut off mid-name
-- Fixed typo searches matching too many unrelated recipes
-- Fixed multiple addon users all responding at the same time when the primary responder was offline
-- Crafter list in `!gc` replies is now limited to 2 names + "+X more" to keep messages short
+  ---
 
----
+  ## 1.1.7a — Guild Chat Fixes — 2026-03-08
 
-## 1.1.7 — Guild Chat Integration — 2026-03-08
+  ### Fixes
 
-### New Features
+  - Fixed responses occasionally posting twice in quick succession
+  - Fixed guild chat messages being cut off mid-name
+  - Fixed typo searches matching too many unrelated recipes
+  - Fixed multiple addon users all responding at the same time when the primary responder was offline
+  - Crafter list in `!gc` replies is now limited to 2 names + "+X more" to keep messages short
 
-- **`!gc <recipe>` in guild chat** — type `!gc shadowcloth` and the addon posts matching crafters right in guild chat. No addon needed to ask, anyone can use it
-- **Post crafters button** — every recipe row now has a small `[>]` button to share that recipe's crafters to guild chat with one click
+  ---
 
-### Improvements
+  ## 1.1.7 — Guild Chat Integration — 2026-03-08
 
-- Fuzzy search so typos still find the right recipe (e.g. "shadwcloth" → Shadowcloth)
-- Shift-clicking an item into `!gc` works correctly
-- 30-second cooldown per recipe/query to prevent accidental spam
+  ### New Features
 
----
+  - **`!gc <recipe>` in guild chat** — type `!gc shadowcloth` and the addon posts matching crafters right in guild chat. No addon needed to ask, anyone can use it
+  - **Post crafters button** — every recipe row now has a small `[>]` button to share that recipe's crafters to guild chat with one click
 
-## 1.1.6 — Multi-Language Support — 2026-03-07
+  ### Improvements
 
-### New Features
+  - Fuzzy search so typos still find the right recipe (e.g. "shadwcloth" → Shadowcloth)
+  - Shift-clicking an item into `!gc` works correctly
+  - 30-second cooldown per recipe/query to prevent accidental spam
 
-- **Mixed-language guilds now work** — French, German, English and other client languages all see recipes in their own language, regardless of what language the crafter scanned them in
-- Recipe search, tooltips, and favorites all show correctly localised names
+  ---
 
----
+  ## 1.1.6 — Multi-Language Support — 2026-03-07
 
-## 1.1.5b — Stability Fixes — 2026-03-03
+  ### New Features
 
-### Fixes
+  - **Mixed-language guilds now work** — French, German, English and other client languages all see recipes in their own language, regardless of what language the crafter scanned them in
+  - Recipe search, tooltips, and favorites all show correctly localised names
 
-- Fixed guild members appearing twice in the member list
-- Fixed recipes being lost when two entries for the same character existed
-- Fixed the addon user count showing too low on login or too high over time
-- Reduced chat noise when many addon users log in at the same time
+  ---
 
----
+  ## 1.1.5b — Stability Fixes — 2026-03-03
 
-## 1.1.5a — 2026-03-03
+  ### Fixes
 
-### Fixes
+  - Fixed guild members appearing twice in the member list
+  - Fixed recipes being lost when two entries for the same character existed
+  - Fixed the addon user count showing too low on login or too high over time
+  - Reduced chat noise when many addon users log in at the same time
 
-- Fixed hunter pet abilities (Claw, Dash, Dive, etc.) showing up as Enchanting recipes for hunters
+  ---
 
----
+  ## 1.1.5a — 2026-03-03
 
-## 1.1.5 — UI Overhaul — 2026-03-01
+  ### Fixes
 
-### New Features
+  - Fixed hunter pet abilities (Claw, Dash, Dive, etc.) showing up as Enchanting recipes for hunters
 
-- **Recipe quality colors** — recipe names are colored by rarity (grey/white/green/blue/purple/orange) so rare recipes stand out
-- **Collapsible reagent rows** — click any recipe to expand its material list; collapsed by default for a clean view
-- **"Recipes" view** — new toggle to switch between a per-member recipe list and an aggregated "who can craft this?" view per profession
-- **Polished sidebar** — dark rows with a gold accent bar on the selected profession and a blue hover highlight
+  ---
 
-### Fixes
+  ## 1.1.5 — UI Overhaul — 2026-03-01
 
-- Fixed the "Select a profession" message overlapping recipe content in various situations
-- Fixed crafters showing twice in search results
-- Fixed recipes always showing `~` (missing reagents) in the Recipe view
-- Fixed quality colors not loading until the window was reopened
-- Fixed expand/collapse icons showing as rectangles on some clients
+  ### New Features
 
----
+  - **Recipe quality colors** — recipe names are colored by rarity (grey/white/green/blue/purple/orange) so rare recipes stand out
+  - **Collapsible reagent rows** — click any recipe to expand its material list; collapsed by default for a clean view
+  - **"Recipes" view** — new toggle to switch between a per-member recipe list and an aggregated "who can craft this?" view per profession
+  - **Polished sidebar** — dark rows with a gold accent bar on the selected profession and a blue hover highlight
 
-## 1.1.0 — Favorites — 2026-02-27
+  ### Fixes
 
-### New Features
+  - Fixed the "Select a profession" message overlapping recipe content in various situations
+  - Fixed crafters showing twice in search results
+  - Fixed recipes always showing `~` (missing reagents) in the Recipe view
+  - Fixed quality colors not loading until the window was reopened
+  - Fixed expand/collapse icons showing as rectangles on some clients
 
-- **Favorites** — star recipes and crafters for quick access. New Favorites tab with Members and Recipes sub-tabs
+  ---
 
-### Improvements
+  ## 1.1.0 — Favorites — 2026-02-27
 
-- Members who leave the guild are automatically removed after 30 days
-- Reduced SavedVariables size by deduplicating shared recipe data
+  ### New Features
 
-### Fixes
+  - **Favorites** — star recipes and crafters for quick access. New Favorites tab with Members and Recipes sub-tabs
 
-- Fixed star icons showing as rectangles
-- Fixed empty state messages overlapping in the Favorites tab
+  ### Improvements
 
----
+  - Members who leave the guild are automatically removed after 30 days
+  - Reduced SavedVariables size by deduplicating shared recipe data
 
-## 1.0.4 — 2026-02-26
+  ### Fixes
 
-### Fixes
+  - Fixed star icons showing as rectangles
+  - Fixed empty state messages overlapping in the Favorites tab
 
-- Fixed characters in multiple guilds on the same account sharing (and corrupting) each other's data
+  ---
 
----
+  ## 1.0.4 — 2026-02-26
 
-## 1.0.3 — 2026-02-25
+  ### Fixes
 
-### Fixes
+  - Fixed characters in multiple guilds on the same account sharing (and corrupting) each other's data
 
-- Fixed missing reagents on some recipes when the game hadn't fully loaded the item data yet (e.g. Enchant Gloves - Spell Strike)
+  ---
 
----
+  ## 1.0.3 — 2026-02-25
 
-## 1.0.2 — 2026-02-23
+  ### Fixes
 
-### Fixes
+  - Fixed missing reagents on some recipes when the game hadn't fully loaded the item data yet (e.g. Enchant Gloves - Spell Strike)
 
-- Removed noisy role-change messages from chat (debug only now)
-- Fixed `/gc minimap` toggle not working
+  ---
 
----
+  ## 1.0.2 — 2026-02-23
 
-## 1.0.1 — 2026-02-23
+  ### Fixes
 
-### Fixes
+  - Removed noisy role-change messages from chat (debug only now)
+  - Fixed `/gc minimap` toggle not working
 
-- Fixed new members showing as "683 months old"
-- Fixed peers not discovering each other correctly on login
-- Fixed scroll panels cutting off the last entry
-- Fixed minimap button position on square minimap addons (Titan Panel, SexyMap)
-- Fixed reagents missing from synced recipe data
-- Fixed craft request popups appearing during combat
-- Fixed sync getting stuck when already up to date
-- Various search and navigation display fixes
+  ---
 
----
+  ## 1.0.1 — 2026-02-23
 
-## 1.0.0 — 2026-02-22
+  ### Fixes
 
-- Initial release
+  - Fixed new members showing as "683 months old"
+  - Fixed peers not discovering each other correctly on login
+  - Fixed scroll panels cutting off the last entry
+  - Fixed minimap button position on square minimap addons (Titan Panel, SexyMap)
+  - Fixed reagents missing from synced recipe data
+  - Fixed craft request popups appearing during combat
+  - Fixed sync getting stuck when already up to date
+  - Various search and navigation display fixes
+
+  ---
+
+  ## 1.0.0 — 2026-02-22
+
+  - Initial release

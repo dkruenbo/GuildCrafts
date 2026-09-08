@@ -398,10 +398,10 @@ function Data:RebuildOnlineCache()
     for i = 1, numMembers do
         local name, _, _, _, _, _, _, _, isOnline = GetGuildRosterInfo(i)
         if name then
-            if not name:find("-") then
-                name = name .. "-" .. GetRealmName()
+            local memberKey = self:NormalizeMemberKey(name)
+            if memberKey then
+                self._onlineCache[memberKey] = isOnline or false
             end
-            self._onlineCache[name] = isOnline or false
         end
     end
 
@@ -410,6 +410,7 @@ function Data:RebuildOnlineCache()
 end
 
 function Data:IsMemberOnline(memberKey)
+    memberKey = self:NormalizeMemberKey(memberKey)
     return self._onlineCache[memberKey] or false
 end
 
@@ -420,11 +421,30 @@ end
 --- Get the current player's "CharacterName-Realm" key.
 function Data:GetPlayerKey()
     if not self._playerKey then
-        local name = UnitName("player")
-        local realm = GetRealmName()
-        self._playerKey = name .. "-" .. realm
+        local name, realm
+        if UnitFullName then
+            name, realm = UnitFullName("player")
+        end
+        name = name or UnitName("player")
+        self._playerKey = self:NormalizeMemberKey(name .. "-" .. (realm or GetRealmName() or "UnknownRealm"))
     end
     return self._playerKey
+end
+
+local function NormalizeRealmName(realm)
+    realm = realm or GetRealmName() or "UnknownRealm"
+    return realm:gsub("[%s%-']", "")
+end
+
+--- Return the canonical key used by roster, comms, and saved member data.
+function Data:NormalizeMemberKey(key)
+    if type(key) ~= "string" or key == "" then return nil end
+    local name, realm = key:match("^([^%-]+)%-(.+)$")
+    if not name then
+        name, realm = key, GetRealmName()
+    end
+    if not name or name == "" then return nil end
+    return name .. "-" .. NormalizeRealmName(realm)
 end
 
 ----------------------------------------------------------------------
@@ -460,39 +480,40 @@ function Data:GetGuildDB()
         self.db.global[guildKey] = {}
     end
 
-    -- One-time cleanup: merge/rename keys stored without realm suffix.
-    -- Requires realm name, which is only guaranteed available after login.
-    if not self._realmlessMerged then
+    -- Normalize legacy display-realm keys before returning the database.
+    if not self._memberKeysNormalized then
         self:MergeRealmlessKeys(self.db.global[guildKey])
-        self._realmlessMerged = true
+        self._memberKeysNormalized = true
     end
 
     return self.db.global[guildKey]
 end
 
---- One-time cleanup: find member keys stored without a realm suffix
---- (e.g. "Betadrul") and merge them into the canonical "Name-Realm" entry.
---- If the canonical entry is newer, the realmless entry is simply deleted.
---- If the canonical entry is absent, the realmless entry is renamed.
+--- Normalize member keys stored with display-realm punctuation or without a
+--- realm suffix, merging duplicate entries into the canonical key.
 function Data:MergeRealmlessKeys(gdb)
     if not gdb then return end
-    local realm = GetRealmName()
-    if not realm or realm == "" then return end
-
     local renamed  = 0
     local merged   = 0
 
-    -- Collect realmless keys first to avoid mutating the table mid-iteration.
-    local realmless = {}
+    -- Collect keys first to avoid mutating the table mid-iteration.
+    local candidates = {}
     for key, entry in pairs(gdb) do
-        if type(entry) == "table" and entry.lastUpdate and not key:find("-") then
-            realmless[#realmless + 1] = key
+        if type(key) == "string"
+            and type(entry) == "table"
+            and (entry.lastUpdate or entry._tombstone)
+        then
+            local canonical = self:NormalizeMemberKey(key)
+            if canonical and canonical ~= key then
+                candidates[#candidates + 1] = { key = key, canonical = canonical }
+            end
         end
     end
 
-    for _, key in ipairs(realmless) do
+    for _, candidate in ipairs(candidates) do
+        local key = candidate.key
         local entry      = gdb[key]
-        local canonical  = key .. "-" .. realm
+        local canonical  = candidate.canonical
         local existing   = gdb[canonical]
 
         if not existing then
@@ -512,18 +533,20 @@ function Data:MergeRealmlessKeys(gdb)
             -- If the profession exists in winner but is empty (e.g. DetectProfessions
             -- created it with a newer timestamp but no recipes scanned yet), merge
             -- individual recipes from the loser so no data is lost.
-            for profName, loserProf in pairs(loser.professions or {}) do
-                if not winner.professions then winner.professions = {} end
-                if not winner.professions[profName] then
-                    -- Profession entirely missing from winner — copy whole block
-                    winner.professions[profName] = loserProf
-                else
-                    -- Profession exists in winner — merge individual recipes
-                    local winnerProf = winner.professions[profName]
-                    if not winnerProf.recipes then winnerProf.recipes = {} end
-                    for recipeKey, recipeData in pairs(loserProf.recipes or {}) do
-                        if not winnerProf.recipes[recipeKey] then
-                            winnerProf.recipes[recipeKey] = recipeData
+            if not winner._tombstone then
+                for profName, loserProf in pairs(loser.professions or {}) do
+                    if not winner.professions then winner.professions = {} end
+                    if not winner.professions[profName] then
+                        -- Profession entirely missing from winner — copy whole block
+                        winner.professions[profName] = loserProf
+                    else
+                        -- Profession exists in winner — merge individual recipes
+                        local winnerProf = winner.professions[profName]
+                        if not winnerProf.recipes then winnerProf.recipes = {} end
+                        for recipeKey, recipeData in pairs(loserProf.recipes or {}) do
+                            if not winnerProf.recipes[recipeKey] then
+                                winnerProf.recipes[recipeKey] = recipeData
+                            end
                         end
                     end
                 end
@@ -581,6 +604,8 @@ end
 
 --- Get or create a member entry in the DB (guild-scoped).
 function Data:GetMemberEntry(memberKey, create)
+    memberKey = self:NormalizeMemberKey(memberKey)
+    if not memberKey then return nil end
     local gdb = self:GetGuildDB()
     if not gdb then return nil end
     local entry = gdb[memberKey]
@@ -1640,8 +1665,9 @@ function Data:MergeIncoming(incomingData)
     if not gdb then return false end
     local changed = false
     local playerKey = self:GetPlayerKey()
-    for memberKey, incomingEntry in pairs(incomingData) do
+    for rawMemberKey, incomingEntry in pairs(incomingData) do
         if type(incomingEntry) == "table" and incomingEntry.lastUpdate then
+            local memberKey = self:NormalizeMemberKey(rawMemberKey) or rawMemberKey
             -- Never overwrite our own data — we're always authoritative
             -- for ourselves (local scans have reagents/cooldowns that
             -- sync payloads strip out)
@@ -1738,6 +1764,8 @@ end
 function Data:MergeDelta(memberKey, profName, recipeKey, recipeData, newLastUpdate)
     local gdb = self:GetGuildDB()
     if not gdb then return end
+    memberKey = self:NormalizeMemberKey(memberKey)
+    if not memberKey then return end
 
     -- Reject delta if we have a tombstone that is at least as new.
     -- If the delta is strictly newer, the member re-joined and re-scanned —
@@ -1777,6 +1805,8 @@ end
 function Data:MergeProfessionRemoval(memberKey, profName, newLastUpdate)
     local gdb = self:GetGuildDB()
     if not gdb then return end
+    memberKey = self:NormalizeMemberKey(memberKey)
+    if not memberKey then return end
     local entry = gdb[memberKey]
     -- Tombstone entries have no professions; removal is a no-op for them.
     if entry and entry._tombstone then
@@ -1817,11 +1847,10 @@ function Data:PruneRoster()
     for i = 1, numMembers do
         local name, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = GetGuildRosterInfo(i)
         if name then
-            -- GetGuildRosterInfo may return "Name-Realm" or just "Name"
-            if not name:find("-") then
-                name = name .. "-" .. GetRealmName()
+            local memberKey = self:NormalizeMemberKey(name)
+            if memberKey then
+                rosterKeys[memberKey] = true
             end
-            rosterKeys[name] = true
         end
     end
 

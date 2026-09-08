@@ -16,7 +16,7 @@ local GuildCrafts = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME,
 _G.GuildCrafts = GuildCrafts
 
 -- Addon version — keep in sync with .toc and CurseForge
-GuildCrafts.DISPLAY_VERSION = "2.0.1"
+GuildCrafts.DISPLAY_VERSION = "2.0.2"
 
 -- Protocol version — integer used in sync envelope for compatibility checks.
 -- Bump when the wire format changes in a backward-incompatible way.
@@ -319,6 +319,11 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
     local query = msg:match("^!gc%s+(.+)$")
     if not query then return end
 
+    -- GUILD addon messages do not cross instance boundaries, so an in-instance
+    -- client cannot safely participate in responder election or deduplication.
+    local inInstance = IsInInstance and select(1, IsInInstance())
+    if inInstance then return end
+
     -- Extract a numeric recipe key from a hyperlink before stripping markup.
     -- |Hitem:12345:...|h  →  recipeKey = 12345  (positive itemID)
     -- |Henchant:9876|h    →  recipeKey = -9876   (negative spellID, matches DB convention)
@@ -354,13 +359,10 @@ function GuildCrafts:OnGuildChatMessage(_event, msg)
     -- so a no-match query can be retried immediately with a corrected spelling.
 
     -- Staggered delay: DR=0 s, BDR=5 s, anyone else=12–20 s.
-    -- If DR is inside an instance it may have been silently replaced by the BDR
-    -- (heartbeats don't cross instance boundaries). Treat an in-instance DR as
-    -- OTHER so the outside DR/BDR responds first. When the DR leaves the
-    -- instance it broadcasts HELLO, roles re-converge, and it reclaims DR.
+    -- In-instance clients have already returned above because they cannot
+    -- safely coordinate over the GUILD addon channel.
     local myRole = self.Comms.myRole
-    local inInstance = IsInInstance and select(1, IsInInstance())
-    local effectiveRole = (myRole == "DR" and inInstance) and "OTHER" or myRole
+    local effectiveRole = myRole
     local delay = 0
     if effectiveRole == "BDR" then
         delay = 5

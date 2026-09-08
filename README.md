@@ -27,6 +27,10 @@ The addon itself. This is the folder you drop into `World of Warcraft/_classic_/
 | `Libs/` | Embedded libraries (Ace3, LibDeflate, ChatThrottleLib) |
 | `GuildCrafts*.toc` | Addon metadata and load order (one per game version) |
 
+Member identities use a canonical `Name-Realm` key. Connected-realm display
+punctuation is normalized consistently across roster data, addon messages,
+saved data, and election state; existing entries are merged on first access.
+
 ### `spec/`
 
 Design documents and planning files. Not part of the addon — these are reference material for development.

@@ -191,10 +191,12 @@ isolates data when a player moves between guilds or across realms.
 moves any legacy flat member entries (written by addon versions prior to
 guild partitioning) into the current partition.
 
-**Realmless key cleanup:** `MergeRealmlessKeys` runs once per login to find
-member keys stored without a realm suffix (a bug in early versions) and
-either renames them or merges them into the canonical `Name-Realm` entry,
-keeping whichever has the more recent `lastUpdate`.
+**Canonical member-key migration:** `MergeRealmlessKeys` runs on first access
+to the current guild partition to normalize display-realm punctuation and
+missing realm suffixes, then either renames keys or merges them into the
+canonical `Name-Realm` entry, keeping the newer `lastUpdate`. Newer tombstones
+remain authoritative during the merge. The same canonical form is used for
+roster keys, AceComm senders, sync vectors, and member favorites.
 
 ---
 

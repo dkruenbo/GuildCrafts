@@ -28,7 +28,7 @@
    ---
 
    ## Alt Handling
-   Each character is tracked as a **separate entry** keyed by `CharacterName-Realm`. If a player has multiple characters in the same guild, each appears independently in the member list. No alt-linking is performed.
+   Each character is tracked as a **separate entry** keyed by a canonical `CharacterName-Realm` value. Connected-realm display spaces, hyphens, and apostrophes are normalized consistently across roster data, addon messages, and SavedVariables. If a player has multiple characters in the same guild, each appears independently in the member list. No alt-linking is performed.
 
    ---
 
@@ -49,7 +49,7 @@
 
    ### DR / BDR Election
    - All online addon users participate in an automatic election on the hidden guild addon channel.
-   - **Election criteria** (deterministic, no negotiation needed): the addon user whose character name is **lexicographically lowest** among currently online addon users becomes the **DR**. The second-lowest becomes the **BDR**.
+   - **Election criteria** (deterministic, no negotiation needed): the canonical addon user key that is **lexicographically lowest** among currently known addon users becomes the **DR**. The second-lowest becomes the **BDR**.
    - Election runs on login, on logout detection (via `GUILD_ROSTER_UPDATE` / periodic heartbeat), and when the current DR goes silent.
    - Every addon user tracks who the current DR and BDR are locally — no central state.
 
@@ -59,6 +59,7 @@
    - The DR sends its `SYNC_RESPONSE` via **addon WHISPER** (targeted to the requester, completely invisible — no chat text appears) rather than broadcasting over GUILD. This avoids forcing every online addon user to download data they already have.
    - If the requester does not receive a response within **30 seconds** (`SYNC_TIMEOUT`), it broadcasts a **second `SYNC_REQUEST`** with `retry = 1`. Both the **DR and BDR** are eligible to respond to retry 1. (The BDR cannot directly observe the DR's WHISPER-based responses, so the requester's retry is the failure signal.)
    - If neither DR nor BDR responds after a further **15 seconds** (`SYNC_RETRY_TIMEOUT`), the requester broadcasts a third `SYNC_REQUEST` with `retry = 2`. All nodes (including the requester) **evict the unresponsive DR and BDR** from their `addonUsers` table and run `RecomputeElection()`. Only the **newly elected DR** responds — preventing a flood where every online node would answer simultaneously.
+   - A client inside an instance does not answer `!gc` queries. GUILD addon messages cannot reliably cross instance boundaries, so an instanced client cannot safely participate in the responder election. If every addon user is instanced, the query may receive no answer until one returns to the open world.
 
    ### Sync Rules
 

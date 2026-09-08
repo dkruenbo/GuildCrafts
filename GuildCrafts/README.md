@@ -30,9 +30,10 @@ Supports multiple Classic versions via multi-TOC:
 - **Minimap button** — toggle with `/gc minimap`; drag to reposition
 - **Whisper a crafter** — `[W]` button opens a whisper to the crafter (or shows a picker for multiple)
 - **Post crafters to guild chat** — `[G]` button posts the crafter list to guild chat with a 30-second cooldown
-- **`!gc <query>` chat command** — any guild member can type `!gc <recipe>` in guild chat for a crafter list reply; DR responds immediately, BDR after 5 s, others after 12 s
+- **`!gc <query>` chat command** — any guild member can type `!gc <recipe>` in guild chat for a crafter list reply; only a client that can safely participate in the current GUILD-channel election responds
 - **Delta broadcasts** — learning a new recipe immediately notifies all online addon users
-- **Sync pause policy** — suspends outgoing sync during combat, instances, and zone transitions
+- **Sync pause policy** — suspends bulk sync during combat, instances, and zone transitions while allowing tiny election-signaling messages through
+- **Canonical connected-realm identity** — normalizes realm spellings across roster data, addon messages, saved recipes, favorites, and DR/BDR election state
 
 ## Tracked Professions
 
@@ -68,7 +69,7 @@ The WoW client automatically loads the correct TOC file for your game version.
 
 1. **Open any profession window** — the addon scans all recipes and stores them locally
 2. **On login** — broadcasts `HELLO` to discover other addon users, then syncs
-3. **Designated Router (DR)** — the lexicographically first addon user handles sync requests. Backup DR (BDR) takes over if the DR is unresponsive or instanced
+3. **Designated Router (DR)** — the lexicographically first canonical addon user handles sync requests. Backup DR (BDR) takes over if the DR is unresponsive; clients inside instances do not answer `!gc` because they cannot reliably see GUILD addon traffic from the outside
 4. **Delta updates** — new recipes broadcast immediately; lightweight `DELTA_AD` advertisements trigger targeted pulls from peers who are behind
 5. **Term-numbered authority** — monotone term counter prevents split-brain; stale messages are silently dropped
 
@@ -113,6 +114,7 @@ All libraries are embedded — no external dependencies needed.
 - Recipe scanning requires the profession window to be open
 - Enchanting recipes use negative spellID keys (since they don't produce items)
 - Each character is tracked independently (no alt-linking)
+- `!gc` may receive no automatic answer while every addon user is inside an instance; this is intentional to prevent duplicate guild-chat replies
 
 ## Development
 

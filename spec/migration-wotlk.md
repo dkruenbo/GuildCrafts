@@ -1,7 +1,9 @@
         # GuildCrafts — WotLK Classic Migration Guide
 
+        > **Status:** Historical implementation plan. WotLK support shipped in the 2.0.0 multi-expansion release and is maintained on `main`; the former `wotlk-migration` branch is retired.
+
         > Target: WotLK Classic (interface version `30403`, patch 3.4.3)
-        > Current: TBC Classic (interface version `20505`)
+        > Current at the time of writing: TBC Classic (interface version `20505`)
 
         This document is a complete, ordered task list. Each item includes the exact file, line reference, and the code change required. No investigation needed — start at Task 1 and work down.
 

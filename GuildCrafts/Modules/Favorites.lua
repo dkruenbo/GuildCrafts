@@ -19,6 +19,21 @@ function Favorites:OnInitialize()
     GuildCraftsCharDB = GuildCraftsCharDB or {}
     GuildCraftsCharDB.favoriteRecipes = GuildCraftsCharDB.favoriteRecipes or {} -- [recipeKey] = true
     GuildCraftsCharDB.favoriteMembers = GuildCraftsCharDB.favoriteMembers or {} -- [memberKey] = true
+
+    -- Collect keys first: assigning a new field during pairs() traversal is
+    -- undefined behavior in Lua.
+    local favorites = GuildCraftsCharDB.favoriteMembers
+    local remap = {}
+    for memberKey, favorite in pairs(favorites) do
+        local canonical = GuildCrafts.Data:NormalizeMemberKey(memberKey)
+        if canonical and canonical ~= memberKey then
+            remap[#remap + 1] = { old = memberKey, canonical = canonical, favorite = favorite }
+        end
+    end
+    for _, m in ipairs(remap) do
+        favorites[m.canonical] = favorites[m.canonical] or m.favorite
+        favorites[m.old] = nil
+    end
 end
 
 ----------------------------------------------------------------------
@@ -47,6 +62,8 @@ end
 
 --- Toggle a member's favorite state. Returns the new state.
 function Favorites:ToggleMember(memberKey)
+    memberKey = GuildCrafts.Data:NormalizeMemberKey(memberKey)
+    if not memberKey then return false end
     local db = GuildCraftsCharDB.favoriteMembers
     if db[memberKey] then
         db[memberKey] = nil
@@ -58,6 +75,8 @@ function Favorites:ToggleMember(memberKey)
 end
 
 function Favorites:IsMemberFavorite(memberKey)
+    memberKey = GuildCrafts.Data:NormalizeMemberKey(memberKey)
+    if not memberKey then return false end
     return GuildCraftsCharDB.favoriteMembers[memberKey] == true
 end
 
