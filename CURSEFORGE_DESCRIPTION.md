@@ -1,4 +1,4 @@
-> **GuildCrafts is now considered feature-complete. Only critical fixes may be addressed going forward.**
+> **GuildCrafts is no longer actively maintained. Version 2.0.2 is the final release from the original maintainer. The project remains available for community forks and adoption.**
 
 # GuildCrafts — Guild Profession Tracker for WoW Classic
 
@@ -193,7 +193,11 @@ user is instanced, the query may wait until someone is back in the open world.
 
 ## Project Status
 
-GuildCrafts has reached its original scope and is stable. Critical fixes will still be addressed. Contributions and new maintainers are welcome.
+GuildCrafts is no longer actively maintained by the original developer. The
+final release is **2.0.2**. The project remains available as-is for anyone who
+wants to fork it, adopt maintenance, or continue development with an active
+Classic test environment. If you are interested in maintaining GuildCrafts,
+please contact me through the CurseForge project page.
 
 ***
 
