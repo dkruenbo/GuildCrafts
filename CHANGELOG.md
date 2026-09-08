@@ -4,9 +4,10 @@
 
   ### Fixes
 
-  - **Connected-realm duplicate responders** — member identities now use one canonical `Name-Realm` format across player keys, guild roster entries, AceComm senders, election state, sync payloads, and saved data. Realm spaces, hyphens, and apostrophes are normalized so the same character cannot appear as multiple addon users and independently become DR.
+  - **Connected-realm duplicate responders** — member identities now use one canonical `Name-Realm` format across player keys, guild roster entries, AceComm senders, election state, sync payloads, and saved data. Realm spaces, hyphens, and apostrophes are normalized so the same character cannot appear as multiple addon users and independently become DR. Thanks to Kaedros for identifying the realm-key mismatch and pointing to the proven approach used in Recipe Registry.
   - **SavedVariables key migration** — existing display-realm keys are merged into their canonical entries without discarding newer profession data or tombstones. Member favorites and incoming version vectors are migrated too.
   - **In-instance `!gc` responses** — clients inside raids, dungeons, battlegrounds, or arenas no longer answer `!gc` queries because GUILD addon traffic cannot reliably cross those boundaries. This prevents isolated clients from responding simultaneously.
+
 
   ## 2.0.1 — 2026-09-03
 
